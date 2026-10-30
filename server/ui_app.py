@@ -181,6 +181,12 @@ def _get_app_config():
         "allowed_document_types": [".pdf", ".docx", ".doc", ".txt", ".csv", ".xlsx", ".xls", ".json", ".md"]
     }
 
+@app.get("/healthz", include_in_schema=False)
+@app.get("/health", include_in_schema=False)
+def health_check():
+    return {"status": "ok"}
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon_endpoint():
     p = os.path.join(STATIC_DIR, "favicon.ico")
