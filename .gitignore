@@ -1,0 +1,42 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.class
+*.pyc
+
+# Local databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Sensitive environment & credentials (NEVER commit to GitHub)
+.env
+.env.*
+!.env.example
+client_secret*.json
+*client_secret*.json
+gdrive_service_account*.json
+*service_account*.json
+gdrive_oauth_token*.json
+*oauth_token*.json
+*credentials*.json
+token*.json
+*.secret
+
+# Nexus-AI separate desktop project (saves ~270MB)
+nexus-ai/
+
+# Diagnostic test scripts & test images
+check_*.py
+test_*.py
+find_*.py
+apply_*.py
+verify_*.py
+*.png
+scratch/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+backup_*
