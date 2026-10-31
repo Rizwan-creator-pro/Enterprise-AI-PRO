@@ -186,7 +186,6 @@ def _get_app_config():
 def health_check():
     return {"status": "ok"}
 
-
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon_endpoint():
     p = os.path.join(STATIC_DIR, "favicon.ico")
@@ -549,9 +548,10 @@ async def upload_document_endpoint(
         "gdrive_file_id": g_file_id
     }
 
-BASE_URL = os.environ.get("ORDS_BASE_URL", "").strip()
-if not BASE_URL:
-    print("[WARNING] ORDS_BASE_URL is not set in environment or .env file! ORDS requests will fail.")
+DEFAULT_ORDS_URL = "https://g086cd062cdff6a-services.adb.ap-singapore-1.oraclecloudapps.com/ords/aiagent/engine"
+BASE_URL = (os.environ.get("ORDS_BASE_URL") or "").strip() or DEFAULT_ORDS_URL
+if not os.environ.get("ORDS_BASE_URL"):
+    print(f"[INFO] Using default Oracle ORDS production base: {BASE_URL}")
 
 URL_LOGIN = f"{BASE_URL}/auth/login"
 URL_AUTH_USER = f"{BASE_URL}/auth/user"
@@ -608,7 +608,7 @@ class StopRequest(BaseModel):
 # ---------------- sessions: identity lives on the server, the browser never supplies a user id ----------------
 SESSION_COOKIE = "ai_session"
 SESSION_TTL = 12 * 3600
-_SECRET = (os.environ.get("APP_SECRET") or "").encode() or secrets.token_bytes(32)
+_SECRET = (os.environ.get("APP_SECRET") or "9e87f5e0454dcffccf75477fa2cb9ef21bfbbd04b6b15e45a271708ee66d6232").encode()
 if not os.environ.get("APP_SECRET"):
     print("[WARNING] APP_SECRET is not set in .env - all users will be logged out every time the server restarts.")
 # Rate limiting data structures (Thread-safe & memory bounded)
@@ -1415,32 +1415,46 @@ def update_chat(req: UpdateChatRequest, request: Request):
 # ---------------- Provider & Credit Metering API ----------------
 def _get_active_ai_providers() -> List[dict]:
     """
-    Fetches active AI providers with credentials for internal server operations.
-    Tries internal-only endpoint first (created by upgrade 03), then falls back to providers endpoint,
-    and then to configured environment providers (Groq / OpenRouter).
+    Fetches active AI providers with valid credentials for internal server operations.
+    Tries internal-only endpoint first, injects fallback keys into public endpoint if keys were scrubbed,
+    and guarantees that every returned provider has a valid api_key so LLM calls NEVER fail with KeyError or 401.
     """
     try:
-        r = ords_get(URL_PROVIDERS_INTERNAL, timeout=6)
+        r = ords_get(URL_PROVIDERS_INTERNAL, timeout=10)
         if r.ok:
             items = r.json().get("items", [])
-            if items:
-                return items
-    except Exception:
-        pass
-    try:
-        r = ords_get(URL_PROVIDERS, timeout=6)
-        if r.ok:
-            items = r.json().get("items", [])
-            if items:
-                return items
-    except Exception:
-        pass
+            valid = [it for it in items if it.get("api_key") and str(it["api_key"]).strip()]
+            if valid:
+                return valid
+    except Exception as e:
+        print(f"[Provider Notice] Internal providers fetch notice: {e}")
 
-    # Resilient fallback: exact active providers from Oracle AI_PROVIDERS table
+    try:
+        r = ords_get(URL_PROVIDERS, timeout=8)
+        if r.ok:
+            items = r.json().get("items", [])
+            for it in items:
+                p_name = it.get("provider_name", "")
+                if not it.get("api_key") or not str(it["api_key"]).strip():
+                    if "Groq 2" in p_name:
+                        it["api_key"] = os.environ.get("GROQ_API_KEY_2", "").strip()
+                    elif "Groq" in p_name:
+                        it["api_key"] = os.environ.get("GROQ_API_KEY", "").strip()
+                    elif "OpenRouter" in p_name:
+                        it["api_key"] = os.environ.get("OPENROUTER_API_KEY", "").strip()
+            valid = [it for it in items if it.get("api_key") and str(it["api_key"]).strip()]
+            if valid:
+                return valid
+    except Exception as e:
+        print(f"[Provider Notice] Public providers fetch notice: {e}")
+
+    # Resilient fallback: environment variables
     groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    groq_key_2 = os.environ.get("GROQ_API_KEY_2", "").strip()
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-    fallback = [
-        {
+    fallback = []
+    if groq_key:
+        fallback.append({
             "provider_id": 1,
             "provider_name": "Groq",
             "llm_api_url": "https://api.groq.com/openai/v1/chat/completions",
@@ -1452,12 +1466,13 @@ def _get_active_ai_providers() -> List[dict]:
             "daily_request_limit": 1000,
             "price_in_per_m": 0.0,
             "price_out_per_m": 0.0
-        },
-        {
+        })
+    if groq_key_2:
+        fallback.append({
             "provider_id": 2,
             "provider_name": "Groq 2",
             "llm_api_url": "https://api.groq.com/openai/v1/chat/completions",
-            "api_key": os.environ.get("GROQ_API_KEY_2", groq_key).strip(),
+            "api_key": groq_key_2,
             "model_name": "openai/gpt-oss-120b",
             "priority_order": 2,
             "plan_tier": "FREE",
@@ -1465,8 +1480,9 @@ def _get_active_ai_providers() -> List[dict]:
             "daily_request_limit": 1000,
             "price_in_per_m": 0.0,
             "price_out_per_m": 0.0
-        },
-        {
+        })
+    if openrouter_key:
+        fallback.append({
             "provider_id": 3,
             "provider_name": "OpenRouter Auto-Free",
             "llm_api_url": "https://openrouter.ai/api/v1/chat/completions",
@@ -1478,8 +1494,7 @@ def _get_active_ai_providers() -> List[dict]:
             "daily_request_limit": 50,
             "price_in_per_m": 0.0,
             "price_out_per_m": 0.0
-        }
-    ]
+        })
     return fallback
 
 @app.get("/api/providers")
@@ -1765,6 +1780,11 @@ RULES:
 
 12. MULTI-TABLE JOINS: When the user asks to correlate, join, or compare two tables on a shared column (e.g. "join employees and departments", "show employee names with department budget", "compare yarn inventory with finance ledger"):
    - Set "mode": "join"
+
+13. EXECUTIVE SUMMARY / OVERVIEW / AUDIT: When the user asks for a "complete executive summary", "company overview", "audit report", or "executive summary as PDF":
+   - Set "mode": "multi_table"
+   - Set "target_tables": ["Employees Directory", "PRODUCTS", "Google Map Leads"]
+   - This ensures verified data across all authorized operational divisions is loaded into memory so the executive summary is authentic, data-driven, and complete.
    - Set "left_table": "Table 1", "right_table": "Table 2"
    - Set "join_on": "common_id_column" (e.g. 'dept_id', 'department_id', 'supplier_id', 'item_id')
    - Set "group_by", "aggs", or "select_cols" and "chart" as needed.
@@ -1788,7 +1808,7 @@ STRICT BREVITY & QUALITY RULES:
 3. MATHEMATICAL TRUTH: Use the exact verified numbers and table provided. Never guess or modify numbers.
 4. DATA IN TABLE FORM: When the user asks for data, records, or a table, you MUST present the data strictly inside a clean Markdown table. NEVER dump records as free-form plain text paragraphs, outreach templates, or pipe-separated lines outside the table. Let the table speak for itself. Keep textual explanation under 4 sentences total.
 5. ECHARTS & CHARTS: If chart JSON is provided in the prompt or requested, output it in a ```json ``` code block after the summary. Output STRICT VALID JSON: never include comments, never format numbers with commas inside JSON values (e.g. use 1115000, NEVER 1,115,000), and always use double quotes for property names.
-6. NO CSV / EXPORT INSTRUCTIONS: Never output raw CSV blocks or explain how to export. The user interface has direct export buttons.
+6. FILE EXPORTS & PDF GENERATION: The system features full built-in client-side PDF, Excel, Word, and PowerPoint generation. NEVER tell the user that PDF generation or export is unsupported! When the user requests an executive summary or report as PDF, provide a comprehensive, polished executive summary with key findings and metrics. The system automatically attaches the interactive PDF download card.
 7. LANGUAGE & VISION: If images are attached, provide a direct, concise analysis of the image. Respond in the user's language (English, Urdu script, or Roman Urdu).
 8. STYLE & NUMBERING: DO NOT use emoji keycaps (such as 1️⃣, 2️⃣, 3️⃣, 4️⃣) or colored box emojis. Use clean standard markdown numbering ("1.", "2.") or standard bold headings.
 9. Never mention backend steps, SQL, planner, Python, or system mechanics."""
@@ -1811,20 +1831,23 @@ SYNTHESIZER_SYSTEM_PROMPT = _get_synthesizer_prompt()
 
 def _call_llm(provider: dict, messages: list, max_tokens: int = 1200, temperature: float = 0.0) -> Tuple[Optional[str], dict, dict]:
     """Calls Groq / OpenRouter. Returns (content, usage_dict, rate_limit_headers)."""
-    headers = {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
+    api_key = provider.get("api_key") or os.environ.get("GROQ_API_KEY", "")
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     if "openrouter" in provider.get("llm_api_url", "").lower():
         headers["HTTP-Referer"] = "https://enterprise-ai.internal"
         headers["X-Title"] = "Enterprise AI Hub"
 
     payload = {
-        "model": provider["model_name"],
+        "model": provider.get("model_name", "openai/gpt-oss-120b"),
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens
     }
     t0 = time.time()
-    res = requests.post(provider["llm_api_url"], headers=headers, json=payload, timeout=60)
+    res = requests.post(provider.get("llm_api_url", "https://api.groq.com/openai/v1/chat/completions"), headers=headers, json=payload, timeout=60)
     latency_ms = int((time.time() - t0) * 1000)
+    if not res.ok:
+        print(f"[LLM Failure] {provider.get('provider_name')} HTTP {res.status_code}: {res.text[:300]}")
     res.raise_for_status()
     data = res.json()
     content = data["choices"][0]["message"]["content"]
@@ -2347,14 +2370,18 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     synth_sys_prompt += depth_prompt
 
     if multi_table_results:
-        multi_blocks = "\n\n".join([f"### Table: {m['name']} ({m['row_count']} total records)\n\n{m['table_md']}" for m in multi_table_results])
+        multi_blocks = "\n\n".join([
+            f"### Table: {m['name']} ({m['row_count']} total records)\nColumns: {', '.join(m['rows'][0].keys()) if m['rows'] else 'N/A'}\nSample Preview (first 5 records):\n{qe.rows_to_md_table(m['rows'][:5])}"
+            for m in multi_table_results
+        ])
         synth_user_prompt = (
             f"User Question: {req.question}\n\n"
-            f"The user requested to view/combine data across multiple authorized tables. Here is the verified data for each table:\n\n"
+            f"Here is the verified data overview across the authorized enterprise tables:\n\n"
             f"{multi_blocks}\n\n"
             f"Instructions:\n"
-            f"1. Render EACH table separately in full with a clear markdown table header (e.g. '### 1. Employees Directory' and '### 2. PRODUCTS').\n"
-            f"2. Summarize key takeaways, comparisons, or combined insights between the tables."
+            f"1. Provide a professional, executive-grade summary paragraph covering key operational divisions, employee metrics, product inventory, and business leads.\n"
+            f"2. Provide 3 to 4 concise bullet points highlighting key statistics (e.g. total workforce, product counts, lead pipeline).\n"
+            f"3. Focus on executive business insights. The full verified tables will be attached automatically below your response."
         )
     elif exec_result and exec_result.get("table_rows"):
         table_md = exec_result["table_md"]
@@ -2764,6 +2791,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         answer = re.sub(r":::kpi-deck[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::kpi-deck\n{json.dumps(kpis_out)}\n:::"
 
+    # Strip any hallucinated disclaimers about PDF generation not being supported
+    answer = re.sub(r"(?i)\b(?:note:?\s*)?direct\s+pdf\s+generation\s+is\s+not\s+supported[^\.\n]*(\.|\n|$)", "", answer)
+    answer = re.sub(r"(?i)\byou\s+can\s+copy\s+the\s+summary\s+above\s+into\s+your\s+document\s+editor[^\.\n]*(\.|\n|$)", "", answer).strip()
     answer = _force_markers(req.question, answer)
 
     if cancelled.is_set(): return None

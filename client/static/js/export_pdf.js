@@ -212,63 +212,68 @@ async function buildPDF(data, title, summary = '', charts = []) {
     };
 
     let page = 0;
-    doc.autoTable({
-        head: [cleanHead],
-        body: cleanBody,
-        startY,
-        tableWidth: availableWidth,
-        columnStyles,
-        margin: { top: 15, left: marginSide, right: marginSide, bottom: 10 },
-        styles: {
-            fontSize: tableFontSize,
-            cellPadding: pad,
-            lineWidth: 0.2,
-            lineColor: [0, 128, 191],
-            textColor: 20,
-            overflow: 'linebreak',
-            valign: 'middle'
-        },
-        headStyles: {
-            fillColor: [223, 255, 255],
-            textColor: 0,
-            fontStyle: 'bold',
-            halign: 'center',
-            fontSize: tableFontSize + 0.5
-        },
-        didParseCell(d) {
-            const raw = d.cell.raw && d.cell.raw.content !== undefined ? d.cell.raw.content : d.cell.raw;
-            const t = String(raw ?? '');
-            if (hasComplex(t)) {
-                const im = textImg(t, d.cell.styles.fontSize, d.section === 'head');
-                const w = Math.min(im.w, 60), h = im.h * w / im.w;
-                d.cell._img = { im, w, h };
-                d.cell.text = [''];
-                d.cell.styles.minCellHeight = h + 2 * pad;
-                d.cell.styles.minCellWidth = w + 2 * pad;
-                return;
-            }
-            if (AR !== 'helvetica' && hasArabic(t)) {
-                d.cell.styles.font = AR;
-                if (!d.cell.styles.halign || d.cell.styles.halign === 'left') d.cell.styles.halign = 'right';
-                doc.setFont(AR, 'normal');
-                doc.setFontSize(d.cell.styles.fontSize);
-                const tw = Math.max(...t.split('\n').map(l => doc.getTextWidth(l.replace(/\s+/g, ' ').trim())));
-                const need = tw * 1.03 + 2 * pad + 0.3;
-                if (need <= 55) {
-                    d.cell.styles.overflow = 'visible';
-                    d.cell.styles.minCellWidth = Math.max(d.cell.styles.minCellWidth || 0, need);
+    if (cleanHead.length > 0 && cleanBody.length > 0) {
+        doc.autoTable({
+            head: [cleanHead],
+            body: cleanBody,
+            startY,
+            tableWidth: availableWidth,
+            columnStyles,
+            margin: { top: 15, left: marginSide, right: marginSide, bottom: 10 },
+            styles: {
+                fontSize: tableFontSize,
+                cellPadding: pad,
+                lineWidth: 0.2,
+                lineColor: [0, 128, 191],
+                textColor: 20,
+                overflow: 'linebreak',
+                valign: 'middle'
+            },
+            headStyles: {
+                fillColor: [223, 255, 255],
+                textColor: 0,
+                fontStyle: 'bold',
+                halign: 'center',
+                fontSize: tableFontSize + 0.5
+            },
+            didParseCell(d) {
+                const raw = d.cell.raw && d.cell.raw.content !== undefined ? d.cell.raw.content : d.cell.raw;
+                const t = String(raw ?? '');
+                if (hasComplex(t)) {
+                    const im = textImg(t, d.cell.styles.fontSize, d.section === 'head');
+                    const w = Math.min(im.w, 60), h = im.h * w / im.w;
+                    d.cell._img = { im, w, h };
+                    d.cell.text = [''];
+                    d.cell.styles.minCellHeight = h + 2 * pad;
+                    d.cell.styles.minCellWidth = w + 2 * pad;
+                    return;
                 }
+                if (AR !== 'helvetica' && hasArabic(t)) {
+                    d.cell.styles.font = AR;
+                    if (!d.cell.styles.halign || d.cell.styles.halign === 'left') d.cell.styles.halign = 'right';
+                    doc.setFont(AR, 'normal');
+                    doc.setFontSize(d.cell.styles.fontSize);
+                    const tw = Math.max(...t.split('\n').map(l => doc.getTextWidth(l.replace(/\s+/g, ' ').trim())));
+                    const need = tw * 1.03 + 2 * pad + 0.3;
+                    if (need <= 55) {
+                        d.cell.styles.overflow = 'visible';
+                        d.cell.styles.minCellWidth = Math.max(d.cell.styles.minCellWidth || 0, need);
+                    }
+                }
+            },
+            didDrawCell(d) {
+                const g = d.cell._img;
+                if (g) doc.addImage(g.im.url, 'PNG', d.cell.x + pad, d.cell.y + (d.cell.height - g.h) / 2, g.w, g.h);
+            },
+            didDrawPage() {
+                page++;
+                frame(page);
             }
-        },
-        didDrawCell(d) {
-            const g = d.cell._img;
-            if (g) doc.addImage(g.im.url, 'PNG', d.cell.x + pad, d.cell.y + (d.cell.height - g.h) / 2, g.w, g.h);
-        },
-        didDrawPage() {
-            page++;
-            frame(page);
-        }
-    });
+        });
+    } else {
+        page++;
+        frame(page);
+    }
 
     if (extraTables && extraTables.length > 0) {
         for (const tbl of extraTables) {

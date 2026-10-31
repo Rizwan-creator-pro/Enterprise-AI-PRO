@@ -7186,9 +7186,9 @@ const skeletonHTML = () => `
 
         // File request: AI summary stays visible, table is hidden, one card per file (Open ▾ + Download), plus "Download all (ZIP)" when 2+ files.
         function addFileCards(box, kinds, summary) {
-            const data = readAllTables(box);
-            if (!data) return;
-            const title = titleFor(box);
+            const rawData = readAllTables(box);
+            const data = rawData || { head: [], body: [], extra_tables: [] };
+            const title = titleFor(box) || 'Executive Report';
             // Keep table block visible so user can preview and access 3-dot options
             const tag = box.querySelector('.provider-tag');
             const nCharts = box.querySelectorAll('.echarts-container').length;
@@ -7208,9 +7208,15 @@ const skeletonHTML = () => `
                     </div>`;
                 card.querySelector('b').textContent = fileBase(title) + '.' + K.ext;
                 const totalRows = (data.body ? data.body.length : 0) + (data.extra_tables ? data.extra_tables.reduce((acc, et) => acc + (et.body ? et.body.length : 0), 0) : 0);
-                const totalTables = 1 + (data.extra_tables ? data.extra_tables.length : 0);
-                const tableInfo = totalTables > 1 ? ` · ${totalTables} tables` : '';
-                card.querySelector('.fc-meta span').textContent = `${K.label} · ${totalRows} rows${tableInfo}` + (nCharts ? ` · ${nCharts} ${nCharts === 1 ? 'chart' : 'charts'}` : '');
+                const totalTables = (data.head && data.head.length ? 1 : 0) + (data.extra_tables ? data.extra_tables.length : 0);
+                let metaDesc = '';
+                if (totalRows > 0) {
+                    const tableInfo = totalTables > 1 ? ` · ${totalTables} tables` : '';
+                    metaDesc = `${K.label} · ${totalRows} rows${tableInfo}` + (nCharts ? ` · ${nCharts} ${nCharts === 1 ? 'chart' : 'charts'}` : '');
+                } else {
+                    metaDesc = `${K.label} · Executive Document Report` + (nCharts ? ` · ${nCharts} ${nCharts === 1 ? 'chart' : 'charts'}` : '');
+                }
+                card.querySelector('.fc-meta span').textContent = metaDesc;
                 const menu = card.querySelector('.pop');
                 OPEN_WITH[kind].forEach(([label, icon, url]) => {
                     const it = document.createElement('div'); it.className = 'pop-item';
