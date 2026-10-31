@@ -1413,18 +1413,28 @@ def update_chat(req: UpdateChatRequest, request: Request):
     return {"status": "success"}
 
 # ---------------- Provider & Credit Metering API ----------------
+_cached_providers: List[dict] = []
+_cached_providers_time: float = 0.0
+
 def _get_active_ai_providers() -> List[dict]:
     """
     Fetches active AI providers with valid credentials for internal server operations.
     Tries internal-only endpoint first, injects fallback keys into public endpoint if keys were scrubbed,
     and guarantees that every returned provider has a valid api_key so LLM calls NEVER fail with KeyError or 401.
+    Caches valid providers in memory for 5 minutes for resilience against transient ORDS latency spikes.
     """
+    global _cached_providers, _cached_providers_time
+    now = time.time()
+    if _cached_providers and (now - _cached_providers_time < 300):
+        return _cached_providers
     try:
         r = ords_get(URL_PROVIDERS_INTERNAL, timeout=10)
         if r.ok:
             items = r.json().get("items", [])
             valid = [it for it in items if it.get("api_key") and str(it["api_key"]).strip()]
             if valid:
+                _cached_providers = valid
+                _cached_providers_time = now
                 return valid
     except Exception as e:
         print(f"[Provider Notice] Internal providers fetch notice: {e}")
@@ -1444,9 +1454,14 @@ def _get_active_ai_providers() -> List[dict]:
                         it["api_key"] = os.environ.get("OPENROUTER_API_KEY", "").strip()
             valid = [it for it in items if it.get("api_key") and str(it["api_key"]).strip()]
             if valid:
+                _cached_providers = valid
+                _cached_providers_time = now
                 return valid
     except Exception as e:
         print(f"[Provider Notice] Public providers fetch notice: {e}")
+
+    if _cached_providers:
+        return _cached_providers
 
     # Resilient fallback: environment variables
     groq_key = os.environ.get("GROQ_API_KEY", "").strip()
@@ -2945,22 +2960,27 @@ def transcribe(request: Request, audio: UploadFile = File(...), language: str = 
     last = "No speech-to-text provider configured."
     for prov in providers:
         url = prov.get("llm_api_url", "")
-        model = "whisper-large-v3" if "groq.com" in url else "whisper-1" if "api.openai.com" in url else None
-        if not model:
+        models_to_try = ["whisper-large-v3", "whisper-large-v3-turbo"] if "groq.com" in url else ["whisper-1"] if "api.openai.com" in url else []
+        if not models_to_try:
             continue
-        data = {"model": model, "response_format": "verbose_json", "temperature": "0"}
-        if language in ("ur", "en"):
-            data["language"] = language
-        try:
-            r = requests.post(url.replace("/chat/completions", "/audio/transcriptions"),
-                              headers={"Authorization": f"Bearer {prov['api_key']}"},
-                              files={"file": (audio.filename or "voice.webm", raw, audio.content_type or "audio/webm")},
-                              data=data, timeout=60)
-            if r.ok:
-                return {"text": (r.json().get("text") or "").strip()}
-            last = f"Whisper failed ({r.status_code})"
-        except Exception as e:
-            last = f"Speech error: {e}"
+        for model in models_to_try:
+            data = {"model": model, "response_format": "verbose_json", "temperature": "0"}
+            if language in ("ur", "en"):
+                data["language"] = language
+            try:
+                r = requests.post(url.replace("/chat/completions", "/audio/transcriptions"),
+                                  headers={"Authorization": f"Bearer {prov['api_key']}"},
+                                  files={"file": (audio.filename or "voice.webm", raw, audio.content_type or "audio/webm")},
+                                  data=data, timeout=60)
+                if r.ok:
+                    txt = (r.json().get("text") or "").strip()
+                    if txt:
+                        return {"text": txt}
+                last = f"Whisper failed ({r.status_code})"
+                print(f"[Whisper Notice] {prov.get('provider_name')} ({model}) status {r.status_code}: {r.text[:200]}")
+            except Exception as e:
+                last = f"Speech error: {e}"
+                print(f"[Whisper Notice] {prov.get('provider_name')} ({model}) error: {e}")
     raise HTTPException(status_code=502, detail=last)
 
 @app.get("/api/chat/attachments/{session_id}")
