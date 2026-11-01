@@ -183,6 +183,8 @@ def _get_app_config():
 
 @app.get("/healthz", include_in_schema=False)
 @app.get("/health", include_in_schema=False)
+@app.get("/ai/healthz", include_in_schema=False)
+@app.get("/ai/health", include_in_schema=False)
 def health_check():
     return {"status": "ok"}
 
