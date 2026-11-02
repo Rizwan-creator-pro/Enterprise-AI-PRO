@@ -7534,8 +7534,16 @@ const skeletonHTML = () => `
                 fd.append('audio', blob, 'voice.' + (blob.type.includes('mp4') ? 'mp4' : 'webm'));
                 fd.append('language', VOICE_LANGS[voiceLangIdx][0]);
                 const res = await fetch('/api/transcribe', { method: 'POST', body: fd });
-                const d = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'Transcription failed.');
+                let d = {};
+                try { d = await res.json(); } catch(e) {}
+                if (!res.ok) {
+                    let msg = 'Transcription failed.';
+                    if (typeof d.detail === 'string') msg = d.detail;
+                    else if (Array.isArray(d.detail) && d.detail[0]?.msg) msg = d.detail[0].msg;
+                    else if (res.status === 504 || res.status === 502) msg = 'Server is spinning up (free tier cold-start). Please try again in 15 seconds.';
+                    else if (res.status === 401) msg = 'Your session has expired. Please refresh and sign in.';
+                    throw new Error(msg);
+                }
                 if (d.text) { const i = document.getElementById('userInput'); i.value = (i.value ? i.value + ' ' : '') + d.text; autoGrow(); i.focus(); }
                 else showError('info', 'No speech detected', 'Try again and speak a little closer to the microphone.');
             } catch (e) { showError('error', 'Voice error', e.message); }
@@ -9643,9 +9651,22 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                     })
                 });
                 if (!response.ok) {
-                    const d = await response.json().catch(() => ({}));
+                    let errMsg = 'Request failed.';
+                    try {
+                        const d = await response.json();
+                        if (typeof d.detail === 'string') errMsg = d.detail;
+                        else if (Array.isArray(d.detail) && d.detail[0]?.msg) errMsg = d.detail[0].msg;
+                    } catch(e) {
+                        if (response.status === 504 || response.status === 502) {
+                            errMsg = 'Server is spinning up (free tier cold-start). Please retry in 15 seconds.';
+                        } else if (response.status === 401) {
+                            errMsg = 'Your session has expired. Please refresh and sign in.';
+                        } else {
+                            errMsg = `Server error (${response.status}). Please retry.`;
+                        }
+                    }
                     await rollback();
-                    return showError('warning', 'AI Error', typeof d.detail === 'string' ? d.detail : 'Request failed.');
+                    return showError('warning', 'AI Error', errMsg);
                 }
                 // NDJSON stream: {"status": "..."} lines, then one {"done": true, ...}
                 const reader = response.body.getReader(), dec = new TextDecoder();
