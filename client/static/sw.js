@@ -1,5 +1,5 @@
 // Enterprise AI Hub - Service Worker for PWA
-const CACHE_NAME = 'enterprise-ai-cache-v3';
+const CACHE_NAME = 'enterprise-ai-cache-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/static/manifest.json',
@@ -35,10 +35,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch (e) {
+    return;
+  }
 
-  // API calls: Network-only (no caching of chat or auth)
-  if (url.pathname.startsWith('/api/') || event.request.method !== 'GET') {
+  // Only handle standard HTTP/HTTPS GET requests. Skip API calls and non-http schemes (e.g. chrome-extension://)
+  if (!url.protocol.startsWith('http') || event.request.method !== 'GET' || url.pathname.startsWith('/api/')) {
     return;
   }
 
@@ -49,8 +54,8 @@ self.addEventListener('fetch', (event) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+            cache.put(event.request, responseToCache).catch(() => {});
+          }).catch(() => {});
         }
         return networkResponse;
       })
