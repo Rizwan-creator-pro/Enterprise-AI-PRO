@@ -1,5 +1,5 @@
 // Enterprise AI Hub - Service Worker for PWA
-const CACHE_NAME = 'enterprise-ai-cache-v4';
+const CACHE_NAME = 'enterprise-ai-cache-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/static/manifest.json',

@@ -136,10 +136,12 @@ async def security_middleware(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
-        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net data:; "
-        "img-src 'self' data: https:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "font-src 'self' https: data:; "
+        "img-src 'self' data: blob: https:; "
+        "media-src 'self' blob: data: https:; "
+        "worker-src 'self' blob:; "
         "connect-src 'self' https:;"
     )
     if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":

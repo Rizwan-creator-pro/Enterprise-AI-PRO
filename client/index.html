@@ -51,11 +51,17 @@
         .pop-backdrop {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.45);
-            z-index: 99990;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 99980;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s ease;
+        }
+        #appLayout .input-wrapper.menu-open,
+        #appLayout .input-wrapper:has(.pop.open),
+        #appLayout .composer:has(.pop.open) {
+            z-index: 99995 !important;
+            position: relative !important;
         }
         .pop-backdrop.show {
             opacity: 1;
@@ -132,15 +138,15 @@
 
         /* Gemini black theme: cosmic radial glow centered on new chat */
         html[data-theme="dark"] .main-content.empty-chat {
-            background-color: #131314;
-            background-image: radial-gradient(ellipse 75% 60% at 50% 45%, rgba(26, 45, 100, 0.32) 0%, rgba(18, 25, 55, 0.14) 48%, rgba(19, 19, 20, 0) 80%) !important;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
+            background-color: #131314 !important;
+            background-image: radial-gradient(ellipse 72% 58% at 50% 46%, rgba(24, 80, 205, 0.58) 0%, rgba(18, 56, 155, 0.32) 34%, rgba(13, 32, 95, 0.12) 58%, rgba(19, 19, 20, 0) 78%) !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
         }
         html[data-theme="dark"] #bootSkel .bk-app .main-content {
-            background-color: #131314;
-            background-image: radial-gradient(ellipse 75% 60% at 50% 45%, rgba(26, 45, 100, 0.32) 0%, rgba(18, 25, 55, 0.14) 48%, rgba(19, 19, 20, 0) 80%) !important;
-            background-repeat: no-repeat;
+            background-color: #131314 !important;
+            background-image: radial-gradient(ellipse 72% 58% at 50% 46%, rgba(24, 80, 205, 0.58) 0%, rgba(18, 56, 155, 0.32) 34%, rgba(13, 32, 95, 0.12) 58%, rgba(19, 19, 20, 0) 78%) !important;
+            background-repeat: no-repeat !important;
         }
 
         html[data-theme="light"] .main-content.empty-chat {
@@ -268,6 +274,28 @@
             line-height: 1.14 !important;
         }
         html[data-theme="dark"] .empty-state h2 {
+            color: #ffffff !important;
+            font-family: var(--font-body) !important;
+            font-weight: 500 !important;
+            letter-spacing: -0.015em !important;
+        }
+        html[data-theme="dark"] .es-logo {
+            background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            display: inline-block !important;
+        }
+        html[data-theme="dark"] .ai-text,
+        html[data-theme="dark"] .user-text,
+        html[data-theme="dark"] .composer textarea,
+        html[data-theme="dark"] .ai-text p,
+        html[data-theme="dark"] .ai-text li,
+        html[data-theme="dark"] .ai-text strong,
+        html[data-theme="dark"] .ai-text h1,
+        html[data-theme="dark"] .ai-text h2,
+        html[data-theme="dark"] .ai-text h3,
+        html[data-theme="dark"] .ai-text h4,
+        html[data-theme="dark"] .chat-container {
             color: #ffffff !important;
         }
         html[data-theme="light"] .empty-state h2 {
@@ -2405,7 +2433,8 @@
         .smc-idx-chg.neg { color: #ef4444; }
 
         /* ================= Modern Elevative Theme: Web Intelligence Citation Card ================= */
-        .web-intelligence-card {
+        .web-intelligence-card { display: none !important; }
+        .web-intelligence-card-old {
             margin: 16px 0 14px 0;
             width: 100%;
             max-width: 720px;
@@ -4043,13 +4072,11 @@
             font-weight: 700;
             font-size: 15.5px;
             color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: block !important;
             letter-spacing: -0.01em;
-            word-break: normal;
-            overflow-wrap: break-word;
-            white-space: normal;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
         }
         .cq-sub {
             font-size: 13.5px;
@@ -4402,7 +4429,7 @@
                 align-items: center !important;
                 gap: 5px !important;
                 overflow-x: auto !important;
-                overflow-y: hidden !important;
+                overflow-y: visible !important;
                 white-space: nowrap !important;
                 scrollbar-width: none !important;
                 -ms-overflow-style: none !important;
@@ -4495,6 +4522,60 @@
                 width: 30px !important;
                 height: 30px !important;
                 font-size: 13px !important;
+            }
+        }
+
+    
+        /* Live Cards Responsiveness & Anti-Squash rules */
+        .smc-title, .gw-title, .cc-title, .cq-title {
+            display: block !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
+        }
+        .smc-sub, .gw-sub, .cc-sub, .cq-sub {
+            display: block !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
+        }
+        .gw-temp-val, .gw-temp-wrap {
+            white-space: nowrap !important;
+        }
+        @media (max-width: 768px) {
+            .smc-header, .gw-header, .cc-header, .cq-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+            .smc-title-wrap, .gw-title-wrap, .cc-title-wrap, .cq-title-wrap {
+                width: 100% !important;
+                min-width: 0 !important;
+                gap: 10px !important;
+                align-items: flex-start !important;
+            }
+            .smc-titles, .gw-titles, .cc-titles, .cq-titles {
+                width: 100% !important;
+                min-width: 0 !important;
+                flex: 1 1 100% !important;
+            }
+            .smc-card-inner, .gw-card-inner, .cc-card-inner, .cq-card {
+                padding: 14px 14px !important;
+                border-radius: 18px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                gap: 12px !important;
+            }
+            .smc-source-badge, .gw-live-badge, .cc-live-badge, .cq-badge {
+                align-self: flex-start !important;
+                font-size: 11px !important;
+                padding: 4px 10px !important;
+            }
+            .chat-container {
+                padding: 16px 20px 32px 20px !important;
+                padding-left: max(20px, env(safe-area-inset-left)) !important;
+                padding-right: max(20px, env(safe-area-inset-right)) !important;
             }
         }
 
@@ -6911,6 +6992,8 @@ const skeletonHTML = () => `
         }
 
         function buildWebIntelligenceCard(intel) {
+            // User requested not to display site discovery/citation cards
+            return null;
             if (!intel || !intel.results || !intel.results.length) return null;
             const wic = document.createElement('div');
             wic.className = 'web-intelligence-card';
@@ -7332,6 +7415,8 @@ const skeletonHTML = () => `
             document.querySelectorAll('.pop.open').forEach(p => p.classList.remove('open'));
             const bd = document.getElementById('popBackdrop');
             if (bd) bd.classList.remove('show');
+            const iw = document.querySelector('#appLayout .input-wrapper');
+            if (iw) iw.classList.remove('menu-open');
             document.querySelectorAll('.tb-more').forEach(b => b.setAttribute('aria-expanded', 'false'));
             document.querySelectorAll('.table-block.has-open-menu').forEach(b => b.classList.remove('has-open-menu'));
         }
@@ -7350,7 +7435,9 @@ const skeletonHTML = () => `
                 }
                 const isComposerMenu = ['modelMenu', 'plusMenu', 'attachMenu', 'depthMenu'].includes(menuId);
                 const bd = document.getElementById('popBackdrop');
+                const iw = document.querySelector('#appLayout .input-wrapper');
                 if (bd && window.innerWidth <= 768 && isComposerMenu) bd.classList.add('show');
+                if (iw && isComposerMenu) iw.classList.add('menu-open');
             }
         }
         document.addEventListener('click', e => { if (!e.target.closest('.pop')) closeMenus(); });
@@ -8285,9 +8372,59 @@ const skeletonHTML = () => `
             b.disabled = state === 'transcribing';
             i.placeholder = state === 'recording' ? `Listening… ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  (tap ■ when done)` : state === 'transcribing' ? 'Transcribing…' : DEFAULT_PH;
         }
+        let activeSpeechRec = null;
         async function toggleVoice() {
             if (pendingCtrl || voiceBusy) return;
+            if (activeSpeechRec) {
+                try { activeSpeechRec.stop(); } catch(e) {}
+                activeSpeechRec = null;
+                setVoiceUI('idle');
+                return;
+            }
             if (rec) { rec.stop(); return; }
+
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRec) {
+                try {
+                    const sr = new SpeechRec();
+                    const langCode = (VOICE_LANGS && VOICE_LANGS[voiceLangIdx] && VOICE_LANGS[voiceLangIdx][0]) || 'en-US';
+                    sr.lang = langCode === 'ur' ? 'ur-PK' : langCode === 'en' ? 'en-US' : langCode;
+                    sr.interimResults = false;
+                    sr.maxAlternatives = 1;
+                    sr.onstart = () => {
+                        activeSpeechRec = sr;
+                        setVoiceUI('recording');
+                    };
+                    sr.onresult = (ev) => {
+                        const transcript = Array.from(ev.results).map(r => r[0].transcript).join(' ').trim();
+                        if (transcript) {
+                            const i = document.getElementById('userInput');
+                            i.value = (i.value ? i.value + ' ' : '') + transcript;
+                            autoGrow();
+                            i.focus();
+                        }
+                    };
+                    sr.onerror = (ev) => {
+                        activeSpeechRec = null;
+                        setVoiceUI('idle');
+                        if (ev.error && ev.error !== 'no-speech' && ev.error !== 'aborted') {
+                            startMediaRecorderFallback();
+                        }
+                    };
+                    sr.onend = () => {
+                        activeSpeechRec = null;
+                        setVoiceUI('idle');
+                    };
+                    sr.start();
+                    return;
+                } catch(e) {
+                    // Fall back to server media recorder
+                }
+            }
+            startMediaRecorderFallback();
+        }
+
+        async function startMediaRecorderFallback() {
             if (!navigator.mediaDevices || !window.MediaRecorder) return showError('error', 'Voice input', 'Needs a modern browser over HTTPS (or localhost).');
             let stream;
             try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
