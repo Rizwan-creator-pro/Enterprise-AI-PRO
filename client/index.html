@@ -47,6 +47,26 @@
     <script src="/static/js/export_ppt.js"></script>
 
     <style>
+        /* Pop Backdrop for mobile bottom sheets */
+        .pop-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 99990;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .pop-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .lbl-compact { display: none; }
+        @media (max-width: 640px) {
+            .lbl-full { display: none !important; }
+            .lbl-compact { display: inline !important; }
+        }
+
         :root {
             --bg-color: #f7f9fc;
             --sidebar-bg: #edf2f7;
@@ -73,22 +93,22 @@
             color-scheme: light;
         }
         html[data-theme="dark"] {
-            --bg-color: #0f1013;
-            --sidebar-bg: #141519;
-            --sidebar-hover: #1f2127;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --text-faint: #64748b;
-            --user-msg-bg: #1e2128;
+            --bg-color: #131314;
+            --sidebar-bg: #1e1f20;
+            --sidebar-hover: #282a2c;
+            --text-main: #ffffff;
+            --text-muted: #ffffff;
+            --text-faint: rgba(255, 255, 255, 0.75);
+            --user-msg-bg: #282a2c;
             --accent-blue: #8ab4f8;
             --accent-blue-hover: #aecbfa;
-            --border-color: rgba(255,255,255,0.08);
-            --surface: #18191f;
-            --surface-2: #21232a;
-            --code-bg: rgba(255,255,255,0.06);
-            --pre-bg: #14151a;
-            --shadow-color: rgba(0,0,0,.45);
-            --tk-bg1: #1f2b3d; --tk-bg2: #1a2535; --tk-border: rgba(138,180,248,.28); --tk-text: #dbe7fb;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --surface: #1e1f20;
+            --surface-2: #282a2c;
+            --code-bg: rgba(255, 255, 255, 0.06);
+            --pre-bg: #1e1f20;
+            --shadow-color: rgba(0, 0, 0, 0.55);
+            --tk-bg1: #1e2b3d; --tk-bg2: #1a2535; --tk-border: rgba(138, 180, 248, 0.28); --tk-text: #dbe7fb;
             --positive-color: #2dd4bf;
             --positive-bg: rgba(45, 212, 191, 0.12);
             --negative-color: #fb7185;
@@ -98,7 +118,7 @@
         /* Base solid backgrounds for active chat sessions (blue shadow REMOVED on active chat/scroll) */
         html[data-theme="dark"] body,
         html[data-theme="dark"] .main-content {
-            background-color: #0f1013;
+            background-color: #131314;
             background-image: none !important;
         }
         html[data-theme="dark"] .input-wrapper { background: transparent; }
@@ -110,16 +130,16 @@
         }
         html[data-theme="light"] .input-wrapper { background: transparent; }
 
-        /* Blue shadow / ambient gradient ONLY shown on new/empty chat */
+        /* Gemini black theme: cosmic radial glow centered on new chat */
         html[data-theme="dark"] .main-content.empty-chat {
-            background-color: #0f1013;
-            background-image: radial-gradient(ellipse 75% 65% at 50% 50%, rgba(26, 34, 81, 0.40) 0%, rgba(18, 24, 56, 0.16) 45%, rgba(14, 15, 18, 0) 75%) !important;
+            background-color: #131314;
+            background-image: radial-gradient(ellipse 75% 60% at 50% 45%, rgba(26, 45, 100, 0.32) 0%, rgba(18, 25, 55, 0.14) 48%, rgba(19, 19, 20, 0) 80%) !important;
             background-repeat: no-repeat;
             background-attachment: fixed;
         }
         html[data-theme="dark"] #bootSkel .bk-app .main-content {
-            background-color: #0f1013;
-            background-image: radial-gradient(ellipse 75% 65% at 50% 50%, rgba(26, 34, 81, 0.40) 0%, rgba(18, 24, 56, 0.16) 45%, rgba(14, 15, 18, 0) 75%) !important;
+            background-color: #131314;
+            background-image: radial-gradient(ellipse 75% 60% at 50% 45%, rgba(26, 45, 100, 0.32) 0%, rgba(18, 25, 55, 0.14) 48%, rgba(19, 19, 20, 0) 80%) !important;
             background-repeat: no-repeat;
         }
 
@@ -135,6 +155,274 @@
             background-repeat: no-repeat;
         }
 
+        /* Gemini Black Theme with Claude Serif Font & Crisp White Contrast */
+        html[data-theme="dark"] .brand-title,
+        html[data-theme="dark"] .brand-sb-title,
+        html[data-theme="dark"] .sb-title,
+        html[data-theme="dark"] .sb-toggle,
+        html[data-theme="dark"] .menu-toggle,
+        html[data-theme="dark"] .top-bar,
+        html[data-theme="dark"] .top-bar-actions button,
+        html[data-theme="dark"] .top-action-btn,
+        html[data-theme="dark"] .prompt-nav-toggle {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .menu-toggle svg {
+            stroke: #ffffff !important;
+        }
+        html[data-theme="dark"] .top-action-btn:hover,
+        html[data-theme="dark"] .prompt-nav-toggle:hover,
+        html[data-theme="dark"] .sb-toggle:hover {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Sidebar in Gemini Dark (#1e1f20) with pure white text and icons */
+        html[data-theme="dark"] .sidebar {
+            background: #1e1f20 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        html[data-theme="dark"] .new-chat-btn {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 24px;
+        }
+        html[data-theme="dark"] .new-chat-btn i {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+        html[data-theme="dark"] .new-chat-btn:hover {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+        }
+        html[data-theme="dark"] .sidebar-search-wrap .sb-search-icon {
+            color: #ffffff !important;
+            opacity: 0.9;
+        }
+        html[data-theme="dark"] .sb-search-input {
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background: #131314 !important;
+        }
+        html[data-theme="dark"] .sb-search-input::placeholder {
+            color: rgba(255, 255, 255, 0.55) !important;
+        }
+        html[data-theme="dark"] .sb-search-input:focus {
+            border-color: var(--accent-blue) !important;
+            background: rgba(255, 255, 255, 0.07) !important;
+            box-shadow: 0 0 0 1px var(--accent-blue);
+        }
+        html[data-theme="dark"] .hs-title,
+        html[data-theme="dark"] .nav-section-title {
+            color: rgba(255, 255, 255, 0.75) !important;
+            font-weight: 600;
+        }
+        html[data-theme="dark"] .history-item {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .history-item .history-item-text,
+        html[data-theme="dark"] .history-item .t {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .history-item .hi-dot,
+        html[data-theme="dark"] .history-item i {
+            color: #ffffff !important;
+            opacity: 0.95;
+        }
+        html[data-theme="dark"] .history-item .hi-more {
+            color: #ffffff !important;
+            opacity: 0.95;
+        }
+        html[data-theme="dark"] .history-item:hover {
+            background: #282a2c !important;
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .history-item.active {
+            background: #333538 !important;
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .user-profile,
+        html[data-theme="dark"] .up-name {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .up-sub {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        html[data-theme="dark"] .up-chev,
+        html[data-theme="dark"] .suf-btn {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .suf-btn:hover {
+            background: #282a2c !important;
+            color: #ffffff !important;
+        }
+
+        /* Claude Serif Font for Greeting */
+        .empty-state h2 {
+            font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif !important;
+            font-size: clamp(32px, 5vw, 50px) !important;
+            font-weight: 400 !important;
+            letter-spacing: -.02em !important;
+            line-height: 1.14 !important;
+        }
+        html[data-theme="dark"] .empty-state h2 {
+            color: #ffffff !important;
+        }
+        html[data-theme="light"] .empty-state h2 {
+            color: #1f1f1f !important;
+        }
+
+        .empty-state .es-sub {
+            font-family: var(--font-body);
+            font-size: 15px;
+            margin: 12px 0 0;
+        }
+        html[data-theme="dark"] .empty-state .es-sub {
+            color: rgba(255, 255, 255, 0.75) !important;
+        }
+        html[data-theme="light"] .empty-state .es-sub {
+            color: #5f6368 !important;
+        }
+
+        .es-logo {
+            color: #d97757 !important;
+            font-size: 34px;
+            margin-bottom: 14px;
+        }
+
+        /* Suggestion pills below composer (Gemini style) */
+        html[data-theme="dark"] .es-pill {
+            color: #ffffff !important;
+            background: #1e1f20 !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 999px !important;
+            padding: 9px 18px !important;
+            font-size: 13.5px !important;
+            font-weight: 500 !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+            transition: all .15s ease !important;
+        }
+        html[data-theme="dark"] .es-pill i {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .es-pill:hover {
+            background: #282a2c !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+            transform: translateY(-1px);
+        }
+        html[data-theme="dark"] .es-pill:hover i {
+            color: #ffffff !important;
+        }
+
+        html[data-theme="light"] .es-pill {
+            color: #1f1f1f !important;
+            background: #ffffff !important;
+            border: 1px solid rgba(0, 0, 0, 0.12) !important;
+            border-radius: 999px !important;
+            padding: 9px 18px !important;
+            font-size: 13.5px !important;
+            font-weight: 500 !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+            transition: all .15s ease !important;
+        }
+        html[data-theme="light"] .es-pill i {
+            color: #1a73e8 !important;
+        }
+        html[data-theme="light"] .es-pill:hover {
+            background: #f1f3f4 !important;
+            border-color: rgba(0, 0, 0, 0.22) !important;
+            color: #1f1f1f !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08) !important;
+            transform: translateY(-1px);
+        }
+        html[data-theme="light"] .es-pill:hover i {
+            color: #1a73e8 !important;
+        }
+
+        /* Prompt Box controls & icons */
+        html[data-theme="dark"] .composer textarea {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .composer textarea::placeholder {
+            color: rgba(255, 255, 255, 0.55) !important;
+        }
+        html[data-theme="dark"] .composer .cbtn {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .composer .cbtn:hover {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+        html[data-theme="dark"] #attachBtn {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .model-btn,
+        html[data-theme="dark"] .mode-toggle-btn,
+        html[data-theme="dark"] .composer-table-btn,
+        html[data-theme="dark"] #depthBtn {
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+        }
+        html[data-theme="dark"] .model-btn i,
+        html[data-theme="dark"] .mode-toggle-btn i,
+        html[data-theme="dark"] .composer-table-btn i,
+        html[data-theme="dark"] #depthBtn i {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .mode-toggle-btn.active {
+            background: rgba(138, 180, 248, 0.2) !important;
+            color: #8ab4f8 !important;
+            border-color: rgba(138, 180, 248, 0.4) !important;
+        }
+        html[data-theme="dark"] .mode-toggle-btn.active i {
+            color: #8ab4f8 !important;
+        }
+        html[data-theme="dark"] .cbtn.send:not(.ready):not(.stop) {
+            color: rgba(255, 255, 255, 0.4) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+        }
+        html[data-theme="dark"] .cbtn.send.ready {
+            background: #2563eb !important;
+            color: #ffffff !important;
+        }
+
+        /* Popups, Dropdowns & Menus in Gemini Surface */
+        html[data-theme="dark"] .pop {
+            background: #1e1f20 !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6) !important;
+        }
+        html[data-theme="dark"] .pop-item {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .pop-item i {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .pop-item:hover {
+            background: #282a2c !important;
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .pop-item .pi-name {
+            color: #ffffff !important;
+        }
+        html[data-theme="dark"] .pop-item .pi-sub {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        html[data-theme="dark"] .pop-sep {
+            background: rgba(255, 255, 255, 0.08) !important;
+        }
+        html[data-theme="dark"] .user-text {
+            background: #282a2c !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+        }
+
         /* Profile Menu & Flyouts Styling (Gemini style: borderless, deep rounded, smooth pill hover) */
         .pop-profile-menu {
             border: none !important;
@@ -143,6 +431,17 @@
             background: #ffffff !important;
             padding: 8px !important;
             min-width: 250px !important;
+            position: absolute !important;
+            bottom: calc(100% + 6px) !important;
+            left: 8px !important;
+            right: 8px !important;
+            top: auto !important;
+            width: auto !important;
+            max-width: none !important;
+            max-height: calc(100vh - 120px) !important;
+            max-height: calc(100dvh - 120px) !important;
+            overflow-y: auto !important;
+            z-index: 150 !important;
         }
         html[data-theme="dark"] .pop-profile-menu {
             background: #282a2c !important;
@@ -166,43 +465,96 @@
             background: rgba(255, 255, 255, 0.08) !important;
         }
 
-        /* Flyout sub-menus for Theme & Voice language */
-        .pop-has-flyout { position: relative; }
-        .pop-has-flyout .flyout-chevron { margin-inline-start: auto; font-size: 11px; color: var(--text-faint); }
+        /* Inline Submenu Accordion for Theme & Voice Language (Works 100% on Desktop, Tablet & Mobile) */
+        .pop-has-flyout {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            margin: 1px 0;
+            position: relative;
+        }
+        .pop-flyout-trigger {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: background .12s ease;
+            box-sizing: border-box;
+            user-select: none;
+            width: 100%;
+        }
+        .pop-flyout-trigger > i:first-child {
+            width: 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .pop-flyout-trigger:hover {
+            background: #f0f4f9;
+        }
+        html[data-theme="dark"] .pop-flyout-trigger:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .pop-has-flyout .flyout-chevron {
+            margin-inline-start: auto;
+            font-size: 11px;
+            color: var(--text-faint);
+            transition: transform .2s ease;
+        }
+        .pop-has-flyout.flyout-open .flyout-chevron {
+            transform: rotate(90deg);
+        }
         .pop-sub-flyout {
-            position: absolute;
-            left: calc(100% + 8px);
-            bottom: -6px;
-            min-width: 150px;
-            background: #ffffff;
-            border-radius: 18px;
-            padding: 6px;
-            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.14);
+            display: none !important;
+            position: static !important;
+            left: auto !important;
+            right: auto !important;
+            bottom: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            background: rgba(0, 0, 0, 0.03) !important;
+            border-radius: 12px !important;
+            padding: 4px 6px 4px 34px !important;
+            margin: 2px 0 4px !important;
+            box-sizing: border-box !important;
             border: none !important;
-            display: none;
-            z-index: 220;
+            box-shadow: none !important;
+            flex-direction: column;
+            gap: 2px;
         }
         html[data-theme="dark"] .pop-sub-flyout {
-            background: #282a2c;
-            box-shadow: 0 12px 42px rgba(0, 0, 0, 0.55);
+            background: rgba(255, 255, 255, 0.05) !important;
         }
-        .pop-has-flyout:hover .pop-sub-flyout,
         .pop-has-flyout.flyout-open .pop-sub-flyout {
-            display: block;
-            animation: fadeIn .15s ease;
+            display: flex !important;
+            animation: fadeIn .18s ease;
         }
         .sub-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            font-size: 13.5px;
+            padding: 8px 10px;
+            font-size: 13px;
             color: var(--text-main);
             cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.12s ease;
+        }
+        .sub-item:hover {
+            background: rgba(0, 0, 0, 0.06);
+        }
+        html[data-theme="dark"] .sub-item:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
         .sub-ck {
-            color: var(--text-main);
-            font-size: 13px;
+            color: var(--accent-blue);
+            font-size: 12px;
             margin-inline-start: 12px;
             visibility: hidden;
         }
@@ -1657,9 +2009,13 @@
             transition: border-color .2s, box-shadow .2s, background .25s ease;
         }
         html[data-theme="dark"] .composer {
-            background: #1c1d24;
-            border-color: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 36px rgba(0, 0, 0, 0.45);
+            background: #1e1f20;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        }
+        html[data-theme="dark"] .composer:focus-within {
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
         }
         .composer:focus-within {
             border-color: var(--text-muted);
@@ -2115,21 +2471,79 @@
         }
         .wic-chip i { font-size: 10px; opacity: 0.75; }
 
-        /* ================= KPI Cards Deck (Hallmark Architectural Metric Cards) ================= */
-        .kpi-deck { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0 18px; }
+        /* ================= Bento Metric Deck (Stageshow Craft Architecture) ================= */
+        .kpi-deck {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 14px 0 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        @media (max-width: 480px) {
+            .kpi-deck {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+        }
         .kpi-card {
-            background: var(--surface); border: 1px solid var(--border-color);
-            border-radius: 16px; padding: 14px 18px; text-align: left;
-            box-shadow: 0 4px 18px var(--shadow-color); transition: all 0.2s ease;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 13px 16px;
+            text-align: left;
+            box-shadow: 0 2px 12px var(--shadow-color);
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(138, 180, 248, 0.4), transparent);
+            opacity: 0.6;
         }
         html[data-theme="dark"] .kpi-card {
-            background: #18191f; border-color: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.32);
+            background: #1e1f20;
+            border-color: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
-        .kpi-card:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.15); }
-        .kpi-lbl { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-        .kpi-val { font-size: 22px; font-weight: 700; color: var(--text-main); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.2; }
-        .kpi-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(138, 180, 248, 0.35);
+            box-shadow: 0 8px 24px var(--shadow-color);
+        }
+        .kpi-lbl {
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-faint);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+        .kpi-val {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            margin-bottom: 4px;
+        }
+        .kpi-sub {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            line-height: 1.35;
+            font-variant-numeric: tabular-nums;
+        }
 
 
 
@@ -2148,15 +2562,74 @@
         .pop-item .ck { margin-inline-start: auto; color: var(--accent-blue); visibility: hidden; font-size: 13px; }
         .pop-item.sel .ck { visibility: visible; }
 
-        /* ================= Thinking indicator ================= */
-        .think { margin: 2px 0 10px; }
-        .think-head { display: inline-flex; align-items: center; gap: 10px; background: none; border: none; padding: 4px 0; cursor: pointer; font: inherit; font-size: 14px; color: var(--text-muted); max-width: 100%; text-align: start; }
+        /* ================= Thinking indicator (Mobile-resilient, No time wrap) ================= */
+        .think { margin: 2px 0 10px; max-width: 100%; }
+        .think-head {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: none;
+            border: none;
+            padding: 4px 0;
+            cursor: pointer;
+            font: inherit;
+            font-size: 13.5px;
+            color: var(--text-muted);
+            max-width: 100%;
+            width: auto;
+            text-align: start;
+            box-sizing: border-box;
+        }
         .think-head:hover .think-chev { color: var(--text-main); }
-        .think-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .think.live .think-text { background: linear-gradient(90deg, #5f6368 35%, #1a73e8 50%, #5f6368 65%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: textShimmer 2.2s linear infinite; }
+        .think-spin {
+            position: relative;
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0 !important;
+            animation: spin 2.4s linear infinite;
+        }
+        .think-text {
+            flex: 0 1 auto;
+            min-width: 0 !important;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap !important;
+        }
+        .think.live .think-text {
+            background: linear-gradient(90deg, #5f6368 35%, #1a73e8 50%, #5f6368 65%);
+            background-size: 250% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: textShimmer 2.2s linear infinite;
+        }
         .think-text.swap { animation: fadeIn .35s ease; }
-        .think-time { font-variant-numeric: tabular-nums; color: var(--text-faint); font-size: 13px; }
-        .think-chev { font-size: 11px; color: var(--text-faint); transition: transform .2s; }
+        .think-time {
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            font-weight: 500;
+            flex-shrink: 0 !important;
+            white-space: nowrap !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 1.4 !important;
+            padding: 1px 7px;
+            border-radius: 6px;
+            background: rgba(138, 180, 248, 0.12);
+            color: #8ab4f8;
+            margin-left: 2px;
+        }
+        html[data-theme="light"] .think-time {
+            background: rgba(26, 115, 232, 0.08);
+            color: #1a73e8;
+        }
+        .think-chev {
+            font-size: 10.5px;
+            color: var(--text-faint);
+            transition: transform .2s;
+            flex-shrink: 0 !important;
+            margin-left: 2px;
+        }
         .think.open .think-chev { transform: rotate(90deg); }
         .think-ok { color: #188038; font-size: 14px; }
         .think-steps { display: none; margin: 8px 0 4px 8px; padding-left: 16px; border-left: 2px solid var(--border-color); }
@@ -2809,11 +3282,53 @@
             .composer-table-btn .table-btn-label { display: none; }
         }
 
-        /* model menu on phones/tablets: a bottom sheet that always fits the screen */
+        /* model and tool menus on phones/tablets: sleek native bottom sheets */
         @media (max-width: 768px) {
-            #appLayout #modelMenu { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; min-width: 0; max-width: none; max-height: min(70vh, 460px); max-height: min(70dvh, 460px); overflow-y: auto; overscroll-behavior: contain; padding: 8px; border-radius: 20px; z-index: 400; box-shadow: 0 -6px 40px rgba(0, 0, 0, .3); }
-            #appLayout #modelMenu .pop-item { padding: 13px 14px; }
-            #appLayout #plusMenu { max-width: calc(100vw - 24px); }
+            #appLayout .composer .pop,
+            #appLayout #modelMenu,
+            #appLayout #plusMenu,
+            #appLayout #attachMenu,
+            #appLayout #depthMenu {
+                position: fixed !important;
+                left: 12px !important;
+                right: 12px !important;
+                top: auto !important;
+                bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: calc(100vw - 24px) !important;
+                max-height: min(72vh, 480px) !important;
+                max-height: min(72dvh, 480px) !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
+                padding: 10px 10px 14px !important;
+                border-radius: 22px !important;
+                z-index: 99999 !important;
+                box-shadow: 0 16px 54px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+                animation: sheetSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            #appLayout .composer .pop-item,
+            #appLayout #modelMenu .pop-item,
+            #appLayout #plusMenu .pop-item,
+            #appLayout #attachMenu .pop-item,
+            #appLayout #depthMenu .pop-item {
+                padding: 13px 15px !important;
+                font-size: 14.5px !important;
+                border-radius: 14px !important;
+                min-height: 46px !important;
+                box-sizing: border-box !important;
+                touch-action: manipulation !important;
+                cursor: pointer !important;
+            }
+            #appLayout .pop-item > i:first-child {
+                font-size: 16px !important;
+                width: 22px !important;
+            }
+        }
+        @keyframes sheetSlideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
         /* ===== KPI Cards Deck (Hallmark Architectural Metric Cards) ===== */
@@ -3841,6 +4356,148 @@
             background: rgba(26,115,232,0.22);
         }
 
+        /* ===== Mobile Responsiveness Enforcement (Screen-fit & No Hidden Prompt Elements) ===== */
+        @media (max-width: 768px) {
+            .chat-scroll-area {
+                padding-bottom: 8px !important;
+            }
+            .chat-container::after {
+                content: '' !important;
+                display: block !important;
+                height: 140px !important;
+                min-height: 140px !important;
+                width: 100% !important;
+                flex-shrink: 0 !important;
+            }
+            .input-wrapper {
+                padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .composer {
+                padding: 10px 12px 8px !important;
+                border-radius: 20px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: visible !important;
+            }
+            .composer textarea {
+                font-size: 15px !important;
+                min-height: 36px !important;
+                padding: 2px 2px 6px !important;
+            }
+            .composer-toolbar {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                width: 100% !important;
+                gap: 4px !important;
+                padding-top: 2px !important;
+                box-sizing: border-box !important;
+            }
+            .composer-tools-left {
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 5px !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                white-space: nowrap !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
+                -webkit-overflow-scrolling: touch !important;
+                padding: 2px 4px 2px 0 !important;
+            }
+            .composer-tools-left::-webkit-scrollbar {
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+            }
+            .composer-tools-left > * {
+                flex-shrink: 0 !important;
+            }
+            .composer-tools-right {
+                flex-shrink: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                margin-left: 2px !important;
+            }
+            .cbtn {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 13.5px !important;
+            }
+            .model-btn,
+            .mode-toggle-btn {
+                font-size: 11px !important;
+                padding: 3px 7px !important;
+                gap: 4px !important;
+                line-height: 1.3 !important;
+            }
+            #depthPickerWrap .model-btn {
+                max-width: 110px !important;
+            }
+            .lbl-full {
+                display: none !important;
+            }
+            .lbl-compact {
+                display: inline !important;
+            }
+            .think-head {
+                max-width: 100% !important;
+                gap: 6px !important;
+                font-size: 13px !important;
+            }
+            .think-text {
+                max-width: calc(100vw - 150px) !important;
+                min-width: 0 !important;
+            }
+            .think-time {
+                flex-shrink: 0 !important;
+                white-space: nowrap !important;
+            }
+            .think-chev {
+                flex-shrink: 0 !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .think-head {
+                gap: 5px !important;
+                font-size: 12.5px !important;
+            }
+            .think-text {
+                max-width: calc(100vw - 130px) !important;
+            }
+            .think-time {
+                font-size: 11px !important;
+                padding: 1px 5px !important;
+            }
+            .input-wrapper {
+                padding: 4px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+            }
+            .composer {
+                padding: 8px 10px 6px !important;
+                border-radius: 18px !important;
+            }
+            .composer-tools-left {
+                gap: 4px !important;
+            }
+            .model-btn,
+            .mode-toggle-btn {
+                font-size: 10.5px !important;
+                padding: 3px 6px !important;
+                gap: 3px !important;
+            }
+            .cbtn {
+                width: 30px !important;
+                height: 30px !important;
+                font-size: 13px !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -3892,7 +4549,7 @@
                 </div>
             </div>
             <div class="lg-hero">
-                <img src="https://gw.alicdn.com/imgextra/i1/O1CN011KsaRmriAND4d0xY_!!6000000003510-0-tps-2280-1548.jpg" alt="" loading="eager" decoding="async" fetchpriority="high" draggable="false" onerror="this.remove()">
+                <img src="static/profile.jpeg" alt="" loading="eager" decoding="async" fetchpriority="high" draggable="false" onerror="this.remove()">
             </div>
         </div>
     </div>
@@ -3941,11 +4598,13 @@
                         <span class="pop-badge">DOCS</span>
                     </div>
 
-                    <!-- Theme Flyout (Gemini style, with checkmarks) -->
-                    <div class="pop-item pop-has-flyout" id="themeFlyoutRow" onclick="toggleSubFlyout('themeSubFlyout', event)">
-                        <i class="fa-solid fa-circle-half-stroke"></i>
-                        <div class="pi-text"><span class="pi-name">Theme</span><span class="pi-sub" id="menuThemeLabel">System</span></div>
-                        <i class="fa-solid fa-chevron-right flyout-chevron"></i>
+                    <!-- Theme Accordion (clean inline expansion, works on all screens) -->
+                    <div class="pop-has-flyout" id="themeFlyoutRow">
+                        <div class="pop-flyout-trigger" onclick="toggleSubFlyout('themeSubFlyout', event)">
+                            <i class="fa-solid fa-circle-half-stroke"></i>
+                            <div class="pi-text"><span class="pi-name">Theme</span><span class="pi-sub" id="menuThemeLabel">System</span></div>
+                            <i class="fa-solid fa-chevron-right flyout-chevron"></i>
+                        </div>
                         <div class="pop-sub-flyout" id="themeSubFlyout">
                             <div class="sub-item" onclick="setThemeVal('system', event)">
                                 <span>System</span>
@@ -3962,11 +4621,13 @@
                         </div>
                     </div>
 
-                    <!-- Voice Language Flyout (Gemini style, with checkmarks) -->
-                    <div class="pop-item pop-has-flyout" id="langFlyoutRow" onclick="toggleSubFlyout('langSubFlyout', event)">
-                        <i class="fa-solid fa-language"></i>
-                        <div class="pi-text"><span class="pi-name">Voice language</span><span class="pi-sub" id="menuLangLabel">Auto</span></div>
-                        <i class="fa-solid fa-chevron-right flyout-chevron"></i>
+                    <!-- Voice Language Accordion (clean inline expansion, works on all screens) -->
+                    <div class="pop-has-flyout" id="langFlyoutRow">
+                        <div class="pop-flyout-trigger" onclick="toggleSubFlyout('langSubFlyout', event)">
+                            <i class="fa-solid fa-language"></i>
+                            <div class="pi-text"><span class="pi-name">Voice language</span><span class="pi-sub" id="menuLangLabel">Auto</span></div>
+                            <i class="fa-solid fa-chevron-right flyout-chevron"></i>
+                        </div>
                         <div class="pop-sub-flyout" id="langSubFlyout">
                             <div class="sub-item" onclick="setLanguageVal(0, event)">
                                 <span>Auto</span>
@@ -4116,6 +4777,7 @@
             </div>
 
             <div class="input-wrapper">
+                <div id="popBackdrop" class="pop-backdrop" onclick="closeMenus()"></div>
                 <button type="button" id="jumpBtn" class="jump-btn" title="Scroll to latest" aria-label="Scroll to latest message" onclick="scrollToBottom(true)"><i class="fa-solid fa-arrow-down"></i></button>
                 <div class="composer">
                     <div id="composerImageTray" class="composer-image-tray" style="display:none;"></div>
@@ -4126,8 +4788,8 @@
                                 <button type="button" id="plusBtn" class="cbtn" title="More options" onclick="toggleMenu('plusMenu', event)"><i class="fa-solid fa-plus"></i></button>
                                 <div class="pop" id="plusMenu">
                                     <div class="pop-item" onclick="closeMenus(); startNewSession()"><i class="fa-regular fa-pen-to-square"></i><span>New chat</span></div>
-                                    <div class="pop-item" onclick="closeMenus(); triggerImageUpload()"><i class="fa-regular fa-image"></i><span>Attach images</span></div>
-                                    <div class="pop-item" onclick="closeMenus(); triggerDocUpload()"><i class="fa-regular fa-file-lines"></i><span>Upload document</span></div>
+                                    <div class="pop-item" onclick="triggerImageUpload()"><i class="fa-regular fa-image"></i><span>Attach images</span></div>
+                                    <div class="pop-item" onclick="triggerDocUpload()"><i class="fa-regular fa-file-lines"></i><span>Upload document</span></div>
                                     <div class="pop-sep"></div>
                                     <div class="pop-item rem-row" role="switch" onclick="toggleRemember()"><i class="fa-solid fa-clock-rotate-left"></i><div class="pi-text"><span class="pi-name">Remember chat</span><span class="pi-sub">Use earlier messages as context</span></div><span class="sw"></span></div>
                                     <div class="pop-item outside-db-row" role="switch" onclick="toggleOutsideDb()"><i class="fa-solid fa-globe"></i><div class="pi-text"><span class="pi-name">Outside DB Mode</span><span class="pi-sub">Answer general questions (weather, dollar rate, etc.)</span></div><span class="sw" id="outsideDbSw"></span></div>
@@ -4136,19 +4798,19 @@
                             <div class="attach-wrap" id="composerAttachWrap" style="position:relative;">
                                 <button type="button" id="attachBtn" class="cbtn" onclick="toggleMenu('attachMenu', event)" title="Attach image or document"><i class="fa-solid fa-paperclip"></i></button>
                                 <div class="pop" id="attachMenu" style="min-width:210px;">
-                                    <div class="pop-item" onclick="closeMenus(); triggerImageUpload()"><i class="fa-regular fa-image"></i><span>Upload image</span></div>
-                                    <div class="pop-item" onclick="closeMenus(); triggerDocUpload()"><i class="fa-regular fa-file-lines"></i><span>Upload document (PDF, Word, Excel, CSV, TXT)</span></div>
+                                    <div class="pop-item" onclick="triggerImageUpload()"><i class="fa-regular fa-image"></i><span>Upload image</span></div>
+                                    <div class="pop-item" onclick="triggerDocUpload()"><i class="fa-regular fa-file-lines"></i><span>Upload document (PDF, Word, Excel, CSV, TXT)</span></div>
                                 </div>
                             </div>
-                            <input type="file" id="imageFileInput" accept="image/*,.jfif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.svg" multiple style="display:none;" onchange="handleImageSelection(event)">
-                            <input type="file" id="docFileInput" accept=".pdf,.docx,.doc,.txt,.csv,.xlsx,.xls,.json,.md" multiple style="display:none;" onchange="handleDocSelection(event)">
+                            <input type="file" id="imageFileInput" accept="image/*,.jfif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.svg" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1;" onchange="handleImageSelection(event)">
+                            <input type="file" id="docFileInput" accept=".pdf,.docx,.doc,.txt,.csv,.xlsx,.xls,.json,.md" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1;" onchange="handleDocSelection(event)">
                             <div class="model-picker" id="composerModelPicker">
                                 <button type="button" id="modelBtn" class="model-btn" onclick="toggleMenu('modelMenu', event)" title="Choose which AI answers"><span id="modelLabel">Auto</span><i class="fa-solid fa-chevron-down"></i></button>
                                 <div class="pop" id="modelMenu"></div>
                             </div>
-                            <button type="button" id="outsideDbBtn" class="mode-toggle-btn" onclick="toggleOutsideDb()" title="Toggle: Answer general questions outside database (weather, dollar rate, etc.)"><i class="fa-solid fa-globe"></i><span id="outsideDbLabel">General AI: Off</span></button>
+                            <button type="button" id="outsideDbBtn" class="mode-toggle-btn" onclick="toggleOutsideDb()" title="Toggle: Answer general questions outside database (weather, dollar rate, etc.)"><i class="fa-solid fa-globe"></i><span id="outsideDbLabel"><span class="lbl-full">General AI: Off</span><span class="lbl-compact">AI: Off</span></span></button>
                             <div class="model-picker" id="depthPickerWrap" title="AI Response Depth">
-                                <button type="button" id="depthBtn" class="model-btn" onclick="toggleMenu('depthMenu', event)" title="Choose AI Response Depth"><i class="fa-solid fa-sliders" style="font-size:11px;opacity:0.85;"></i><span id="depthLabel">Depth: Balanced</span><i class="fa-solid fa-chevron-down"></i></button>
+                                <button type="button" id="depthBtn" class="model-btn" onclick="toggleMenu('depthMenu', event)" title="Choose AI Response Depth"><i class="fa-solid fa-sliders" style="font-size:11px;opacity:0.85;"></i><span id="depthLabel"><span class="lbl-full">Depth: Balanced</span><span class="lbl-compact">Balanced</span></span><i class="fa-solid fa-chevron-down"></i></button>
                                 <div class="pop" id="depthMenu" style="min-width:210px;">
                                     <div class="pop-item" data-depth="low" onclick="closeMenus(); setResponseDepth('low')">
                                         <i class="fa-solid fa-bolt" style="color:#eab308;"></i>
@@ -6550,7 +7212,9 @@ const skeletonHTML = () => `
                     : 'Database mode: Strictly queries your authorized enterprise database';
             }
             if (lbl) {
-                lbl.textContent = outsideDb ? 'General AI: On' : 'General AI: Off';
+                const full = outsideDb ? 'General AI: On' : 'General AI: Off';
+                const compact = outsideDb ? 'AI: On' : 'AI: Off';
+                lbl.innerHTML = `<span class="lbl-full">${full}</span><span class="lbl-compact">${compact}</span>`;
             }
             document.querySelectorAll('.outside-db-row').forEach(r => {
                 r.setAttribute('aria-checked', outsideDb);
@@ -6575,12 +7239,13 @@ const skeletonHTML = () => `
         function renderResponseDepth() {
             const labelEl = document.getElementById('depthLabel');
             if (labelEl) {
-                const labels = {
-                    'low': 'Depth: Concise',
-                    'medium': 'Depth: Balanced',
-                    'high': 'Depth: Deep'
+                const map = {
+                    'low': { full: 'Depth: Concise', compact: 'Concise' },
+                    'medium': { full: 'Depth: Balanced', compact: 'Balanced' },
+                    'high': { full: 'Depth: Deep', compact: 'Deep' }
                 };
-                labelEl.textContent = labels[currentResponseDepth] || 'Depth: Balanced';
+                const cur = map[currentResponseDepth] || { full: 'Depth: Balanced', compact: 'Balanced' };
+                labelEl.innerHTML = `<span class="lbl-full">${cur.full}</span><span class="lbl-compact">${cur.compact}</span>`;
             }
             document.querySelectorAll('#depthMenu .pop-item').forEach(item => {
                 item.classList.toggle('active', item.dataset.depth === currentResponseDepth);
@@ -6665,14 +7330,28 @@ const skeletonHTML = () => `
 
         function closeMenus() {
             document.querySelectorAll('.pop.open').forEach(p => p.classList.remove('open'));
+            const bd = document.getElementById('popBackdrop');
+            if (bd) bd.classList.remove('show');
             document.querySelectorAll('.tb-more').forEach(b => b.setAttribute('aria-expanded', 'false'));
             document.querySelectorAll('.table-block.has-open-menu').forEach(b => b.classList.remove('has-open-menu'));
         }
         function toggleMenu(id, ev) {
-            ev.stopPropagation();
-            const m = typeof id === 'string' ? document.getElementById(id) : id, open = !m.classList.contains('open');
+            if (ev && ev.stopPropagation) ev.stopPropagation();
+            const m = typeof id === 'string' ? document.getElementById(id) : id;
+            if (!m) return;
+            const open = !m.classList.contains('open');
             closeMenus();
-            if (open) m.classList.add('open');
+            if (open) {
+                m.classList.add('open');
+                const menuId = typeof id === 'string' ? id : m.id;
+                if (menuId === 'profileMenu') {
+                    if (typeof updateThemeCheckmarks === 'function') updateThemeCheckmarks();
+                    if (typeof updateLangCheckmarks === 'function') updateLangCheckmarks();
+                }
+                const isComposerMenu = ['modelMenu', 'plusMenu', 'attachMenu', 'depthMenu'].includes(menuId);
+                const bd = document.getElementById('popBackdrop');
+                if (bd && window.innerWidth <= 768 && isComposerMenu) bd.classList.add('show');
+            }
         }
         document.addEventListener('click', e => { if (!e.target.closest('.pop')) closeMenus(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenus(); togglePromptNav(false); toggleChatArtifacts(false); } });
@@ -7493,9 +8172,13 @@ const skeletonHTML = () => `
             renderVoiceLang();
         }
         function setLanguageVal(idx, e) {
-            if (e) e.stopPropagation();
+            if (e) {
+                e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+            }
             setVoiceLang(idx);
-            closeMenus();
+            updateLangCheckmarks();
+            setTimeout(closeMenus, 150);
         }
         function updateLangCheckmarks() {
             const cur = typeof voiceLangIdx !== 'undefined' ? voiceLangIdx : 0;
@@ -7506,10 +8189,13 @@ const skeletonHTML = () => `
             });
         }
         function setThemeVal(val, e) {
-            if (e) e.stopPropagation();
+            if (e) {
+                e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+            }
             setTheme(val);
             updateThemeCheckmarks();
-            closeMenus();
+            setTimeout(closeMenus, 150);
         }
         function updateThemeCheckmarks() {
             const cur = typeof themeMode !== 'undefined' ? themeMode : 'system';
@@ -7520,13 +8206,18 @@ const skeletonHTML = () => `
             });
         }
         function toggleSubFlyout(id, e) {
-            if (e) e.stopPropagation();
+            if (e) {
+                e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+            }
             const el = document.getElementById(id);
             if (!el) return;
-            const parent = el.parentElement;
+            const parent = el.closest('.pop-has-flyout') || el.parentElement;
             const isOpen = parent.classList.contains('flyout-open');
-            document.querySelectorAll('.pop-has-flyout').forEach(r => r.classList.remove('flyout-open'));
-            if (!isOpen) parent.classList.add('flyout-open');
+            document.querySelectorAll('.pop-has-flyout').forEach(r => {
+                if (r !== parent) r.classList.remove('flyout-open');
+            });
+            parent.classList.toggle('flyout-open', !isOpen);
         }
 
         // ---- Theme: system / light / dark, persisted, live-updates when following system ----
@@ -9916,19 +10607,29 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         }
 
         function triggerImageUpload() {
-            const fi = document.getElementById('imageFileInput');
-            if (fi) {
-                fi.value = '';
-                fi.click();
+            try {
+                const fi = document.getElementById('imageFileInput');
+                if (fi) {
+                    fi.value = '';
+                    fi.click();
+                }
+            } catch (err) {
+                console.error('[Upload Trigger Error]', err);
             }
+            setTimeout(closeMenus, 80);
         }
 
         function triggerDocUpload() {
-            const fi = document.getElementById('docFileInput');
-            if (fi) {
-                fi.value = '';
-                fi.click();
+            try {
+                const fi = document.getElementById('docFileInput');
+                if (fi) {
+                    fi.value = '';
+                    fi.click();
+                }
+            } catch (err) {
+                console.error('[Upload Trigger Error]', err);
             }
+            setTimeout(closeMenus, 80);
         }
 
         async function processImageFiles(files) {

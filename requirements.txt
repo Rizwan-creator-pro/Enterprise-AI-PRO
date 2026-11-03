@@ -9,13 +9,14 @@ python-dotenv>=1.0        # reads secrets from the .env file
 pypdf>=4.0                # PDF document text parsing
 python-docx>=1.1.0        # Word .docx document parsing
 openpyxl>=3.1.0           # Excel .xlsx document parsing
-duckdb>=2.0.0             # In-memory high-speed analytical query engine (Zero-Disk)
-pandas>=2.0.0             # Fast vectorization & DataFrame data manipulation
+numpy<2.0.0               # High-performance array backend for pandas
+duckdb<=0.9.2             # In-memory high-speed analytical query engine (Zero-Disk)
+pandas<=2.0.3             # Fast vectorization & DataFrame data manipulation
 google-api-python-client>=2.100.0  # Google Drive API storage
 google-auth>=2.20.0        # Google Cloud authentication
 google-auth-oauthlib>=1.2.0 # Google Drive OAuth2 login flow
 google-auth-httplib2>=0.2.0 # Google API HTTP transport
-zxing-cpp>=3.1.0            # Barcode & QR Code decoding engine
+zxing-cpp<=3.0.0            # Barcode & QR Code decoding engine
 Pillow>=10.0.0              # Image processing & barcode extraction
 firecrawl>=1.0.0            # Web scraping, search & structured extraction (Firecrawl)
 ddgs>=9.0.0                 # Universal open-web search engine (Zero saved sites)

@@ -22,8 +22,14 @@ def scan_barcodes_and_qr(image_bytes: bytes) -> List[Dict[str, Any]]:
         img = Image.open(io.BytesIO(image_bytes))
         results = zxingcpp.read_barcodes(img)
         if not results:
-            # Try rotating 90, 180, 270 if not detected directly
-            for rot in [Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270]:
+            # Try rotating 90, 180, 270 if not detected directly (Pillow 10+ and legacy compatible)
+            rotations = []
+            if hasattr(Image, "Transpose"):
+                rotations = [Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_270]
+            elif hasattr(Image, "ROTATE_90"):
+                rotations = [Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270]
+
+            for rot in rotations:
                 rotated = img.transpose(rot)
                 results = zxingcpp.read_barcodes(rotated)
                 if results:

@@ -282,9 +282,6 @@ async def upload_image_endpoint(
     cfg = _get_app_config()
     max_img_mb = cfg.get("max_image_size_mb", 15)
     allowed_types = cfg.get("allowed_image_types", [".png", ".jpg", ".jpeg", ".jfif", ".webp", ".gif", ".bmp", ".avif", ".svg"])
-    api_keys = cfg.get("imgbb_api_keys", [])
-    if not api_keys:
-        api_keys = ["c76e832efba7ae9dd0e968437a639931", "74c1453b68399dcb3a8cb9b312e0bc58"]
 
     b64_content = None
     mime_type = "image/jpeg"
@@ -610,7 +607,7 @@ class StopRequest(BaseModel):
 # ---------------- sessions: identity lives on the server, the browser never supplies a user id ----------------
 SESSION_COOKIE = "ai_session"
 SESSION_TTL = 12 * 3600
-_SECRET = (os.environ.get("APP_SECRET") or "9e87f5e0454dcffccf75477fa2cb9ef21bfbbd04b6b15e45a271708ee66d6232").encode()
+_SECRET = (os.environ.get("APP_SECRET") or secrets.token_hex(32)).encode()
 if not os.environ.get("APP_SECRET"):
     print("[WARNING] APP_SECRET is not set in .env - all users will be logged out every time the server restarts.")
 # Rate limiting data structures (Thread-safe & memory bounded)
@@ -1821,7 +1818,14 @@ You deliver direct, concise, high-value answers from verified enterprise data.
 
 STRICT BREVITY & QUALITY RULES:
 1. EXECUTIVE SUMMARY: Begin immediately with a crisp, authentic, and professional executive summary paragraph addressing the question directly. Use clear, simple, executive-grade language with zero filler or robotic phrases.
-2. CONCISE HIGHLIGHTS: If multiple metrics or categories are compared, provide 2 to 3 concise bullet points for key figures or top contributors.
+2. BENTO METRICS DECK & STAGESHOW CRAFT: When reporting key operational figures, summaries, or multi-metric overviews, format the top 2 to 4 metrics in a clean Bento KPI deck block right below the summary:
+:::kpi-deck
+[
+  {{"label": "Total Active Records", "value": "30", "sub": "100% verified status"}},
+  {{"label": "Category Depth", "value": "4", "sub": "Core active groups"}}
+]
+:::
+This renders as miniature, framed executive Bento cards. Keep highlights visual and grounded in verified data.
 3. MATHEMATICAL TRUTH: Use the exact verified numbers and table provided. Never guess or modify numbers.
 4. DATA IN TABLE FORM: When the user asks for data, records, or a table, you MUST present the data strictly inside a clean Markdown table. NEVER dump records as free-form plain text paragraphs, outreach templates, or pipe-separated lines outside the table. Let the table speak for itself. Keep textual explanation under 4 sentences total.
 5. ECHARTS & CHARTS: If chart JSON is provided in the prompt or requested, output it in a ```json ``` code block after the summary. Output STRICT VALID JSON: never include comments, never format numbers with commas inside JSON values (e.g. use 1115000, NEVER 1,115,000), and always use double quotes for property names.
@@ -2862,8 +2866,6 @@ def _save_and_record(req: ChatRequest, answer: str, t_start: float, provider_use
 # ---------------- Chat Task Runner & Background Workers ----------------
 _jobs: dict = {}
 
-class StopRequest(BaseModel):
-    session_id: str
 
 def _prune_jobs():
     now = time.time()
@@ -3048,7 +3050,7 @@ def get_chat_attachments_endpoint(session_id: str, request: Request):
                                 "gdrive_download_link": img_url,
                                 "thumbnail_url": disp_url,
                                 "display_url": disp_url,
-                                "storage_source": "GDRIVE" if g_id else ("IMGBB" if "ibb.co" in img_url else "INLINE"),
+                                "storage_source": "GDRIVE" if g_id else "INLINE",
                                 "created_at": m.get("created_at") or ""
                             })
                     # Parse document markers [📄 Document: filename]

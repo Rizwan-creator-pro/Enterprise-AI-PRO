@@ -17,10 +17,6 @@
   "max_document_size_mb": 25,
   "allowed_image_types": [".png", ".jpg", ".jpeg", ".jfif", ".webp", ".gif", ".bmp", ".avif", ".svg"],
   "allowed_document_types": [".pdf", ".docx", ".doc", ".txt", ".csv", ".xlsx", ".xls", ".json", ".md"],
-  "imgbb_api_keys": [
-    "c76e832efba7ae9dd0e968437a639931",
-    "74c1453b68399dcb3a8cb9b312e0bc58"
-  ],
   "gdrive_enabled": true,
   "gdrive_credentials_file": "gdrive_service_account.json",
   "gdrive_root_folder_id": "1RVltBG3BT2Q519qQKS5Qa9U2RCaqGrHP"

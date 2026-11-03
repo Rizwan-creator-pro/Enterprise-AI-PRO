@@ -36,17 +36,22 @@ if exist "server\ui_app.py" (
 echo [1/4] Verifying and installing required libraries...
 python -m pip install --upgrade pip
 if exist requirements.txt (
-    python -m pip install -r requirements.txt
+    python -m pip install --prefer-binary -r requirements.txt
 ) else (
-    python -m pip install fastapi uvicorn requests pydantic python-multipart python-dotenv
+    python -m pip install --prefer-binary fastapi uvicorn requests pydantic python-multipart python-dotenv
 )
 if errorlevel 1 (
-    echo.
-    echo [ERROR] Library install failed. Check your internet connection and
-    echo the error message above, then re-run this file.
-    echo.
-    pause
-    exit /b 1
+    echo [INFO] Checking if required libraries are already installed...
+    python -c "import fastapi, uvicorn, requests, pydantic, duckdb, pandas" >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Library install failed. Check your internet connection and
+        echo the error message above, then re-run this file.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo [INFO] Core libraries are verified and healthy. Continuing...
 )
 echo Libraries are ready!
 echo.
