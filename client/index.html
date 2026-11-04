@@ -7146,6 +7146,8 @@ const skeletonHTML = () => `
                 // Eliminate duplicate card box overload: remove any duplicate KPI decks that repeat the widget
                 const redundantKpi = box.querySelector('.kpi-deck');
                 if (redundantKpi) redundantKpi.remove();
+                // Strictly remove duplicate manual markdown table containers under live widgets
+                box.querySelectorAll('.table-block, table').forEach(tbl => tbl.remove());
             }
 
             // Render KPI cards deck if present (from live meta or persisted in message content)

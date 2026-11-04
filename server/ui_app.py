@@ -1864,8 +1864,10 @@ def _get_general_synthesizer_prompt() -> str:
 You operate with advanced multi-modal reasoning, real-time external intelligence feeds, and enterprise visual analytics.
 
 CORE REASONING & PRESENTATION PRINCIPLES:
-1. TEXT-FIRST & DIRECT ANSWERS (NO CARD OVERLOAD): Answer the user directly in authoritative, well-formatted text and clean Markdown tables. Avoid redundant cards, bento boxes, or excessive UI container blocks.
-2. CLEAN TABLES FOR TABULAR DATA: When presenting prices, exchange rates, fuel rates, or comparative numbers, format them in a single clean Markdown table followed by concise key takeaways.
+1. TEXT-FIRST & DIRECT ANSWERS (NO CARD OVERLOAD): Answer the user directly in authoritative, well-formatted text. Avoid redundant cards, bento boxes, or excessive UI container blocks.
+2. LIVE WIDGETS vs TABULAR DATA:
+- For live currency exchange (Forex), stock quotes, and weather where an interactive card widget is attached: Output ONLY a clean 1 to 2 sentence executive market commentary above or below the widget. DO NOT output manual markdown tables, multi-row conversion metrics, or redundant card containers. Let the interactive card widget handle the figures.
+- For enterprise database queries, multiple records, or fuel rates without interactive widgets: format data strictly inside a clean Markdown table.
 3. INTENT DECOMPOSITION: If the user's inquiry contains multiple parts or intents (e.g., currency rate AND stock market price, or calculation AND company analysis), break down each component thoughtfully. Provide structured, dedicated sections or clear bullet points so every part of the question is answered thoroughly and accurately.
 2. REAL-TIME FACTUAL BENCHMARKS: When provided with verified live feeds (Interbank Forex, Central Bank Benchmarks, Pakistan Stock Exchange PSX, Global Equities, Weather, or Firecrawl Web Intelligence), treat these numbers as authoritative ground truth. Clearly cite exact values, currency symbols (PKR, USD, etc.), and timestamps.
 3. GROUND TRUTH FROM USER IMAGES: When the user attaches an image or screenshot (such as an exchange trading screen, chart, ERP interface, or invoice), the visual evidence is the user's direct ground truth. Inspect the image with extreme precision: read exact ticker symbols, trading prices, dates, percentages, and labels shown in the screenshot. If there is any variance with older cached feeds, explicitly acknowledge and validate the user's screenshot as the primary snapshot.
@@ -2886,10 +2888,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"- Live Source: {forex_card_data.get('source')} as of {forex_card_data.get('timestamp')}\n"
                 f"- Cross Rates with PKR: " + ", ".join(f"{k}: {v} PKR" for k, v in forex_card_data.get("comparisons", {}).items()) + "\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. The interactive live currency exchange widget is already attached at the top of your response with the real-time rate calculator and cross-currency comparisons. DO NOT output a duplicate markdown table or duplicate metric cards repeating these exact fields.\n"
-                f"2. State the official interbank rate ({rate_val} PKR per {base_c}) clearly in your opening sentence. Explain that open-market cash exchange counters typically operate with a tight 0.5% - 1.5% spread (~1 to 2 PKR margin).\n"
-                f"3. Provide practical financial context, conversion examples (e.g. 1 USD, 10 USD, 100 USD), and key takeaways directly in crisp, readable text paragraphs.\n"
-                f"4. You MUST include the following exact currency converter widget block at the end of your response:\n"
+                f"1. Return ONLY a clean 1 to 2 sentence executive market commentary addressing the official interbank exchange rate ({rate_val} PKR per {base_c}) and the typical open-market cash exchange margin (~0.5% - 1.5%).\n"
+                f"2. ABSOLUTELY FORBIDDEN: NEVER output any markdown tables, tabular data, conversion examples (e.g. 1 USD = ..., 10 USD = ...), lists of numbers, bullet points of comparisons, or card blocks. The interactive live currency converter widget is already attached and handles all conversions and comparisons.\n"
+                f"3. You MUST include the following exact currency converter widget block at the end of your response:\n"
                 f":::currency-converter\n{json.dumps(forex_card_data)}\n:::\n"
             )
 
@@ -2920,8 +2921,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     f"- Day High: {quote_raw['high']} | Day Low: {quote_raw['low']}\n"
                     f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n\n"
                     f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                    f"1. The interactive equity ticker card is already attached at the top of your response displaying the live price, day high/low, and exchange status. DO NOT output a duplicate markdown table or duplicate metric cards repeating these exact numbers.\n"
-                    f"2. Deliver a crisp narrative analysis in clean paragraphs: summarize the trading session, momentum ({quote_raw['change_percent']}%), sector perspective, and key takeaways.\n"
+                    f"1. Return ONLY a clean 1 to 2 sentence executive market commentary summarizing the company's price ({quote_raw['price']} {quote_raw['currency']}), momentum ({quote_raw['change_percent']}%), and sector context.\n"
+                    f"2. ABSOLUTELY FORBIDDEN: NEVER output any markdown tables, tabular data, metric lists, bullet points of figures, or card blocks. The interactive equity ticker card is already attached and handles all quote metrics.\n"
                     f"3. You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
@@ -3218,9 +3219,23 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         answer = f"{answer.strip()}\n\n:::stock-market-card\n{json.dumps(stock_card_data)}\n:::"
 
     if req_outside_enabled and (forex_card_data or stock_card_data or weather_info):
-        # Eliminate card box overload: Strip redundant 2-column key-value tables that duplicate widget fields
-        answer = re.sub(r"\|[ \t]*(?:Item|Property|Field|Metric|Parameter)[ \t]*\|[ \t]*(?:Value|Rate|Price|Details)[ \t]*\|[\s\S]*?(?:\n\n|\Z)", "\n\n", answer).strip()
-        answer = re.sub(r"\|[ \t]*(?:Base Currency|Current Price|Exchange Rate)[ \t]*\|[\s\S]*?(?:\n\n|\Z)", "\n\n", answer).strip()
+        # Eliminate card box overload: Strip all manual markdown tables, multi-row conversion metrics,
+        # and enforce ONLY a clean 1-2 sentence executive market commentary alongside the specialized widget.
+        widget_blocks = re.findall(r":::(?:currency-converter|stock-market-card|google-weather)[\s\S]*?:::", answer)
+        text_body = re.sub(r":::[\s\S]*?:::", "", answer).strip()
+        text_body = re.sub(r"(?m)^\|[^\n]+\|\s*$\n(?:^\|[^\n]+\|\s*$\n?)+", "", text_body).strip()
+        text_body = re.sub(r"(?i)(?:quick\s+)?conversion\s+examples?:?[\s\S]*?(?=(?:\n\n|\Z))", "", text_body).strip()
+        text_body = re.sub(r"(?m)^\s*[-*•]?\s*\d+\s*[A-Z]{3}\s*=\s*[\d,.]+\s*[A-Z]{3}.*$", "", text_body).strip()
+        text_body = re.sub(r"(?i)\b(?:what\s+this\s+means\s+for\s+you|overview\s*/\s*conversions|quick\s+takeaways?):?\s*", "", text_body).strip()
+
+        paragraphs = [p.strip() for p in text_body.split("\n\n") if p.strip() and not p.strip().startswith(("#", "-", "*", "|"))]
+        commentary = paragraphs[0] if paragraphs else text_body
+        sentences = re.split(r"(?<=[.!?])\s+", commentary)
+        if len(sentences) > 2:
+            commentary = " ".join(sentences[:2]).strip()
+
+        widgets_combined = "\n\n".join(widget_blocks)
+        answer = f"{commentary}\n\n{widgets_combined}".strip() if commentary else widgets_combined
     if req_outside_enabled and not has_docs and web_agent_data and web_agent_data.get("has_content"):
         total_sources = len(web_agent_data.get("direct_pages", [])) + len(web_agent_data.get("search_pages", [])) + len(web_agent_data.get("search_snippets", []))
         wic_payload = {
