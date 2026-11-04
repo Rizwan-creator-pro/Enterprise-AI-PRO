@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 import sys
+import logging
 
 # ---------------- Dynamic Multi-Folder Path Resolution (Client / Server) ----------------
 SERVER_DIR = Path(__file__).resolve().parent
@@ -1983,6 +1984,208 @@ def evaluate_math_expression(text: str) -> Optional[dict]:
     except Exception:
         return None
 
+logger = logging.getLogger("EnterpriseAI.Orchestrator")
+
+
+async def execute_tool_task(tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    """Autonomous worker dispatching external real-time tool calls concurrently."""
+    tool_type = tool_call.get("tool")
+    try:
+        from agent.external_intelligence import (
+            fetch_live_forex,
+            fetch_psx_indices,
+            fetch_stock_quote,
+            fetch_live_fuel_prices,
+        )
+        from agent.weather_helper import fetch_live_weather
+        from agent.web_agent import universal_internet_agent_async
+
+        if tool_type == "web_search":
+            query = tool_call.get("query", "").strip()
+            if not query:
+                return {"tool": tool_type, "success": False, "error": "Empty query"}
+            res = await universal_internet_agent_async(
+                search_queries=[query],
+                direct_urls=[],
+                include_news=True,
+                max_pages_to_read=2
+            )
+            return {"tool": tool_type, "success": True, "data": res}
+
+        elif tool_type in ("browse_url", "browse", "read_url"):
+            url = tool_call.get("url", "").strip()
+            res = await universal_internet_agent_async(
+                search_queries=[],
+                direct_urls=[url],
+                include_news=False,
+                max_pages_to_read=1
+            )
+            return {"tool": tool_type, "success": True, "data": res}
+
+        elif tool_type == "weather":
+            city = tool_call.get("city", "Lahore")
+            data = await asyncio.to_thread(fetch_live_weather, city)
+            return {"tool": tool_type, "success": bool(data), "data": data}
+
+        elif tool_type == "forex":
+            pair = tool_call.get("pair", "USD/PKR")
+            base = pair.split("/")[0].strip().upper() if "/" in pair else "USD"
+            data = await asyncio.to_thread(fetch_live_forex, base)
+            return {"tool": tool_type, "success": bool(data), "data": data}
+
+        elif tool_type == "stock":
+            symbol = tool_call.get("symbol", "").strip().upper()
+            if symbol in ("PSX", "PSX_INDEX", "KSE100"):
+                data = await asyncio.to_thread(fetch_psx_indices)
+            else:
+                data = await asyncio.to_thread(fetch_stock_quote, symbol)
+            return {"tool": tool_type, "success": bool(data), "data": data}
+
+        elif tool_type == "fuel":
+            country = tool_call.get("country", "Pakistan")
+            data = await asyncio.to_thread(fetch_live_fuel_prices, country)
+            return {"tool": tool_type, "success": bool(data), "data": data}
+
+    except Exception as exc:
+        logger.error(f"Error executing external tool '{tool_type}': {exc}", exc_info=True)
+        return {"tool": tool_type, "success": False, "error": str(exc)}
+
+    return {"tool": tool_type, "success": False, "error": f"Unknown tool: {tool_type}"}
+
+
+async def run_hybrid_orchestrator(
+    plan: Optional[Dict[str, Any]],
+    question: str,
+    endpoints: List[Dict[str, Any]],
+    emit_func: Any,
+    db_executor_func: Optional[Any] = None,
+    general_ai_enabled: bool = False,
+    user_id: Optional[str] = None,
+    history_msgs: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Stage 2 Concurrent Execution Orchestrator:
+    Concurrently coordinates DuckDB in-memory database queries and external tool discovery via asyncio.gather.
+
+    PERIMETER & TOGGLE ENFORCEMENT:
+    - If general_ai_enabled is True: auto-injects real-world web/commodity tools when needed and runs external tools concurrently.
+    - If general_ai_enabled is False: strictly forbids any external web tool fallbacks and forces execution to stay inside local database scope.
+    """
+    from agent.external_intelligence import (
+        extract_forex_intent,
+        extract_stock_intent,
+        extract_fuel_intent,
+    )
+    from agent.weather_helper import extract_weather_intent
+
+    plan = plan or {}
+    tasks: Dict[str, asyncio.Task] = {}
+
+    # 1. Evaluate DuckDB Analytical Execution Intent
+    has_db_intent = (
+        plan.get("mode") in ("raw", "aggregate", "pivot", "join", "multi_table")
+        and bool(plan.get("target_table") or plan.get("target_tables") or plan.get("left_table"))
+    )
+
+    if has_db_intent and db_executor_func is not None:
+        emit_func("Executing high-speed in-memory DuckDB query across authorized dataset...")
+        tasks["db_task"] = asyncio.create_task(
+            asyncio.to_thread(db_executor_func, plan, endpoints, emit_func)
+        )
+
+    # 2. Evaluate External Tool / Web Search Intent strictly gated by general_ai_enabled
+    external_tool_calls: List[Dict[str, Any]] = []
+
+    if general_ai_enabled:
+        external_tool_calls = list(plan.get("external_tools") or [])
+
+        # Safety condition: Auto-inject real-world web/commodity tools ONLY if general_ai_enabled is True
+        is_realworld_query = not has_db_intent or any(
+            kw in question.lower()
+            for kw in [
+                "latest", "current", "release", "version", "update", "today",
+                "news", "price", "vs", "competitor", "online", "weather",
+                "forecast", "dollar", "usd", "pkr", "rate", "stock", "petrol", "fuel"
+            ]
+        )
+
+        if is_realworld_query and not any(t.get("tool") == "web_search" for t in external_tool_calls):
+            fuel_int = extract_fuel_intent(question)
+            forex_int = extract_forex_intent(question)
+            stock_int = extract_stock_intent(question, history_msgs or [])
+            weather_int = extract_weather_intent(question)
+
+            if fuel_int:
+                external_tool_calls.append({"tool": "fuel", "country": fuel_int.get("country", "Pakistan")})
+            elif forex_int:
+                external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
+            elif stock_int:
+                external_tool_calls.append({"tool": "stock", "symbol": stock_int})
+            elif weather_int:
+                external_tool_calls.append({"tool": "weather", "city": weather_int})
+            elif not has_db_intent:
+                external_tool_calls.append({"tool": "web_search", "query": question})
+    else:
+        # STRICT PERIMETER: If general_ai_enabled is False, strictly forbid any external web tool fallbacks
+        # and force the execution plan to stay contained inside the local database scope.
+        external_tool_calls = []
+        if plan:
+            plan["external_tools"] = []
+            if plan.get("mode") == "direct_answer" and not plan.get("target_table"):
+                matched_ep = _match_endpoint(question, endpoints)
+                if matched_ep:
+                    plan["target_table"] = matched_ep.get("endpoint_name")
+                    plan["mode"] = "raw"
+
+    # 3. Dispatch external tool tasks concurrently
+    for idx, tool_call in enumerate(external_tool_calls):
+        tool_name = tool_call.get("tool", "external_tool")
+        emit_func(f"Dispatching concurrent live tool discovery [{tool_name}]...")
+        tasks[f"tool_{idx}"] = asyncio.create_task(execute_tool_task(tool_call))
+
+    # 4. Concurrent Await with Exception Isolation
+    if tasks:
+        results_list = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        named_results = dict(zip(tasks.keys(), results_list))
+    else:
+        named_results = {}
+
+    # 5. Extract and Assemble Context
+    db_result = named_results.get("db_task")
+    if isinstance(db_result, Exception):
+        logger.error(f"DuckDB execution error: {db_result}")
+        db_result = {"error": str(db_result), "table_md": "", "row_count": 0}
+
+    external_contexts: List[str] = []
+    specialized_widgets: Dict[str, Any] = {}
+
+    for k, res in named_results.items():
+        if k == "db_task" or isinstance(res, Exception) or not isinstance(res, dict) or not res.get("success"):
+            continue
+        tool_type = res.get("tool")
+        tool_data = res.get("data")
+        if tool_type in ("web_search", "browse_url") and tool_data:
+            ctx = tool_data.get("synthesized_context", "")
+            if ctx:
+                external_contexts.append(ctx)
+        elif tool_type == "weather" and tool_data:
+            specialized_widgets["weather"] = tool_data
+        elif tool_type == "forex" and tool_data:
+            specialized_widgets["forex"] = tool_data
+        elif tool_type == "stock" and tool_data:
+            specialized_widgets["stock"] = tool_data
+        elif tool_type == "fuel" and tool_data:
+            specialized_widgets["fuel"] = tool_data
+
+    return {
+        "db_result": db_result,
+        "external_contexts": external_contexts,
+        "synthesized_web_context": "\n\n".join(external_contexts),
+        "specialized_widgets": specialized_widgets,
+        "tool_results": named_results
+    }
+
+
 def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     t_start = time.time()
     kpis_out = []
@@ -2081,14 +2284,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         except Exception:
             history_msgs = []
 
-    # Automatic outside intent detection (seamless answering for real-world queries)
-    fuel_intent = extract_fuel_intent(req.question)
-    auto_outside = bool(fuel_intent or extract_forex_intent(req.question) or extract_stock_intent(req.question, history_msgs) or extract_weather_intent(req.question))
-    if auto_outside:
-        req_outside_enabled = True
-        is_outside_db = True
-
     # STRICT PERIMETER: Enforce General AI / Outside DB toggle
+    # Outside intents are strictly gated by req_outside_enabled (General AI toggle state).
+    # If the user has General AI turned OFF, NEVER override or auto-enable external discovery.
     if req_outside_enabled:
         can_search_ext = True
         is_outside_db = True
@@ -2113,14 +2311,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         chk_weather = extract_weather_intent(req.question)
         chk_forex = extract_forex_intent(req.question)
         chk_stock = extract_stock_intent(req.question, history_msgs)
+        chk_fuel = extract_fuel_intent(req.question)
         chk_urls = extract_urls_from_text(req.question)
         chk_matched = _match_endpoint(req.question, endpoints)
         has_ext_kw = any(k in req.question.lower() for k in [
             "weather", "forecast", "temperature", "rain", "climate", "dollar", "usd", "pkr", "forex",
             "exchange rate", "currency", "stock price", "psx", "kse", "nasdaq", "crypto", "bitcoin",
-            "president", "prime minister", "celebrity", "cricket", "who is", "what is the capital"
+            "president", "prime minister", "celebrity", "cricket", "who is", "what is the capital",
+            "petrol", "diesel", "fuel", "gas price", "gold price", "silver price"
         ])
-        is_outside_inquiry = bool((chk_weather or chk_forex or chk_stock or chk_urls or has_ext_kw) and not chk_matched)
+        is_outside_inquiry = bool((chk_weather or chk_forex or chk_stock or chk_fuel or chk_urls or has_ext_kw) and not chk_matched)
         if is_outside_inquiry:
             pol_msg = (
                 "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
@@ -2285,6 +2485,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", p_content)
             raw_json = m.group(1) if m else p_content.strip()
             plan = json.loads(raw_json)
+            # Enforce strict database perimeter when General AI is OFF
+            if not req_outside_enabled and plan:
+                plan["external_tools"] = []
             break
         except Exception as e:
             emit(f"{provider['provider_name']} planner failed — trying fallback…")
@@ -2387,7 +2590,46 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 print(f"[Join Engine Error] {e}")
                 exec_result = None
 
-    if not is_join_query and not multi_table_results and plan and plan.get("mode") != "direct_answer":
+    # STAGE 3: Run Hybrid Orchestrator (DuckDB local execution + external tools gated by general_ai_enabled)
+    if not is_join_query and not multi_table_results and plan and not exec_result:
+        try:
+            def _local_db_worker(p, eps, em):
+                tt = p.get("target_table")
+                ep = _match_endpoint(str(tt), eps) if tt else (_match_endpoint(req.question, eps) or (eps[0] if eps else None))
+                if ep:
+                    d = _fetch_single_table_dataset(ep, em)
+                    return qe.execute_plan(d, p)
+                return None
+
+            loop = asyncio.new_event_loop()
+            try:
+                orch_out = loop.run_until_complete(
+                    run_hybrid_orchestrator(
+                        plan=plan,
+                        question=req.question,
+                        endpoints=endpoints,
+                        emit_func=emit,
+                        db_executor_func=_local_db_worker if plan.get("mode") != "direct_answer" else None,
+                        general_ai_enabled=req_outside_enabled,
+                        user_id=req.user_id,
+                        history_msgs=history_msgs
+                    )
+                )
+            finally:
+                loop.close()
+
+            if orch_out:
+                if orch_out.get("db_result") and isinstance(orch_out["db_result"], dict) and orch_out["db_result"].get("table_md"):
+                    exec_result = orch_out["db_result"]
+                if req_outside_enabled and orch_out.get("synthesized_web_context"):
+                    web_agent_data = {
+                        "has_content": True,
+                        "synthesized_context": orch_out["synthesized_web_context"]
+                    }
+        except Exception as orch_e:
+            logger.error(f"Error executing hybrid orchestrator: {orch_e}", exc_info=True)
+
+    if not is_join_query and not multi_table_results and plan and plan.get("mode") != "direct_answer" and not exec_result:
         target_table = plan.get("target_table")
         matched_target_ep = None
         if target_table:
@@ -2617,7 +2859,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 include_news=True
             )
 
-    if web_agent_data and web_agent_data.get("has_content"):
+    if req_outside_enabled and web_agent_data and web_agent_data.get("has_content"):
         synth_user_prompt += (
             f"\n\n[VERIFIED REAL-TIME INTERNET INTELLIGENCE (UNIVERSAL OPEN-WEB DISCOVERY)]:\n"
             f"{web_agent_data['synthesized_context']}\n\n"
