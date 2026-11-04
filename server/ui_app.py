@@ -2590,11 +2590,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     browse_urls.append(t["url"])
 
     has_db_match = bool(exec_result or (plan and plan.get("target_table") and plan.get("mode") != "direct_answer"))
-    # Universal Internet Search:
+    # Universal Internet Search (Dual-Intent Enabled):
     # 1. NEVER run when analyzing an uploaded document (has_docs) — the document is the source of truth!
-    # 2. NEVER run if an internal database query matched (has_db_match).
-    # 3. ONLY run if General AI / Outside DB is enabled (req_outside_enabled) OR direct URLs were pasted.
-    if req_outside_enabled and not has_docs and not has_db_match and not firecrawl_result_data:
+    # 2. Concurrently execute alongside DuckDB if external_tools specified or real-world validation needed.
+    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data
+    if should_run_web:
         if browse_urls or search_queries:
             emit("Browsing live internet sources with Universal Web Agent...")
             web_agent_data = universal_internet_agent(
@@ -2602,8 +2602,15 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 direct_urls=browse_urls,
                 include_news=True
             )
-        elif req_outside_enabled and not _match_endpoint(req.question, endpoints) and not (forex_intent or stock_intent or weather_city or fuel_intent):
+        elif not _match_endpoint(req.question, endpoints) and not (forex_intent or stock_intent or weather_city or fuel_intent):
             emit("Querying open web intelligence & live sources...")
+            web_agent_data = universal_internet_agent(
+                search_queries=[req.question],
+                direct_urls=[],
+                include_news=True
+            )
+        elif any(k in req.question.lower() for k in ["latest", "current", "release", "version", "update", "competitor", "market price", "vs online", "online"]):
+            emit("Conducting dual-intent live web verification...")
             web_agent_data = universal_internet_agent(
                 search_queries=[req.question],
                 direct_urls=[],

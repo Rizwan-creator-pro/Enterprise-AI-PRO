@@ -24,7 +24,7 @@ Features:
 import re
 import difflib
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
 try:
     import duckdb
@@ -195,10 +195,151 @@ def _compare(cell: Any, op: str, target: Any) -> bool:
     return False
 
 
+
+# ---------------------------------------------------------------------------
+# Self-Healing Categorical Sanitizer & Fuzzy Domain Matcher
+# ---------------------------------------------------------------------------
+
+class CategoricalSanitizer:
+    """
+    Zero-Hallucination Categorical Value Sanitizer for In-Memory Analytical Engines.
+    Maps corrupted, accented, differently cased, or hyphenated user filters to true database column profiles.
+    (e.g., handles 'IN STOCK' / 'in-stock' -> 'IN_STOCK', 'instok' -> 'IN_STOCK').
+    """
+
+    @staticmethod
+    def canonical_slug(val: Any) -> str:
+        """Transforms arbitrary values into normalized alphanumeric comparison tokens."""
+        if val is None:
+            return ""
+        s = str(val).strip().lower()
+        return re.sub(r"[^a-z0-9]", "", s)
+
+    @classmethod
+    def sanitize_filter_value(
+        cls,
+        raw_val: Any,
+        candidate_domain: Union[List[str], Set[str]],
+        similarity_threshold: float = 0.78
+    ) -> Tuple[Any, bool, float]:
+        """
+        Sanitizes a candidate value against an authoritative categorical domain.
+        Returns: (repaired_value, was_modified, confidence_score)
+        """
+        if raw_val is None or not candidate_domain:
+            return raw_val, False, 0.0
+
+        raw_str = str(raw_val).strip()
+        canon_raw = cls.canonical_slug(raw_str)
+
+        if not canon_raw:
+            return raw_val, False, 0.0
+
+        candidates = [str(c) for c in candidate_domain if c is not None]
+
+        # 1. Exact Literal Identity
+        if raw_str in candidates:
+            return raw_str, False, 1.0
+
+        # 2. Case-Insensitive Matching
+        for cand in candidates:
+            if raw_str.lower() == cand.lower():
+                return cand, True, 1.0
+
+        # 3. Canonical Slug Exact Matching (e.g. 'in-stock' -> 'instock' <- 'IN_STOCK')
+        for cand in candidates:
+            if canon_raw == cls.canonical_slug(cand):
+                return cand, True, 0.98
+
+        # 4. Token-Permutation Matching (e.g. 'Stock In' == 'In Stock')
+        raw_tokens = set(re.split(r"[\s_\-]+", raw_str.lower()))
+        for cand in candidates:
+            cand_tokens = set(re.split(r"[\s_\-]+", cand.lower()))
+            if raw_tokens == cand_tokens and raw_tokens:
+                return cand, True, 0.95
+
+        # 5. Sequence Matcher (Typo & Levenshtein Proximity)
+        best_cand: Optional[str] = None
+        best_score: float = 0.0
+
+        for cand in candidates:
+            canon_cand = cls.canonical_slug(cand)
+            score = difflib.SequenceMatcher(None, canon_raw, canon_cand).ratio()
+            if score > best_score:
+                best_score = score
+                best_cand = cand
+
+        if best_cand and best_score >= similarity_threshold:
+            return best_cand, True, round(best_score, 4)
+
+        return raw_val, False, 0.0
+
+
+def self_heal_plan_filters(
+    dataset_rows: List[dict],
+    filters: List[dict],
+    similarity_threshold: float = 0.78
+) -> Tuple[List[dict], List[str]]:
+    """
+    Scans the in-memory dataset to extract distinct domain profiles for filtered columns,
+    repairing faulty planner parameters before executing queries to eliminate 0-row errors.
+    """
+    if not dataset_rows or not filters:
+        return filters, []
+
+    audit_logs: List[str] = []
+    healed_filters: List[dict] = []
+
+    active_cols = {str(f.get("col") or f.get("field", "")).strip().lower() for f in filters if f.get("col") or f.get("field")}
+    column_profiles: Dict[str, Set[str]] = {c: set() for c in active_cols}
+
+    # Extract distinct categorical profiles from dataset
+    for row in dataset_rows:
+        for k, val in row.items():
+            k_low = k.strip().lower()
+            if k_low in column_profiles and val is not None and not isinstance(val, (int, float, dict, list)):
+                column_profiles[k_low].add(str(val))
+
+    for f in filters:
+        col = str(f.get("col") or f.get("field", "")).strip()
+        col_low = col.lower()
+        op = (f.get("op") or "==").strip().lower()
+        val = f.get("val") if "val" in f else f.get("value")
+
+        if col_low in column_profiles and op in ("==", "eq", "!=", "neq", "in", "contains"):
+            candidates = column_profiles[col_low]
+            if isinstance(val, list):
+                new_vals = []
+                for v in val:
+                    fixed_v, modified, conf = CategoricalSanitizer.sanitize_filter_value(
+                        v, candidates, similarity_threshold
+                    )
+                    if modified:
+                        audit_logs.append(f"Healed [{col}] item '{v}' -> '{fixed_v}' (Conf: {conf})")
+                    new_vals.append(fixed_v)
+                f_copy = dict(f)
+                f_copy["val"] = new_vals
+                healed_filters.append(f_copy)
+            else:
+                fixed_val, modified, conf = CategoricalSanitizer.sanitize_filter_value(
+                    val, candidates, similarity_threshold
+                )
+                if modified:
+                    audit_logs.append(f"Healed [{col}] filter value '{val}' -> '{fixed_val}' (Conf: {conf})")
+                f_copy = dict(f)
+                f_copy["val"] = fixed_val
+                healed_filters.append(f_copy)
+        else:
+            healed_filters.append(f)
+
+    return healed_filters, audit_logs
+
 def apply_filters(rows: List[dict], filters: List[dict]) -> List[dict]:
     """filters: [{"col": "status", "op": "==", "val": "Active"}, ...]"""
     if not filters:
         return rows
+    # Self-heal incoming filters against dataset domain values (e.g. 'in-stock' -> 'IN_STOCK')
+    filters, _ = self_heal_plan_filters(rows, filters)
     out = []
     for r in rows:
         match = True
@@ -883,6 +1024,11 @@ def execute_plan(dataset: List[dict], plan: dict) -> dict:
         "mode": "raw" | "aggregate" | "pivot"
       }
     """
+    # Self-heal plan filters against dataset categorical domain before DuckDB or Python execution
+    if plan.get("filters") and dataset:
+        healed_filters, _ = self_heal_plan_filters(dataset, plan["filters"])
+        plan["filters"] = healed_filters
+
     rows = dataset
     mode = plan.get("mode", "aggregate" if plan.get("group_by") else "raw")
     chart_obj = None
