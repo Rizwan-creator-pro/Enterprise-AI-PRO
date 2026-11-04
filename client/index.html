@@ -280,10 +280,30 @@
             letter-spacing: -0.02em !important;
             line-height: 1.14 !important;
         }
-        .ai-text h1, .ai-text h2, .ai-text h3 {
-            font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif !important;
-            font-weight: 500 !important;
-            letter-spacing: -0.01em !important;
+        .ai-text h1, .ai-text h2, .ai-text h3, .ai-text h4 {
+            font-family: var(--font-body) !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.015em !important;
+        }
+        .clean-inline-table {
+            width: 100%;
+            max-width: 650px;
+            margin: 14px 0 16px;
+            border-collapse: collapse;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        .clean-inline-table th, .clean-inline-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .clean-inline-table th {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         html[data-theme="dark"] .es-logo {
             background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%) !important;
@@ -6980,8 +7000,8 @@ const skeletonHTML = () => `
                         </div>
 
                         <div class="smc-stats-row">
-                            <div class="smc-stat-col">Day High: <strong>${data.high !== undefined ? Number(data.high).toFixed(2) : '-'}</strong></div>
-                            <div class="smc-stat-col">Day Low: <strong>${data.low !== undefined ? Number(data.low).toFixed(2) : '-'}</strong></div>
+                            <div class="smc-stat-col">Day High: <strong>${(data.high !== null && data.high !== undefined && !isNaN(Number(data.high))) ? Number(data.high).toFixed(2) : '-'}</strong></div>
+                            <div class="smc-stat-col">Day Low: <strong>${(data.low !== null && data.low !== undefined && !isNaN(Number(data.low))) ? Number(data.low).toFixed(2) : '-'}</strong></div>
                             <div class="smc-stat-col">Currency: <strong>${curr}</strong></div>
                         </div>
 
@@ -7120,6 +7140,12 @@ const skeletonHTML = () => `
             if (weatherData) {
                 const wCard = buildGoogleWeatherCard(weatherData);
                 if (wCard) box.prepend(wCard);
+            }
+
+            if (stockData || forexData || weatherData) {
+                // Eliminate duplicate card box overload: remove any duplicate KPI decks that repeat the widget
+                const redundantKpi = box.querySelector('.kpi-deck');
+                if (redundantKpi) redundantKpi.remove();
             }
 
             // Render KPI cards deck if present (from live meta or persisted in message content)
@@ -7670,8 +7696,19 @@ const skeletonHTML = () => `
 
         function decorateTables() {
             document.querySelectorAll('#chatContainer .ai-text table').forEach(t => {
-                if (t.parentElement.classList.contains('table-wrap')) return;
+                if (t.parentElement.classList.contains('table-wrap') || t.classList.contains('clean-inline-table')) return;
                 const data = readTable(t);
+                const isKeyValueTable = data.head.length <= 2 && data.body.length <= 7;
+                const parentBox = t.closest('.ai-text');
+                const hasSiblingWidget = parentBox && (
+                    parentBox.querySelector('.google-weather-card') ||
+                    parentBox.querySelector('.currency-converter-card') ||
+                    parentBox.querySelector('.stock-market-card')
+                );
+                if (isKeyValueTable && hasSiblingWidget) {
+                    t.classList.add('clean-inline-table');
+                    return;
+                }
                 const rows = [...t.querySelectorAll('tr')];
                 data.head.forEach((_, i) => {
                     const vals = data.body.map(r => (r[i] || '').replace(/[,$%\s]/g, ''));

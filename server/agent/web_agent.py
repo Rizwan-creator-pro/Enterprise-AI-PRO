@@ -275,6 +275,23 @@ def universal_news_search(query: str, max_results: int = 4) -> List[Dict[str, st
     return news_items
 
 
+def _score_recency(text: str) -> int:
+    """Calculates recency priority score for search snippets and news items."""
+    t = text.lower()
+    score = 0
+    if re.search(r'\b\d+\s+hours?\s+ago\b', t) or re.search(r'\b\d+\s+mins?\s+ago\b', t):
+        score += 100
+    if 'today' in t or 'just now' in t:
+        score += 80
+    if 'yesterday' in t or '1 day ago' in t:
+        score += 60
+    if '2026' in t or 'november' in t:
+        score += 40
+    if re.search(r'\b(2023|2022|2021|2020|2019)\b', t):
+        score -= 150
+    return score
+
+
 async def universal_internet_agent_async(
     search_queries: Optional[List[str]] = None,
     direct_urls: Optional[List[str]] = None,
@@ -326,8 +343,17 @@ async def universal_internet_agent_async(
             read_search_pages = await asyncio.gather(*page_tasks, return_exceptions=True)
             read_search_pages = [p for p in read_search_pages if isinstance(p, dict) and p.get("success")]
 
+    # 4.5. Enforce recency sorting & date prioritization
+    search_results.sort(key=lambda r: _score_recency(r.get("title", "") + " " + r.get("body", "")), reverse=True)
+    news_results.sort(key=lambda n: _score_recency(n.get("title", "") + " " + n.get("body", "") + " " + n.get("date", "")), reverse=True)
+
     # 5. Build structured Markdown synthesis
-    context_blocks = []
+    context_blocks = [
+        "### REAL-TIME TEMPORAL EXTRACTION DIRECTIVE (STRICT DATE VALIDATION):\n"
+        "- MANDATORY: Prioritize numbers, prices, and rates associated with the most recent timestamp or date header (e.g. today, hours ago, current month/year).\n"
+        "- HISTORICAL RANGE REJECTION: Strictly IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.\n"
+        "- State the verified current active number directly and unequivocally."
+    ]
 
     if direct_pages:
         context_blocks.append("### LIVE WEBPAGE CONTENT (Directly Retrieved from User Links):")

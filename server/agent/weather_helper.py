@@ -60,14 +60,106 @@ def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Opt
 
     return (default_city or "Lahore").title()
 
-def fetch_live_weather(city_query: str = "Faisalabad") -> Optional[Dict[str, Any]]:
-    """Fetches verified live weather, hourly timeline, and 7-day forecast from Open-Meteo."""
+def fetch_wttr_in(city_name: str) -> Optional[Dict[str, Any]]:
+    """Resilient fallback meteorological provider querying wttr.in JSON API."""
     try:
-        clean_q = city_query.strip().strip("?,.!")
+        clean_c = requests.utils.quote(city_name.strip())
+        url = f"https://wttr.in/{clean_c}?format=j1"
+        res = requests.get(url, timeout=5).json()
+        if not res.get("current_condition"):
+            return None
+        c_cond = res["current_condition"][0]
+        temp_c = int(c_cond.get("temp_C", 0))
+        feels_c = int(c_cond.get("FeelsLikeC", temp_c))
+        humidity = int(c_cond.get("humidity", 0))
+        wind_kph = int(c_cond.get("windspeedKmph", 0))
+        precip_mm = float(c_cond.get("precipMM", 0.0))
+        precip_pct = min(100, int(precip_mm * 20))
+        desc = c_cond.get("weatherDesc", [{}])[0].get("value", "Clear")
+
+        desc_l = desc.lower()
+        if "rain" in desc_l:
+            icon = "cloud-rain"
+        elif "cloud" in desc_l or "overcast" in desc_l:
+            icon = "cloud-sun"
+        elif "snow" in desc_l:
+            icon = "snowflake"
+        elif "thunder" in desc_l:
+            icon = "cloud-bolt"
+        elif "fog" in desc_l or "mist" in desc_l or "haze" in desc_l or "smoke" in desc_l:
+            icon = "smog"
+        else:
+            icon = "sun"
+
+        current_dict = {
+            "temp": temp_c,
+            "feels_like": feels_c,
+            "humidity": humidity,
+            "wind_kph": wind_kph,
+            "precipitation_pct": precip_pct,
+            "condition": desc,
+            "icon": icon,
+            "is_day": 1
+        }
+
+        hourly_list = []
+        daily_list = []
+        weather_days = res.get("weather", [])
+        if weather_days:
+            for h in weather_days[0].get("hourly", []):
+                h_time_int = int(h.get("time", "0")) // 100
+                ampm = "am" if h_time_int < 12 else "pm"
+                h_disp = 12 if h_time_int in (0, 12) else h_time_int % 12
+                hourly_list.append({
+                    "time": f"{h_disp} {ampm}",
+                    "temp": int(h.get("tempC", temp_c)),
+                    "pop": int(h.get("chanceofrain", 0)),
+                    "wind": int(h.get("windspeedKmph", wind_kph))
+                })
+
+            for d in weather_days[:7]:
+                try:
+                    dt = datetime.date.fromisoformat(d.get("date"))
+                    day_lbl = dt.strftime("%a")
+                except Exception:
+                    day_lbl = "Day"
+                daily_list.append({
+                    "day": day_lbl,
+                    "date": d.get("date", ""),
+                    "condition": desc,
+                    "icon": icon,
+                    "high": int(d.get("maxtempC", temp_c + 3)),
+                    "low": int(d.get("mintempC", temp_c - 5))
+                })
+
+        now_dt = datetime.datetime.now()
+        time_str = now_dt.strftime("%A %I:%M %p")
+        loc_str = f"{city_name.title()}, Pakistan" if "pakistan" not in city_name.lower() else city_name.title()
+
+        return {
+            "location": loc_str,
+            "city": city_name.title(),
+            "time_str": time_str,
+            "current": current_dict,
+            "hourly": hourly_list,
+            "daily": daily_list
+        }
+    except Exception as e:
+        print(f"[wttr.in Error] {e}")
+        return None
+
+
+def fetch_live_weather(city_query: str = "Faisalabad") -> Optional[Dict[str, Any]]:
+    """Fetches verified live weather, hourly timeline, and 7-day forecast from Open-Meteo with wttr.in fallback."""
+    clean_q = city_query.strip().strip("?,.!")
+    try:
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={requests.utils.quote(clean_q)}&count=1"
         geo_res = requests.get(geo_url, timeout=5).json()
         if not geo_res.get("results"):
-            # Fallback to Faisalabad if unknown
+            # Try wttr.in before fallback
+            wttr_res = fetch_wttr_in(clean_q)
+            if wttr_res:
+                return wttr_res
             if clean_q.lower() != "faisalabad":
                 return fetch_live_weather("Faisalabad")
             return None
@@ -89,6 +181,16 @@ def fetch_live_weather(city_query: str = "Faisalabad") -> Optional[Dict[str, Any
         data = requests.get(om_url, timeout=6).json()
 
         curr_raw = data.get("current", {})
+        # If Open-Meteo returns empty/missing current or an anomalous 0-all payload, fall back to wttr.in
+        temp_val = curr_raw.get("temperature_2m")
+        hum_val = curr_raw.get("relative_humidity_2m", 0)
+        wind_val = curr_raw.get("wind_speed_10m", 0)
+
+        if not curr_raw or temp_val is None or (temp_val == 0 and hum_val == 0 and wind_val == 0):
+            wttr_res = fetch_wttr_in(city_name)
+            if wttr_res:
+                return wttr_res
+
         w_code = curr_raw.get("weather_code", 0)
         is_day = curr_raw.get("is_day", 1)
         cond_text, icon_day, icon_night = WMO_CODES.get(w_code, ("Fair", "sun", "moon"))
@@ -164,4 +266,7 @@ def fetch_live_weather(city_query: str = "Faisalabad") -> Optional[Dict[str, Any
         }
     except Exception as e:
         print(f"[Weather API Error] {e}")
+        wttr_res = fetch_wttr_in(clean_q)
+        if wttr_res:
+            return wttr_res
         return None

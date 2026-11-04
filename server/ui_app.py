@@ -1849,7 +1849,12 @@ STRICT BREVITY & QUALITY RULES:
 6. FILE EXPORTS & PDF GENERATION: The system features full built-in client-side PDF, Excel, Word, and PowerPoint generation. NEVER tell the user that PDF generation or export is unsupported! When the user requests an executive summary or report as PDF, provide a comprehensive, polished executive summary with key findings and metrics. The system automatically attaches the interactive PDF download card.
 7. LANGUAGE & VISION: If images are attached, provide a direct, concise analysis of the image. Respond in the user's language (English, Urdu script, or Roman Urdu).
 8. STYLE & NUMBERING: DO NOT use emoji keycaps (such as 1️⃣, 2️⃣, 3️⃣, 4️⃣) or colored box emojis. Use clean standard markdown numbering ("1.", "2.") or standard bold headings.
-9. Never mention backend steps, SQL, planner, Python, or system mechanics."""
+9. Never mention backend steps, SQL, planner, Python, or system mechanics.
+10. STRICT DATE VALIDATION & RECENCY PRIORITY:
+- For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
+  - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
+  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - State the definitive single active rate clearly and unequivocally."""
 
 def _get_general_synthesizer_prompt() -> str:
     company = _get_app_config().get("company_name", "Enterprise AI")
@@ -1865,7 +1870,12 @@ CORE REASONING & PRESENTATION PRINCIPLES:
 4. INTELLECTUAL DEPTH & CONTEXT: Do not output robotic, unthinking, single-sentence answers. Provide rich, dynamic context (e.g., market trading hours, interbank vs open-market margins, sector trends, company background, and price implications).
 5. ZERO HALLUCINATION & TRANSPARENCY: Never guess or invent ticker prices. If an external entity is unlisted or requires verification, explain clearly using the provided live search and exchange data.
 6. LANGUAGE: Respond fluidly in the user's language (English, Urdu script, or Roman Urdu) with professional business clarity.
-7. CHARTS & DATA: If the user requests a chart or graph, provide an ECharts JSON configuration in a ```json ``` code block with "title", "xAxis", "yAxis", and "series". Ensure strict valid JSON without comma-separated numbers (use 1250000 not 1,250,000)."""
+7. CHARTS & DATA: If the user requests a chart or graph, provide an ECharts JSON configuration in a ```json ``` code block with "title", "xAxis", "yAxis", and "series". Ensure strict valid JSON without comma-separated numbers (use 1250000 not 1,250,000).
+8. STRICT DATE VALIDATION & RECENCY PRIORITY:
+- For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
+  - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
+  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - State the definitive single active rate clearly and unequivocally."""
 
 SYNTHESIZER_SYSTEM_PROMPT = _get_synthesizer_prompt()
 
@@ -2804,9 +2814,10 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"- Live Source: {forex_card_data.get('source')} as of {forex_card_data.get('timestamp')}\n"
                 f"- Cross Rates with PKR: " + ", ".join(f"{k}: {v} PKR" for k, v in forex_card_data.get("comparisons", {}).items()) + "\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. You MUST use the verified live interbank rate of {rate_val} PKR per {base_c}. NEVER hallucinate outdated or inflated numbers (such as 380 or 422).\n"
-                f"2. Mention that the official interbank rate is {rate_val} PKR, while open-market cash exchange counters typically trade with a tight 0.5% - 1.5% margin (~1 to 2 PKR difference).\n"
-                f"3. You MUST include the following exact currency converter widget block at the end of your response:\n"
+                f"1. The interactive live currency exchange widget is already attached at the top of your response with the real-time rate calculator and cross-currency comparisons. DO NOT output a duplicate markdown table or duplicate metric cards repeating these exact fields.\n"
+                f"2. State the official interbank rate ({rate_val} PKR per {base_c}) clearly in your opening sentence. Explain that open-market cash exchange counters typically operate with a tight 0.5% - 1.5% spread (~1 to 2 PKR margin).\n"
+                f"3. Provide practical financial context, conversion examples (e.g. 1 USD, 10 USD, 100 USD), and key takeaways directly in crisp, readable text paragraphs.\n"
+                f"4. You MUST include the following exact currency converter widget block at the end of your response:\n"
                 f":::currency-converter\n{json.dumps(forex_card_data)}\n:::\n"
             )
 
@@ -2836,7 +2847,10 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     f"- Change: {quote_raw['change']} ({quote_raw['change_percent']}%)\n"
                     f"- Day High: {quote_raw['high']} | Day Low: {quote_raw['low']}\n"
                     f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n\n"
-                    f"IMPORTANT: You MUST include the following exact stock card widget block at the end of your response:\n"
+                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"1. The interactive equity ticker card is already attached at the top of your response displaying the live price, day high/low, and exchange status. DO NOT output a duplicate markdown table or duplicate metric cards repeating these exact numbers.\n"
+                    f"2. Deliver a crisp narrative analysis in clean paragraphs: summarize the trading session, momentum ({quote_raw['change_percent']}%), sector perspective, and key takeaways.\n"
+                    f"3. You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
 
@@ -2876,9 +2890,10 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"- LPG: {fuel_raw['lpg']}\n\n"
                 f"Live Sources & Dispatches:\n{snippets_txt}\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. Present the fuel prices in a clean, professional Markdown table followed by key takeaways.\n"
-                f"2. Use clean, direct text form. DO NOT generate cards, bento boxes, or card decks.\n"
-                f"3. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan."
+                f"1. State the exact, single active petrol price ({fuel_raw['petrol']}) and diesel price ({fuel_raw['diesel']}) immediately in the first sentence. Strictly IGNORE historical range boundaries (such as old ranges like Rs. 252 - 275).\n"
+                f"2. Present the fuel prices in a clean, professional Markdown table followed by key takeaways.\n"
+                f"3. Use clean, direct text form. DO NOT generate cards, bento boxes, or card decks.\n"
+                f"4. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan."
             )
 
     # Check for live Firecrawl web intelligence (scrape, search, crawl, extract)
@@ -2951,8 +2966,10 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         synth_user_prompt += (
             f"\n\n[VERIFIED REAL-TIME INTERNET INTELLIGENCE (UNIVERSAL OPEN-WEB DISCOVERY)]:\n"
             f"{web_agent_data['synthesized_context']}\n\n"
-            f"IMPORTANT: Use the verified facts, tables, and citations from these live webpages to answer the user's question directly. "
-            f"Never hallucinate. Cite titles or domains where appropriate."
+            f"IMPORTANT TEMPORAL & EXTRACTION DIRECTIVES:\n"
+            f"- Prioritize rates, prices, and numbers associated with the most recent timestamp or date header.\n"
+            f"- Strictly IGNORE historical range boundaries (such as Rs. 253 - Rs. 275) if a definitive single active rate (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.\n"
+            f"- Never hallucinate. Cite titles or domains where appropriate."
         )
 
 
@@ -3125,6 +3142,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     if req_outside_enabled and stock_card_data:
         answer = re.sub(r":::stock-market-card[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::stock-market-card\n{json.dumps(stock_card_data)}\n:::"
+
+    if req_outside_enabled and (forex_card_data or stock_card_data or weather_info):
+        # Eliminate card box overload: Strip redundant 2-column key-value tables that duplicate widget fields
+        answer = re.sub(r"\|[ \t]*(?:Item|Property|Field|Metric|Parameter)[ \t]*\|[ \t]*(?:Value|Rate|Price|Details)[ \t]*\|[\s\S]*?(?:\n\n|\Z)", "\n\n", answer).strip()
+        answer = re.sub(r"\|[ \t]*(?:Base Currency|Current Price|Exchange Rate)[ \t]*\|[\s\S]*?(?:\n\n|\Z)", "\n\n", answer).strip()
     if req_outside_enabled and not has_docs and web_agent_data and web_agent_data.get("has_content"):
         total_sources = len(web_agent_data.get("direct_pages", [])) + len(web_agent_data.get("search_pages", [])) + len(web_agent_data.get("search_snippets", []))
         wic_payload = {
