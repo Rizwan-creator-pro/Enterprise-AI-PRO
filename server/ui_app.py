@@ -1036,7 +1036,7 @@ def _match_endpoint_with_history(text: str, endpoints: List[dict], history_msgs:
             ep_prev = _match_endpoint(c, endpoints)
             if ep_prev:
                 return ep_prev
-    return endpoints[0] if endpoints else None
+    return None
 
 def _match_endpoint(text: str, endpoints: List[dict]) -> Optional[dict]:
     t = (text or "").lower().strip()
@@ -1821,11 +1821,13 @@ RULES:
    - ALWAYS include {{"tool": "web_search", "query": "..."}} in "external_tools".
 
 15. CONVERSATIONAL TABLE CLARIFICATION (STOP GUESSING TABLES):
-When a user gives an ambiguous visualization, data exploration, or file export command (e.g. "show a chart", "draw a graph", "plot this", "visualize", "export this to presentation", "make a presentation", "export to ppt", "generate executive summary", "give me data", "show data") WITHOUT specifying any table or entity name (and there is NO prior table context in the conversation history):
-   - You MUST NOT guess, assume, or default to an arbitrary table (e.g. NEVER randomly choose "Employees Directory" or "PRODUCTS")!
+- When a user gives an ambiguous visualization, data exploration, or file export command (e.g. "Give me the data as a PDF:", "export to PDF", "download as excel", "word document", "show a chart", "draw a graph", "plot this", "visualize", "export to ppt", "give me data", "show data"):
+- If the current message text does NOT explicitly name a valid database table (EVEN IF a table was looked at previously in conversation history):
+   - You MUST treat the query as ambiguous and stop guessing entirely!
+   - NEVER default to or assume "Employees Directory", "PRODUCTS", or any prior table!
    - Set "mode": "clarification_needed"
    - Set "target_table": null
-   - Populate "clarification_message" with a polite, helpful human-like counter-question listing the available authorized tables ({schema}) and asking which specific dataset or metric they would like to work with.
+   - Populate "clarification_message" with: "Which specific dataset would you like me to compile into your PDF document?" (adjusting "PDF" to Excel, Word, or PowerPoint if another format was requested) followed by the structural bullet list of available tables.
 """
 
 PLANNER_ROUTING_SYSTEM_PROMPT = PLANNER_SYSTEM_PROMPT
@@ -2421,6 +2423,41 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000)}
             }
 
+    # -------------------------------------------------------------------------
+    # STRICT FILE EXPORT CLARIFICATION ENFORCEMENT (STOP GUESSING TABLES)
+    # Whenever a file export keyword (PDF, Excel, Word, PPT) is detected,
+    # if the exact message text from the user does NOT explicitly name a valid database table
+    # (even if a table was looked at previously in conversation history), treat query as ambiguous,
+    # force "mode": "clarification_needed", and return counter-question with available tables.
+    # -------------------------------------------------------------------------
+    file_export_match = re.search(r"\b(pdf|excel|xlsx?|word|docx?|ppt|powerpoint|presentation|spreadsheet)\b", req.question.lower())
+    has_file_export_kw = bool(file_export_match) or bool(_asked_kinds(req.question))
+    matched_in_q = _match_endpoint(req.question, endpoints)
+    matched_eps_in_q = _match_endpoints_multi(req.question, endpoints)
+
+    if has_file_export_kw and not matched_in_q and not matched_eps_in_q and not has_images and not has_docs:
+        kw = file_export_match.group(1).lower() if file_export_match else "pdf"
+        if any(x in kw for x in ["excel", "xls", "spreadsheet"]):
+            doc_type = "Excel"
+        elif any(x in kw for x in ["word", "doc"]):
+            doc_type = "Word"
+        elif any(x in kw for x in ["ppt", "powerpoint", "presentation"]):
+            doc_type = "PowerPoint"
+        else:
+            doc_type = "PDF"
+
+        tables_list = "\n".join([f"- **{ep.get('endpoint_name')}**" for ep in endpoints if ep.get("endpoint_name")]) if endpoints else "your authorized database tables"
+        counter_question = f"Which specific dataset would you like me to compile into your {doc_type} document?\n\n{tables_list}"
+
+        emit("Clarification needed – awaiting dataset selection for file export.")
+        _save_and_record(req, counter_question, t_start, provider_used="File Export Orchestrator (Clarification)", total_tokens=0)
+        return {
+            "answer": counter_question,
+            "provider_used": "File Export Orchestrator (Clarification)",
+            "kpis": [],
+            "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
+        }
+
     # Fast path: instant file dump skips LLM entirely (0 tokens, 0ms latency)
     asked = _asked_kinds(req.question)
     if asked and _is_plain_dump(req.question) and not has_images and not has_docs:
@@ -2441,21 +2478,20 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 "kpis": [{"label": "Combined Tables", "value": str(len(tables_data))}],
                 "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
             }
-        else:
-            best_ep = matched_eps[0] if matched_eps else _match_endpoint_with_history(req.question, endpoints, history_msgs)
-            if best_ep:
-                emit("Preparing your file export directly…")
-                best_name = str(best_ep.get("endpoint_name", "Data"))
-                rows = _fetch_single_table_dataset(best_ep, emit)
-                answer = _dump_answer(best_name, rows, asked)
-                answer = _force_markers(req.question, answer)
-                _save_and_record(req, answer, t_start)
-                return {
-                    "answer": answer,
-                    "provider_used": "Direct Export Engine (0 tokens)",
-                    "kpis": qe.compute_kpis(rows),
-                    "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
-                }
+        elif len(matched_eps) == 1:
+            best_ep = matched_eps[0]
+            emit("Preparing your file export directly…")
+            best_name = str(best_ep.get("endpoint_name", "Data"))
+            rows = _fetch_single_table_dataset(best_ep, emit)
+            answer = _dump_answer(best_name, rows, asked)
+            answer = _force_markers(req.question, answer)
+            _save_and_record(req, answer, t_start)
+            return {
+                "answer": answer,
+                "provider_used": "Direct Export Engine (0 tokens)",
+                "kpis": qe.compute_kpis(rows),
+                "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
+            }
 
     # Load providers
     providers = _get_active_ai_providers()
@@ -2570,16 +2606,29 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         needs_clarification = (
             plan.get("mode") == "clarification_needed"
             or bool(plan.get("clarification_message"))
+            or (has_file_export_kw and not matched_in_q and not matched_eps_in_q)
             or (is_ambiguous_request and not matched_in_q and not has_history_table and not (fuel_intent or forex_intent or stock_intent or weather_city))
         )
 
         if needs_clarification:
-            tables_list = "\n".join([f"- **{ep.get('endpoint_name')}**" for ep in endpoints]) if endpoints else "your authorized database tables"
-            clarification_msg = plan.get("clarification_message") or (
-                "I'd be glad to help with that! Which authorized dataset would you like to use?\n\n"
-                f"{tables_list}\n\n"
-                "Please let me know which table or specific metrics you would like to visualize or export."
-            )
+            tables_list = "\n".join([f"- **{ep.get('endpoint_name')}**" for ep in endpoints if ep.get("endpoint_name")]) if endpoints else "your authorized database tables"
+            if has_file_export_kw:
+                kw = file_export_match.group(1).lower() if file_export_match else "pdf"
+                if any(x in kw for x in ["excel", "xls", "spreadsheet"]):
+                    doc_type = "Excel"
+                elif any(x in kw for x in ["word", "doc"]):
+                    doc_type = "Word"
+                elif any(x in kw for x in ["ppt", "powerpoint", "presentation"]):
+                    doc_type = "PowerPoint"
+                else:
+                    doc_type = "PDF"
+                clarification_msg = plan.get("clarification_message") or f"Which specific dataset would you like me to compile into your {doc_type} document?\n\n{tables_list}"
+            else:
+                clarification_msg = plan.get("clarification_message") or (
+                    "I'd be glad to help with that! Which authorized dataset would you like to use?\n\n"
+                    f"{tables_list}\n\n"
+                    "Please let me know which table or specific metrics you would like to visualize or export."
+                )
             emit("Clarification needed — awaiting dataset selection.")
             _save_and_record(req, clarification_msg, t_start, provider_used=provider_used or "Query Planner", total_tokens=total_tokens_used)
             return {
