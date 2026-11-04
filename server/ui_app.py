@@ -2139,7 +2139,12 @@ async def run_hybrid_orchestrator(
             fuel_int = extract_fuel_intent(question)
             forex_int = extract_forex_intent(question)
             stock_int = extract_stock_intent(question, history_msgs or [])
-            weather_int = extract_weather_intent(question)
+            weather_int = extract_weather_intent(question, default_city=client_city)
+
+            is_weather_context = any(
+                wk in question.lower()
+                for wk in ["weather", "temperature", "forecast", "climate", "mausam", "rain", "humidity", "hot today", "cold today"]
+            )
 
             if fuel_int:
                 cntry = fuel_int.get("country") or client_country or "Pakistan"
@@ -2148,11 +2153,20 @@ async def run_hybrid_orchestrator(
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
             elif stock_int:
                 external_tool_calls.append({"tool": "stock", "symbol": stock_int})
-            elif weather_int:
-                c_w = weather_int or client_city or "Lahore"
+            elif weather_int or is_weather_context:
+                # Dynamically prioritize user's actual live client_city over base Lahore default
+                c_w = weather_int or (client_city.strip() if client_city else None) or "Lahore"
                 external_tool_calls.append({"tool": "weather", "city": c_w})
             elif not has_db_intent:
                 external_tool_calls.append({"tool": "web_search", "query": question})
+
+        # Sanitize any plan-generated weather tool calls to auto-localize if defaulting to Lahore
+        for tool_call in external_tool_calls:
+            if tool_call.get("tool") == "weather":
+                call_city = tool_call.get("city", "").strip()
+                if (not call_city or call_city.lower() == "lahore") and "lahore" not in question.lower():
+                    if client_city and client_city.strip():
+                        tool_call["city"] = client_city.strip().title()
     else:
         # STRICT PERIMETER: If general_ai_enabled is False, strictly forbid any external web tool fallbacks
         # and force the execution plan to stay contained inside the local database scope.
@@ -2335,20 +2349,29 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     if c_country and re.search(r"\b" + re.escape(c_country.lower()) + r"\b", req.question.lower()):
         has_country = True
 
+    from agent.weather_helper import KNOWN_CITIES
+    has_city = any(re.search(r"\b" + re.escape(ct) + r"\b", req.question.lower()) for ct in KNOWN_CITIES)
+    has_prep = bool(re.search(r"\b(?:in|for|at|of)\s+([a-zA-Z]{3,20})\b", req.question.lower()))
+    has_explicit = has_country or has_city or (has_prep and not any(k in req.question.lower() for k in ["in the", "of the", "for the"]))
+
     orch_question = req.question
-    if has_loc_kw and not has_country and (c_country or c_city):
-        loc_parts = [p for p in [c_city, c_country] if p]
-        if loc_parts:
-            loc_str = ", ".join(loc_parts)
+    if has_loc_kw and not has_explicit:
+        if c_city:
+            loc_str = f"{c_city}, {c_country}" if c_country else c_city
             orch_question = f"{req.question} in {loc_str}"
             logger.info(f"[Geo Localization] Auto-localized query: '{req.question}' -> '{orch_question}'")
+        elif c_country and not any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate"]):
+            orch_question = f"{req.question} in {c_country}"
+            logger.info(f"[Geo Localization] Auto-localized commodity query: '{req.question}' -> '{orch_question}'")
 
     if req_outside_enabled:
         can_search_ext = True
         is_outside_db = True
         forex_intent = extract_forex_intent(orch_question)
         stock_intent = extract_stock_intent(orch_question, history_msgs)
-        weather_city = extract_weather_intent(orch_question)
+        weather_city = extract_weather_intent(orch_question, default_city=c_city)
+        if not weather_city and any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
+            weather_city = c_city.title() if c_city else "Lahore"
         fuel_intent = extract_fuel_intent(orch_question)
         firecrawl_intent = detect_firecrawl_intent(orch_question)
         direct_urls = extract_urls_from_text(orch_question)
@@ -2906,6 +2929,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # Check for live weather request (only when General AI is enabled)
     weather_info = None
     if req_outside_enabled and weather_city:
+        if weather_city.lower() == "lahore" and "lahore" not in req.question.lower() and c_city:
+            weather_city = c_city.title()
         from agent.weather_helper import fetch_live_weather
         weather_info = fetch_live_weather(weather_city)
         if weather_info:

@@ -58,7 +58,10 @@ def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Opt
         if c not in ["current", "today", "todays", "today's", "live", "local", "the", "what is the", "how is the", "check"]:
             return c.title()
 
-    return (default_city or "Lahore").title()
+    if default_city and str(default_city).strip():
+        return str(default_city).strip().title()
+
+    return None
 
 def fetch_wttr_in(city_name: str) -> Optional[Dict[str, Any]]:
     """Resilient fallback meteorological provider querying wttr.in JSON API."""
