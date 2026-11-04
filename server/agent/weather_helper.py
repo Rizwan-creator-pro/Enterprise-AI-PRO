@@ -32,7 +32,7 @@ KNOWN_CITIES = [
     "dubai", "new york", "tokyo", "paris", "beijing", "toronto"
 ]
 
-def extract_weather_intent(text: str) -> Optional[str]:
+def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Optional[str]:
     """Detects if the query asks about weather and extracts the target location."""
     t = text.lower().strip()
     if not any(k in t for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain today", "is it raining"]):
@@ -58,7 +58,7 @@ def extract_weather_intent(text: str) -> Optional[str]:
         if c not in ["current", "today", "todays", "today's", "live", "local", "the", "what is the", "how is the", "check"]:
             return c.title()
 
-    return "Faisalabad"
+    return (default_city or "Lahore").title()
 
 def fetch_live_weather(city_query: str = "Faisalabad") -> Optional[Dict[str, Any]]:
     """Fetches verified live weather, hourly timeline, and 7-day forecast from Open-Meteo."""

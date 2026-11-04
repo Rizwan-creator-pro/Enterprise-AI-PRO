@@ -7268,6 +7268,29 @@ const skeletonHTML = () => `
         let remember = localStorage.getItem('ai_remember') !== '0';   // on by default
         let outsideDb = localStorage.getItem('ai_outside_db') !== '0'; // on by default for live outside intelligence
 
+        // Global state to store user's localized geography safely
+        let userGeoContext = {
+            country: "Pakistan", // High-reliability local fallback
+            city: "Lahore"
+        };
+
+        // Fetch user country and city immediately on app mount via rapid JSON lookup
+        async function initializeUserLocation() {
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                if (response.ok) {
+                    const data = await response.json();
+                    userGeoContext.country = data.country_name || "Pakistan";
+                    userGeoContext.city = data.city || "Lahore";
+                    console.log(`[Geo Engine] Context locked to: ${userGeoContext.city}, ${userGeoContext.country}`);
+                }
+            } catch (error) {
+                console.warn("[Geo Engine] Network boundary isolated. Reverting to base fallbacks.", error);
+            }
+        }
+        document.addEventListener("DOMContentLoaded", initializeUserLocation);
+        initializeUserLocation();
+
         function setUserName(n) {
             document.getElementById('loggedInUser').textContent = n;
             const menuUser = document.getElementById('menuUser');
@@ -10572,7 +10595,9 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                         response_depth: currentResponseDepth,
                         provider_id: parseInt(selectedModel) || null,
                         images: currentImages,
-                        documents: currentDocs
+                        documents: currentDocs,
+                        client_country: userGeoContext.country,
+                        client_city: userGeoContext.city
                     })
                 });
                 if (!response.ok) {

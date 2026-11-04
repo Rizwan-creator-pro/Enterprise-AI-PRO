@@ -457,7 +457,7 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Live Fuel & Petroleum Intelligence
 # ---------------------------------------------------------------------------
-def extract_fuel_intent(text: str) -> Optional[Dict[str, Any]]:
+def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Detects if user is asking about petrol, diesel, fuel, or petroleum prices."""
     t = text.lower().strip()
     fuel_keywords = [
@@ -476,7 +476,7 @@ def extract_fuel_intent(text: str) -> Optional[Dict[str, Any]]:
     if not any(k in t for k in intent_triggers) and not any(k in t for k in ["petrol", "diesel", "fuel price"]):
         return None
 
-    country = "Pakistan"
+    country = default_country or "Pakistan"
     if any(k in t for k in ["global", "world", "international", "brent", "wti", "us"]):
         country = "International"
     elif "uae" in t or "dubai" in t:

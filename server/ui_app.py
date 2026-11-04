@@ -596,6 +596,8 @@ class ChatRequest(BaseModel):
     images: Optional[List[Any]] = Field(default_factory=list)
     documents: Optional[List[dict]] = Field(default_factory=list)
     response_depth: Optional[str] = "medium"
+    client_country: Optional[str] = None
+    client_city: Optional[str] = None
 
 
 class UpdateChatRequest(BaseModel):
@@ -1724,7 +1726,8 @@ Output ONLY a valid JSON object wrapped in ```json ``` code block. Do NOT write 
 PLAN JSON SCHEMA:
 {{
   "target_table": "Employees Directory",
-  "mode": "aggregate" | "raw" | "pivot" | "join" | "multi_table" | "direct_answer",
+  "mode": "aggregate" | "raw" | "pivot" | "join" | "multi_table" | "direct_answer" | "clarification_needed",
+  "clarification_message": "...",        // only when mode == "clarification_needed" (friendly counter-question)
   "left_table": "Employees Directory",   // when mode == "join"
   "right_table": "Departments",          // when mode == "join"
   "join_on": "department_id",            // common column key to join
@@ -1816,7 +1819,16 @@ RULES:
    - Set "mode": "direct_answer"
    - NEVER select an internal database table (do NOT assign "PRODUCTS" or "Employees Directory" to fuel, gold, or weather inquiries)!
    - ALWAYS include {{"tool": "web_search", "query": "..."}} in "external_tools".
+
+15. CONVERSATIONAL TABLE CLARIFICATION (STOP GUESSING TABLES):
+When a user gives an ambiguous visualization, data exploration, or file export command (e.g. "show a chart", "draw a graph", "plot this", "visualize", "export this to presentation", "make a presentation", "export to ppt", "generate executive summary", "give me data", "show data") WITHOUT specifying any table or entity name (and there is NO prior table context in the conversation history):
+   - You MUST NOT guess, assume, or default to an arbitrary table (e.g. NEVER randomly choose "Employees Directory" or "PRODUCTS")!
+   - Set "mode": "clarification_needed"
+   - Set "target_table": null
+   - Populate "clarification_message" with a polite, helpful human-like counter-question listing the available authorized tables ({schema}) and asking which specific dataset or metric they would like to work with.
 """
+
+PLANNER_ROUTING_SYSTEM_PROMPT = PLANNER_SYSTEM_PROMPT
 
 
 def _get_synthesizer_prompt() -> str:
@@ -2061,7 +2073,9 @@ async def run_hybrid_orchestrator(
     db_executor_func: Optional[Any] = None,
     general_ai_enabled: bool = False,
     user_id: Optional[str] = None,
-    history_msgs: Optional[List[Dict[str, Any]]] = None
+    history_msgs: Optional[List[Dict[str, Any]]] = None,
+    client_country: Optional[str] = None,
+    client_city: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Stage 2 Concurrent Execution Orchestrator:
@@ -2116,13 +2130,15 @@ async def run_hybrid_orchestrator(
             weather_int = extract_weather_intent(question)
 
             if fuel_int:
-                external_tool_calls.append({"tool": "fuel", "country": fuel_int.get("country", "Pakistan")})
+                cntry = fuel_int.get("country") or client_country or "Pakistan"
+                external_tool_calls.append({"tool": "fuel", "country": cntry})
             elif forex_int:
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
             elif stock_int:
                 external_tool_calls.append({"tool": "stock", "symbol": stock_int})
             elif weather_int:
-                external_tool_calls.append({"tool": "weather", "city": weather_int})
+                c_w = weather_int or client_city or "Lahore"
+                external_tool_calls.append({"tool": "weather", "city": c_w})
             elif not has_db_intent:
                 external_tool_calls.append({"tool": "web_search", "query": question})
     else:
@@ -2287,15 +2303,43 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # STRICT PERIMETER: Enforce General AI / Outside DB toggle
     # Outside intents are strictly gated by req_outside_enabled (General AI toggle state).
     # If the user has General AI turned OFF, NEVER override or auto-enable external discovery.
+    c_country = (req.client_country or "").strip()
+    c_city = (req.client_city or "").strip()
+
+    loc_keywords = [
+        "gold", "price", "prices", "fuel", "petrol", "diesel", "gas",
+        "rate", "rates", "weather", "forecast", "temperature",
+        "inflation", "silver", "commodity", "commodities"
+    ]
+    has_loc_kw = any(re.search(r"\b" + re.escape(k) + r"\b", req.question.lower()) for k in loc_keywords)
+
+    known_countries = [
+        "pakistan", "india", "usa", "us", "united states", "uk", "united kingdom",
+        "uae", "dubai", "saudi", "saudi arabia", "canada", "australia", "germany",
+        "china", "japan", "qatar", "kuwait", "oman", "turkey", "singapore",
+        "malaysia", "france", "italy", "bangladesh"
+    ]
+    has_country = any(re.search(r"\b" + re.escape(c) + r"\b", req.question.lower()) for c in known_countries)
+    if c_country and re.search(r"\b" + re.escape(c_country.lower()) + r"\b", req.question.lower()):
+        has_country = True
+
+    orch_question = req.question
+    if has_loc_kw and not has_country and (c_country or c_city):
+        loc_parts = [p for p in [c_city, c_country] if p]
+        if loc_parts:
+            loc_str = ", ".join(loc_parts)
+            orch_question = f"{req.question} in {loc_str}"
+            logger.info(f"[Geo Localization] Auto-localized query: '{req.question}' -> '{orch_question}'")
+
     if req_outside_enabled:
         can_search_ext = True
         is_outside_db = True
-        forex_intent = extract_forex_intent(req.question)
-        stock_intent = extract_stock_intent(req.question, history_msgs)
-        weather_city = extract_weather_intent(req.question)
-        fuel_intent = extract_fuel_intent(req.question)
-        firecrawl_intent = detect_firecrawl_intent(req.question)
-        direct_urls = extract_urls_from_text(req.question)
+        forex_intent = extract_forex_intent(orch_question)
+        stock_intent = extract_stock_intent(orch_question, history_msgs)
+        weather_city = extract_weather_intent(orch_question)
+        fuel_intent = extract_fuel_intent(orch_question)
+        firecrawl_intent = detect_firecrawl_intent(orch_question)
+        direct_urls = extract_urls_from_text(orch_question)
     else:
         can_search_ext = False
         is_outside_db = False
@@ -2493,6 +2537,48 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             emit(f"{provider['provider_name']} planner failed — trying fallback…")
             continue
 
+    # Conversational Table Clarification (Stop Guessing Tables)
+    if plan:
+        # Check if query is ambiguous without dataset reference in query or conversation history
+        has_history_table = False
+        if history_msgs:
+            for hm in reversed(history_msgs):
+                c = (hm.get("content") or "").lower()
+                if any((ep.get("endpoint_name") or "").lower() in c for ep in endpoints if ep.get("endpoint_name")):
+                    has_history_table = True
+                    break
+
+        is_ambiguous_request = any(k in req.question.lower() for k in [
+            "show a chart", "show chart", "draw a chart", "draw chart", "make a chart",
+            "make chart", "plot chart", "plot a chart", "visualize this", "create a chart",
+            "export this to presentation", "make a presentation", "create presentation",
+            "export to ppt", "export presentation", "generate presentation", "give me data",
+            "show data", "generate report", "make report"
+        ])
+        matched_in_q = _match_endpoint(req.question, endpoints)
+
+        needs_clarification = (
+            plan.get("mode") == "clarification_needed"
+            or bool(plan.get("clarification_message"))
+            or (is_ambiguous_request and not matched_in_q and not has_history_table and not (fuel_intent or forex_intent or stock_intent or weather_city))
+        )
+
+        if needs_clarification:
+            tables_list = "\n".join([f"- **{ep.get('endpoint_name')}**" for ep in endpoints]) if endpoints else "your authorized database tables"
+            clarification_msg = plan.get("clarification_message") or (
+                "I'd be glad to help with that! Which authorized dataset would you like to use?\n\n"
+                f"{tables_list}\n\n"
+                "Please let me know which table or specific metrics you would like to visualize or export."
+            )
+            emit("Clarification needed — awaiting dataset selection.")
+            _save_and_record(req, clarification_msg, t_start, provider_used=provider_used or "Query Planner", total_tokens=total_tokens_used)
+            return {
+                "answer": clarification_msg,
+                "provider_used": provider_used or "Query Planner",
+                "kpis": [],
+                "meta_stats": {"tokens": total_tokens_used, "ms": int((time.time() - t_start) * 1000), "cost": 0}
+            }
+
     if plan and not is_outside_db and plan.get("outside_rejected"):
         pol_msg = (
             "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
@@ -2606,13 +2692,15 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 orch_out = loop.run_until_complete(
                     run_hybrid_orchestrator(
                         plan=plan,
-                        question=req.question,
+                        question=orch_question,
                         endpoints=endpoints,
                         emit_func=emit,
                         db_executor_func=_local_db_worker if plan.get("mode") != "direct_answer" else None,
                         general_ai_enabled=req_outside_enabled,
                         user_id=req.user_id,
-                        history_msgs=history_msgs
+                        history_msgs=history_msgs,
+                        client_country=c_country,
+                        client_city=c_city
                     )
                 )
             finally:
@@ -2847,14 +2935,14 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         elif not _match_endpoint(req.question, endpoints) and not (forex_intent or stock_intent or weather_city or fuel_intent):
             emit("Querying open web intelligence & live sources...")
             web_agent_data = universal_internet_agent(
-                search_queries=[req.question],
+                search_queries=[orch_question],
                 direct_urls=[],
                 include_news=True
             )
         elif any(k in req.question.lower() for k in ["latest", "current", "release", "version", "update", "competitor", "market price", "vs online", "online"]):
             emit("Conducting dual-intent live web verification...")
             web_agent_data = universal_internet_agent(
-                search_queries=[req.question],
+                search_queries=[orch_question],
                 direct_urls=[],
                 include_news=True
             )
