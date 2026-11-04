@@ -335,14 +335,40 @@ def fetch_psx_indices() -> Optional[Dict[str, Any]]:
     return None
 
 def fetch_psx_company(sym: str) -> Optional[Dict[str, Any]]:
-    """Scrapes official real-time company stock quote directly from PSX Data Portal."""
+    """Scrapes official real-time company stock quote directly from PSX Data Portal with Scrapling stealth fallback."""
     clean_sym = sym.upper().replace(".KA", "").strip()
     url = f"https://dps.psx.com.pk/company/{clean_sym}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    html_text = ""
     try:
         r = requests.get(url, headers=headers, timeout=6)
-        if not r.ok or "quote__close" not in r.text:
-            return None
+        if r.ok and "quote__close" in r.text:
+            html_text = r.text
+    except Exception:
+        pass
+
+    if not html_text:
+        try:
+            from scrapling import Fetcher
+            p = Fetcher.get(url, timeout=8)
+            if p and p.status == 200 and "quote__close" in (p.html_content or ""):
+                html_text = p.html_content
+        except Exception:
+            try:
+                from curl_cffi import requests as c_requests
+                cr = c_requests.get(url, impersonate="chrome124", timeout=8)
+                if cr.status_code == 200 and "quote__close" in cr.text:
+                    html_text = cr.text
+            except Exception:
+                pass
+
+    if not html_text:
+        return None
+
+    try:
+        class FakeResp:
+            text = html_text
+        r = FakeResp()
         
         name_m = re.search(r'class="quote__name"[^>]*>([^<]+)', r.text)
         if not name_m:

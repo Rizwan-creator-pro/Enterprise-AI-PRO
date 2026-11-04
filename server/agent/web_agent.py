@@ -18,6 +18,18 @@ import trafilatura
 from bs4 import BeautifulSoup
 
 try:
+    from scrapling import AsyncFetcher, Fetcher, Selector
+    HAS_SCRAPLING = True
+except Exception:
+    HAS_SCRAPLING = False
+
+try:
+    from curl_cffi.requests import AsyncSession as CurlAsyncSession
+    HAS_CURL_CFFI = True
+except Exception:
+    HAS_CURL_CFFI = False
+
+try:
     from ddgs import DDGS
     HAS_DDGS = True
 except ImportError:
@@ -65,8 +77,12 @@ def extract_urls_from_text(text: str) -> List[str]:
 async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.0) -> Dict[str, Any]:
     """
     Universally reads ANY URL on the internet without hardcoded scrapers or selectors.
-    Extracts high-fidelity Markdown, structured tables, and page headings.
-    Falls back to dynamic JS rendering (r.jina.ai) if page is an SPA/React app.
+    Multi-tier stealth extraction pipeline:
+    1. Scrapling Stealth Engine (Browser TLS fingerprint impersonation - Bypasses Cloudflare / Anti-Bots)
+    2. curl_cffi direct Chrome impersonation fallback
+    3. Trafilatura high-accuracy article & table extractor
+    4. BeautifulSoup DOM sanitization
+    5. r.jina.ai dynamic JavaScript SPA fallback
     """
     clean_url = url.strip()
     if not clean_url.startswith(("http://", "https://")):
@@ -75,27 +91,53 @@ async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.
     parsed = urllib.parse.urlparse(clean_url)
     domain = parsed.netloc.lower().replace("www.", "")
     title = domain
-
-    # Step 1: Direct HTTP GET with browser emulation
     html_content = ""
-    try:
-        async with httpx.AsyncClient(headers=BROWSER_HEADERS, follow_redirects=True, timeout=timeout_sec) as client:
-            resp = await client.get(clean_url)
-            if resp.status_code == 200:
-                html_content = resp.text
-            elif resp.status_code in (403, 401, 503):
-                # Bot challenge or protected: jump straight to headless reader fallback
-                html_content = ""
-    except Exception as e:
-        html_content = ""
-
     markdown_text = ""
 
-    # Step 2: High-accuracy article & table extraction via Trafilatura
+    # Step 1: Scrapling Stealth Engine (Browser TLS Impersonation via curl_cffi/patchright)
+    if HAS_SCRAPLING:
+        try:
+            page = await AsyncFetcher.get(clean_url, timeout=int(timeout_sec))
+            if page and page.status == 200:
+                html_content = page.html_content or getattr(page, "text", "") or ""
+                t_css = page.css("title::text").get()
+                if t_css and t_css.strip():
+                    title = t_css.strip()
+                if hasattr(page, "markdown"):
+                    try:
+                        scrapling_md = page.markdown()
+                        if scrapling_md and len(scrapling_md.strip()) > 150:
+                            markdown_text = scrapling_md.strip()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Step 1b: curl_cffi direct Chrome impersonation fallback
+    if not html_content and HAS_CURL_CFFI:
+        try:
+            async with CurlAsyncSession(impersonate="chrome124") as session:
+                resp = await session.get(clean_url, timeout=timeout_sec)
+                if resp.status_code == 200:
+                    html_content = resp.text
+        except Exception:
+            pass
+
+    # Step 1c: Standard httpx fallback
+    if not html_content:
+        try:
+            async with httpx.AsyncClient(headers=BROWSER_HEADERS, follow_redirects=True, timeout=timeout_sec) as client:
+                resp = await client.get(clean_url)
+                if resp.status_code == 200:
+                    html_content = resp.text
+        except Exception:
+            pass
+
+    # Step 2: High-accuracy article & table extraction via Trafilatura (preferred for articles & data tables)
     if html_content:
         try:
             soup = BeautifulSoup(html_content, "html.parser")
-            if soup.title and soup.title.string:
+            if (not title or title == domain) and soup.title and soup.title.string:
                 title = soup.title.string.strip()
 
             extracted = trafilatura.extract(
@@ -107,15 +149,13 @@ async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.
             )
             if extracted and len(extracted.strip()) > 150:
                 markdown_text = extracted.strip()
-            else:
-                # Trafilatura couldn't extract enough text; try direct DOM cleanup
+            elif not markdown_text:
                 for tag in soup(["script", "style", "noscript", "svg", "nav", "footer", "header", "aside"]):
                     tag.decompose()
-                # Extract clean readable text
                 body_text = soup.get_text(separator="\n", strip=True)
-                lines = [l for l in body_text.splitlines() if len(l.strip()) > 3]
-                if len("\n".join(lines)) > 150:
-                    markdown_text = "\n".join(lines[:80])
+                valid_lines = [l for l in body_text.splitlines() if len(l.strip()) > 3]
+                if len("\n".join(valid_lines)) > 150:
+                    markdown_text = "\n".join(valid_lines[:80])
         except Exception:
             pass
 
@@ -126,22 +166,20 @@ async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.
             async with httpx.AsyncClient(timeout=timeout_sec + 3.0) as client:
                 jina_resp = await client.get(jina_url, headers={"User-Agent": "Mozilla/5.0"})
                 if jina_resp.status_code == 200 and len(jina_resp.text.strip()) > 100:
-                    lines = jina_resp.text.splitlines()
-                    for l in lines[:5]:
+                    j_lines = jina_resp.text.splitlines()
+                    for l in j_lines[:5]:
                         if l.startswith("Title:"):
                             title = l.replace("Title:", "").strip()
-                    # Strip Jina headers
-                    body_lines = [l for l in lines if not l.startswith(("Title:", "URL Source:", "Markdown Content:"))]
+                    body_lines = [l for l in j_lines if not l.startswith(("Title:", "URL Source:", "Markdown Content:"))]
                     markdown_text = "\n".join(body_lines).strip()
         except Exception:
             pass
 
     # Step 4: Truncate cleanly while preserving readability
     if markdown_text:
-        # Normalize whitespace
-        markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
+        markdown_text = re.sub(r"\n{3,}", "\n\n", markdown_text)
         if len(markdown_text) > max_chars:
-            markdown_text = markdown_text[:max_chars].rsplit('\n', 1)[0] + "\n\n_...[Content truncated for brevity]..._"
+            markdown_text = markdown_text[:max_chars].rsplit("\n", 1)[0] + "\n\n_...[Content truncated for brevity]..._"
         return {
             "url": clean_url,
             "domain": domain,
