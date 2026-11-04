@@ -275,9 +275,15 @@
         }
         html[data-theme="dark"] .empty-state h2 {
             color: #ffffff !important;
-            font-family: var(--font-body) !important;
+            font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif !important;
+            font-weight: 400 !important;
+            letter-spacing: -0.02em !important;
+            line-height: 1.14 !important;
+        }
+        .ai-text h1, .ai-text h2, .ai-text h3 {
+            font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif !important;
             font-weight: 500 !important;
-            letter-spacing: -0.015em !important;
+            letter-spacing: -0.01em !important;
         }
         html[data-theme="dark"] .es-logo {
             background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%) !important;
@@ -7260,7 +7266,7 @@ const skeletonHTML = () => `
         // ---- Model picker + menus ----
         let selectedModel = localStorage.getItem('ai_model') || '';
         let remember = localStorage.getItem('ai_remember') !== '0';   // on by default
-        let outsideDb = localStorage.getItem('ai_outside_db') === '1'; // off by default
+        let outsideDb = localStorage.getItem('ai_outside_db') !== '0'; // on by default for live outside intelligence
 
         function setUserName(n) {
             document.getElementById('loggedInUser').textContent = n;

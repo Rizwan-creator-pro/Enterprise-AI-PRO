@@ -1810,6 +1810,11 @@ RULES:
    - If the question asks for live web discovery, news, or general knowledge: include {{"tool": "web_search", "query": "..."}} in "external_tools".
    - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}.
    - You can combine enterprise database analysis with live open-web tools in a single execution plan!
+
+14. REAL-WORLD, COMMODITIES, FUEL & NEWS INQUIRIES: When the user asks about real-world topics, petrol/diesel/fuel rates, gold/silver prices, commodities, inflation, weather, forex/currency, stock market, sports, world events, or anything outside enterprise warehouse tables:
+   - Set "mode": "direct_answer"
+   - NEVER select an internal database table (do NOT assign "PRODUCTS" or "Employees Directory" to fuel, gold, or weather inquiries)!
+   - ALWAYS include {{"tool": "web_search", "query": "..."}} in "external_tools".
 """
 
 
@@ -1820,14 +1825,11 @@ You deliver direct, concise, high-value answers from verified enterprise data.
 
 STRICT BREVITY & QUALITY RULES:
 1. EXECUTIVE SUMMARY: Begin immediately with a crisp, authentic, and professional executive summary paragraph addressing the question directly. Use clear, simple, executive-grade language with zero filler or robotic phrases.
-2. BENTO METRICS DECK & STAGESHOW CRAFT: When reporting key operational figures, summaries, or multi-metric overviews, format the top 2 to 4 metrics in a clean Bento KPI deck block right below the summary:
-:::kpi-deck
-[
-  {{"label": "Total Active Records", "value": "30", "sub": "100% verified status"}},
-  {{"label": "Category Depth", "value": "4", "sub": "Core active groups"}}
-]
-:::
-This renders as miniature, framed executive Bento cards. Keep highlights visual and grounded in verified data.
+2. TEXT-FIRST & CLEAN MARKDOWN TABLES (NO CARD OVERLOAD):
+- Deliver your answer primarily in crisp, readable text and clean Markdown tables.
+- DO NOT overuse cards, bento blocks, or container boxes. Do NOT wrap every single figure or metric in box cards.
+- Only output :::kpi-deck when the user explicitly requests an executive KPI dashboard or metric cards.
+- Present data records, comparisons, or financial figures strictly inside a clean Markdown table. Let the table and text speak for themselves.
 3. MATHEMATICAL TRUTH: Use the exact verified numbers and table provided. Never guess or modify numbers.
 4. DATA IN TABLE FORM: When the user asks for data, records, or a table, you MUST present the data strictly inside a clean Markdown table. NEVER dump records as free-form plain text paragraphs, outreach templates, or pipe-separated lines outside the table. Let the table speak for itself. Keep textual explanation under 4 sentences total.
 5. ECHARTS & CHARTS: If chart JSON is provided in the prompt or requested, output it in a ```json ``` code block after the summary. Output STRICT VALID JSON: never include comments, never format numbers with commas inside JSON values (e.g. use 1115000, NEVER 1,115,000), and always use double quotes for property names.
@@ -1841,8 +1843,10 @@ def _get_general_synthesizer_prompt() -> str:
     return f"""You are Enterprise AI Hub's elite, dynamic intelligence assistant for {company}.
 You operate with advanced multi-modal reasoning, real-time external intelligence feeds, and enterprise visual analytics.
 
-CORE REASONING & RESPONSE PRINCIPLES:
-1. INTENT DECOMPOSITION: If the user's inquiry contains multiple parts or intents (e.g., currency rate AND stock market price, or calculation AND company analysis), break down each component thoughtfully. Provide structured, dedicated sections or clear bullet points so every part of the question is answered thoroughly and accurately.
+CORE REASONING & PRESENTATION PRINCIPLES:
+1. TEXT-FIRST & DIRECT ANSWERS (NO CARD OVERLOAD): Answer the user directly in authoritative, well-formatted text and clean Markdown tables. Avoid redundant cards, bento boxes, or excessive UI container blocks.
+2. CLEAN TABLES FOR TABULAR DATA: When presenting prices, exchange rates, fuel rates, or comparative numbers, format them in a single clean Markdown table followed by concise key takeaways.
+3. INTENT DECOMPOSITION: If the user's inquiry contains multiple parts or intents (e.g., currency rate AND stock market price, or calculation AND company analysis), break down each component thoughtfully. Provide structured, dedicated sections or clear bullet points so every part of the question is answered thoroughly and accurately.
 2. REAL-TIME FACTUAL BENCHMARKS: When provided with verified live feeds (Interbank Forex, Central Bank Benchmarks, Pakistan Stock Exchange PSX, Global Equities, Weather, or Firecrawl Web Intelligence), treat these numbers as authoritative ground truth. Clearly cite exact values, currency symbols (PKR, USD, etc.), and timestamps.
 3. GROUND TRUTH FROM USER IMAGES: When the user attaches an image or screenshot (such as an exchange trading screen, chart, ERP interface, or invoice), the visual evidence is the user's direct ground truth. Inspect the image with extreme precision: read exact ticker symbols, trading prices, dates, percentages, and labels shown in the screenshot. If there is any variance with older cached feeds, explicitly acknowledge and validate the user's screenshot as the primary snapshot.
 4. INTELLECTUAL DEPTH & CONTEXT: Do not output robotic, unthinking, single-sentence answers. Provide rich, dynamic context (e.g., market trading hours, interbank vs open-market margins, sector trends, company background, and price implications).
@@ -2009,7 +2013,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
 
     from agent.external_intelligence import (
         extract_forex_intent, fetch_live_forex, format_forex_payload,
-        extract_stock_intent, fetch_psx_indices, fetch_stock_quote
+        extract_stock_intent, fetch_psx_indices, fetch_stock_quote,
+        extract_fuel_intent, fetch_live_fuel_prices
     )
     from agent.weather_helper import extract_weather_intent, fetch_live_weather
 
@@ -2076,6 +2081,13 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         except Exception:
             history_msgs = []
 
+    # Automatic outside intent detection (seamless answering for real-world queries)
+    fuel_intent = extract_fuel_intent(req.question)
+    auto_outside = bool(fuel_intent or extract_forex_intent(req.question) or extract_stock_intent(req.question, history_msgs) or extract_weather_intent(req.question))
+    if auto_outside:
+        req_outside_enabled = True
+        is_outside_db = True
+
     # STRICT PERIMETER: Enforce General AI / Outside DB toggle
     if req_outside_enabled:
         can_search_ext = True
@@ -2083,6 +2095,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         forex_intent = extract_forex_intent(req.question)
         stock_intent = extract_stock_intent(req.question, history_msgs)
         weather_city = extract_weather_intent(req.question)
+        fuel_intent = extract_fuel_intent(req.question)
         firecrawl_intent = detect_firecrawl_intent(req.question)
         direct_urls = extract_urls_from_text(req.question)
     else:
@@ -2091,6 +2104,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         forex_intent = None
         stock_intent = None
         weather_city = None
+        fuel_intent = None
         firecrawl_intent = None
         direct_urls = []
 
@@ -2294,6 +2308,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             "kpis": [],
             "meta_stats": {"tokens": total_tokens_used, "ms": int((time.time() - t_start) * 1000), "cost": 0}
         }
+
+    # If inquiry is an external real-world topic, never query internal tables
+    if (fuel_intent or forex_intent or stock_intent or weather_city) and plan:
+        plan["target_table"] = None
+        plan["mode"] = "direct_answer"
 
     # STAGE 3: Execute Plan in Python (Exact numbers, 0 tokens)
     exec_result = None
@@ -2510,6 +2529,28 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"2. DO NOT output hourly timelines or lists of hours/days in your text. The interactive graphical weather card will be attached automatically below your response."
             )
 
+    # Check for live fuel / petroleum prices request
+    fuel_data = None
+    if req_outside_enabled and fuel_intent:
+        emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
+        fuel_raw = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
+        if fuel_raw:
+            fuel_data = fuel_raw
+            snippets_txt = "\n".join(fuel_raw.get("snippets", []))
+            synth_user_prompt += (
+                f"\n\n[VERIFIED REAL-TIME FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} AS OF {fuel_raw['timestamp']}]:\n"
+                f"- Petrol (Premier Super): {fuel_raw['petrol']}\n"
+                f"- High Speed Diesel (HSD): {fuel_raw['diesel']}\n"
+                f"- Hi-Octane (97 RON): {fuel_raw['hi_octane']}\n"
+                f"- Kerosene Oil: {fuel_raw['kerosene']}\n"
+                f"- LPG: {fuel_raw['lpg']}\n\n"
+                f"Live Sources & Dispatches:\n{snippets_txt}\n\n"
+                f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                f"1. Present the fuel prices in a clean, professional Markdown table followed by key takeaways.\n"
+                f"2. Use clean, direct text form. DO NOT generate cards, bento boxes, or card decks.\n"
+                f"3. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan."
+            )
+
     # Check for live Firecrawl web intelligence (scrape, search, crawl, extract)
     firecrawl_result_data = None
     if req_outside_enabled and firecrawl_intent:
@@ -2561,7 +2602,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 direct_urls=browse_urls,
                 include_news=True
             )
-        elif req_outside_enabled and not _match_endpoint(req.question, endpoints) and not (forex_intent or stock_intent or weather_city):
+        elif req_outside_enabled and not _match_endpoint(req.question, endpoints) and not (forex_intent or stock_intent or weather_city or fuel_intent):
             emit("Querying open web intelligence & live sources...")
             web_agent_data = universal_internet_agent(
                 search_queries=[req.question],
@@ -2759,8 +2800,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         }
         answer = re.sub(r":::web-intelligence[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::web-intelligence\n{json.dumps(wic_payload)}\n:::"
+
     kpis_out = exec_result.get("kpis") if exec_result else []
-    if not kpis_out and has_docs and req.documents:
+    # Avoid card overload: Only generate kpis_out if user explicitly requested a KPI deck or multi-table overview
+    user_wants_deck = any(k in req.question.lower() for k in ["kpi", "bento", "metric card", "overview deck", "dashboard"])
+    if not kpis_out and has_docs and req.documents and user_wants_deck:
         d0 = req.documents[0]
         d_name = d0.get("name") or d0.get("filename") or "Attached Document"
         d_pages = d0.get("pages", 1)
@@ -2769,50 +2813,13 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             {"label": "Document Analyzed", "value": d_name[:24], "sub": f"Format: {d_type}"},
             {"label": "Document Scope", "value": f"{d_pages} Page{'s' if d_pages > 1 else ''}", "sub": "Verified Local Extraction"}
         ]
-    elif not kpis_out and has_images and req.images:
-        kpis_out = [
-            {"label": "Image Inspection", "value": f"{len(req.images)} Image{'s' if len(req.images) > 1 else ''}", "sub": "Multi-Modal Visual Analysis"},
-            {"label": "Visual Evidence", "value": "Direct Snapshot", "sub": "Zero Hallucination"}
-        ]
-    elif not kpis_out and forex_card_data:
-        kpis_out = [
-            {"label": f"{forex_card_data['base']} / {forex_card_data['target']} Interbank", "value": f"{forex_card_data['rate']} PKR", "sub": "Live Interbank Benchmark"},
-            {"label": "Converted Total", "value": f"{forex_card_data['converted_amount']:,.2f} PKR", "sub": f"{forex_card_data['amount']:,.2f} {forex_card_data['base']}"}
-        ]
-    elif not kpis_out and stock_card_data:
-        if "indices" in stock_card_data and stock_card_data["indices"]:
-            top_idx = stock_card_data["indices"][0]
-            kpis_out = [
-                {"label": f"{top_idx['index']} Index", "value": str(top_idx['value']), "sub": f"Change: {top_idx['change']}"},
-                {"label": "Exchange", "value": "PSX", "sub": "Pakistan Stock Exchange"}
-            ]
-        elif "price" in stock_card_data:
-            kpis_out = [
-                {"label": f"{stock_card_data['symbol']} Price", "value": f"{stock_card_data['price']} {stock_card_data['currency']}", "sub": f"Change: {stock_card_data.get('change', 0)} ({stock_card_data.get('change_percent', 0)}%)"},
-                {"label": "Day Range", "value": f"{stock_card_data.get('low', '-')} - {stock_card_data.get('high', '-')}", "sub": stock_card_data.get("exchange", "Market")}
-            ]
-    elif not kpis_out and firecrawl_result_data:
-        f_engine = firecrawl_result_data.get("engine", "Firecrawl")
-        f_type = (firecrawl_intent or {}).get("type", "Web").title()
-        kpis_out = [
-            {"label": "Web Engine", "value": "Firecrawl", "sub": f"Mode: {f_type}"},
-            {"label": "Data Source", "value": "Live Web", "sub": f"{f_engine}"}
-        ]
-    elif not kpis_out and web_agent_data and web_agent_data.get("has_content"):
-        total_sources = len(web_agent_data.get("direct_pages", [])) + len(web_agent_data.get("search_pages", [])) + len(web_agent_data.get("search_snippets", []))
-        kpis_out = [
-            {"label": "Web Engine", "value": "Universal Agent", "sub": "Zero Saved Sites"},
-            {"label": "Live Discoveries", "value": f"{total_sources} sources", "sub": "Open-Web Index"}
-        ]
-    elif not kpis_out and re.search(r"\b(how many|which|what|list)\b.{0,25}\b(tables?|sources?|endpoints?)\b", req.question.lower()):
-        kpis_out = [
-            {"label": "Authorized Tables", "value": str(len(endpoints)), "sub": ", ".join(ep.get("endpoint_name","") for ep in endpoints)},
-            {"label": "Catalog Mode", "value": "Schema-Indexed", "sub": "Zero-latency lazy loading"}
-        ]
 
-    if kpis_out:
+    if kpis_out and (user_wants_deck or is_multi_table):
         answer = re.sub(r":::kpi-deck[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::kpi-deck\n{json.dumps(kpis_out)}\n:::"
+    else:
+        # Strip any unrequested kpi-deck card wrappers so response stays in clean text & table format
+        answer = re.sub(r":::kpi-deck[\s\S]*?(?:::|$)", "", answer).strip()
 
     # Strip any hallucinated disclaimers about PDF generation not being supported
     answer = re.sub(r"(?i)\b(?:note:?\s*)?direct\s+pdf\s+generation\s+is\s+not\s+supported[^\.\n]*(\.|\n|$)", "", answer)
