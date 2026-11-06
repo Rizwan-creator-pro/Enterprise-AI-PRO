@@ -122,6 +122,19 @@ STOCK_SYMBOL_MAP = {
 def extract_forex_intent(text: str) -> Optional[Dict[str, Any]]:
     """Detects if user is asking about currency exchange rates or conversions."""
     t = text.lower().strip()
+
+    # Negative override: queries about internal enterprise database entities/schemas
+    # (e.g. employee, salary, department, products, warehouse stock, leads) are NOT standalone forex exchange requests!
+    db_entity_patterns = [
+        r"\b(?:employee|employees|salary|salaries|payroll|headcount|staff|worker|workers)\b",
+        r"\b(?:department|departments|designation|designations|hire\s*date|job\s*title)\b",
+        r"\b(?:product|products|inventory|unit\s*price|stock\s*quantity|stock\s*level|category|categories)\b",
+        r"\b(?:lead|leads|google\s*map|rating|reviews|phone\s*number|address)\b",
+        r"\b(?:table|database|records?|rows?|dataset|columns?)\b"
+    ]
+    if any(re.search(p, t) for p in db_entity_patterns):
+        return None
+
     currency_keywords = [
         "dollar", "usd", "pkr", "rupee", "rupees", "currency", "exchange rate", "forex",
         "dirham", "aed", "riyal", "sar", "euro", "eur", "pound", "gbp", "dinar", "exchange"
@@ -239,6 +252,11 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     # Negative override: queries about maps, leads, places, or directions are NOT stock queries
     if any(k in t for k in ["google map", "google maps", "g map", "gmap", "map lead", "map leads", "leads", "lead score", "niche"]):
         if not any(w in t for w in ["stock", "shares", "equity", "ticker", "nasdaq", "nyse", "psx", "kse"]):
+            return None
+
+    # Negative override: queries about product inventory / warehouse stock or employee payroll are NOT equity stock queries
+    if any(k in t for k in ["product", "products", "item", "items", "catalog", "inventory", "stock_qty", "in stock", "out of stock", "stock level", "unit price", "employee", "salary", "payroll", "department"]):
+        if not any(w in t for w in ["psx", "kse", "ticker", "shares", "equity", "nasdaq", "nyse", "dividend", "close", "open"]):
             return None
 
     # Ambiguous names that collide with common words or table names

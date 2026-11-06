@@ -2683,7 +2683,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         }
 
     # If inquiry is an external real-world topic, never query internal tables
-    if (fuel_intent or forex_intent or stock_intent or weather_city) and plan:
+    # UNLESS the query explicitly targets an authorized database entity/table!
+    is_explicit_db = bool(
+        _match_endpoint(req.question, endpoints)
+        or _match_endpoints_multi(req.question, endpoints)
+        or any(k in req.question.lower() for k in [
+            "employee", "employees", "salary", "salaries", "payroll", "headcount", "staff",
+            "department", "departments", "product", "products", "inventory", "lead", "leads"
+        ])
+    )
+    if not is_explicit_db and (fuel_intent or forex_intent or stock_intent or weather_city) and plan:
         plan["target_table"] = None
         plan["mode"] = "direct_answer"
 
@@ -2850,6 +2859,24 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         )
         if chart_json_str:
             synth_user_prompt += f"Verified Chart ECharts Config:\n```json\n{chart_json_str}\n```\n"
+
+        # Check if user requested dual-currency presentation (e.g. "in dollar and also in the pkr")
+        q_lower = req.question.lower()
+        has_currency_conv = (
+            any(c in q_lower for c in ["dollar", "usd", "pkr", "rupee", "rupees", "euro", "eur", "pound", "gbp", "aed", "sar"])
+            and any(k in q_lower for k in ["salary", "salaries", "price", "prices", "cost", "revenue", "budget", "in dollar", "in pkr", "in rupees", "in usd", "converted", "conversion", "also in"])
+        )
+        if has_currency_conv:
+            live_forex = fetch_live_forex("USD")
+            if live_forex and live_forex.get("rates"):
+                pkr_rate = live_forex["rates"].get("PKR", 276.63)
+                synth_user_prompt += (
+                    f"\n[LIVE CURRENCY BENCHMARK & MULTI-CURRENCY PRESENTATION DIRECTIVE]:\n"
+                    f"- Current Live Interbank Rate: 1 USD = {pkr_rate:,.2f} PKR (Source: {live_forex.get('source')} as of {live_forex.get('timestamp')}).\n"
+                    f"- The user specifically requested figures in BOTH USD ($) and PKR (Rs).\n"
+                    f"- INSTRUCTION: In your response, provide the departmental breakdown table showing columns for BOTH currencies: base USD ($) and converted PKR (Rs.) calculated at 1 USD = {pkr_rate:,.2f} PKR.\n"
+                    f"- Summarize key department payroll insights in both currencies in your executive commentary.\n"
+                )
     else:
         matched_ep = _match_endpoint(req.question, endpoints)
         if matched_ep:
