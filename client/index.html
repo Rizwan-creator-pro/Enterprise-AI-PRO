@@ -1954,8 +1954,8 @@
         @media (max-width: 768px) {
             .sidebar { position: absolute; height: 100%; transform: translateX(-100%); box-shadow: 4px 0 24px rgba(0,0,0,0.2); }
             .sidebar.open { transform: translateX(0); }
-            .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1; pointer-events: auto; visibility: visible; }
-            .sidebar:not(.open) ~ .sidebar-backdrop { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+            .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; }
+            .sidebar:not(.open) ~ .sidebar-backdrop:not(.show) { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; display: none !important; }
             .menu-toggle { display: block; }
             .top-bar { padding: 8px 12px; gap: 8px; }
             .brand-title { font-size: 14px; gap: 4px; white-space: nowrap; }
@@ -3396,9 +3396,9 @@
         /* ===== Credit Badges & Provider Tags ===== */
         .provider-tag { display: none !important; }
         /* ===== Mobile Sidebar Backdrop ===== */
-        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 95; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .2s ease, visibility .2s ease; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-        .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1; pointer-events: auto; visibility: visible; }
-        .sidebar:not(.open) ~ .sidebar-backdrop { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 95; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .2s ease, visibility .2s ease; }
+        .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
+        .sidebar:not(.open) ~ .sidebar-backdrop:not(.show) { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; display: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
         /* ===== Sidebar Search Bar ===== */
         .sidebar-search-wrap { position: relative; margin: 2px 14px 10px; display: flex; align-items: center; }
@@ -3832,8 +3832,8 @@
         .prompt-nav-toggle:hover, .prompt-nav-toggle.active { background: var(--sidebar-bg); color: var(--accent-blue); border-color: var(--accent-blue); }
         @media (max-width: 520px) { .prompt-nav-toggle span { display: none; } .prompt-nav-toggle { padding: 8px 10px; } }
 
-        .prompt-nav-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 120; opacity: 0; pointer-events: none; transition: opacity .25s ease; backdrop-filter: blur(2px); }
-        .prompt-nav-backdrop.show { opacity: 1; pointer-events: auto; }
+        .prompt-nav-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 120; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .25s ease; }
+        .prompt-nav-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
 
         .prompt-nav-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 340px; max-width: 85vw; background: var(--surface); border-left: 1px solid var(--border-color); z-index: 130; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -4px 0 24px var(--shadow-color); }
         .prompt-nav-drawer.open { transform: translateX(0); }
@@ -3856,10 +3856,10 @@
 
         /* ---- Claude-Style Chat Artifacts & Shared Media Drawer ---- */
         .chat-artifacts-backdrop {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
-            z-index: 129; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            z-index: 129; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .2s ease;
         }
-        .chat-artifacts-backdrop.show { opacity: 1; pointer-events: auto; }
+        .chat-artifacts-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
 
         .chat-artifacts-drawer {
             position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 90vw;
@@ -4599,9 +4599,9 @@
                 padding: 4px 10px !important;
             }
             .chat-container {
-                padding: 16px 20px 32px 20px !important;
-                padding-left: max(20px, env(safe-area-inset-left)) !important;
-                padding-right: max(20px, env(safe-area-inset-right)) !important;
+                padding: 12px 14px 28px 14px !important;
+                padding-left: max(14px, env(safe-area-inset-left)) !important;
+                padding-right: max(14px, env(safe-area-inset-right)) !important;
             }
         }
 
@@ -5270,7 +5270,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
                 const sb = document.getElementById('sidebar');
                 const bd = document.getElementById('sidebarBackdrop');
                 const open = sb.classList.toggle('open');
-                if (bd) bd.classList.toggle('show', open);
+                if (bd) {
+                    bd.classList.toggle('show', open);
+                    bd.style.display = open ? 'block' : 'none';
+                }
                 return;
             }
             const collapsed = document.getElementById('appLayout').classList.toggle('sb-collapsed');
@@ -5282,9 +5285,9 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const bd = document.getElementById('sidebarBackdrop');
             if (bd) {
                 bd.classList.remove('show');
+                bd.style.display = 'none';
                 bd.style.opacity = '0';
                 bd.style.pointerEvents = 'none';
-                setTimeout(() => { if (bd) { bd.style.opacity = ''; bd.style.pointerEvents = ''; } }, 200);
             }
         }
         try { if (localStorage.getItem('ai_sb_collapsed') === '1') document.getElementById('appLayout').classList.add('sb-collapsed'); } catch (e) {}
@@ -5308,7 +5311,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const isOpen = drawer.classList.contains('open');
             const willOpen = force !== undefined ? !!force : !isOpen;
             drawer.classList.toggle('open', willOpen);
-            if (backdrop) backdrop.classList.toggle('show', willOpen);
+            if (backdrop) {
+                backdrop.classList.toggle('show', willOpen);
+                backdrop.style.display = willOpen ? 'block' : 'none';
+            }
             if (toggleBtn) toggleBtn.classList.toggle('active', willOpen);
             if (willOpen) {
                 const searchInp = document.getElementById('promptSearchInput');
@@ -5419,7 +5425,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const isOpen = drawer.classList.contains('open');
             const willOpen = force !== undefined ? !!force : !isOpen;
             drawer.classList.toggle('open', willOpen);
-            if (backdrop) backdrop.classList.toggle('show', willOpen);
+            if (backdrop) {
+                backdrop.classList.toggle('show', willOpen);
+                backdrop.style.display = willOpen ? 'block' : 'none';
+            }
             if (toggleBtn) toggleBtn.classList.toggle('active', willOpen);
             if (willOpen) {
                 refreshChatArtifacts();
@@ -6978,6 +6987,28 @@ const skeletonHTML = () => `
                 const chgSign = isPos ? '+' : '';
                 const chgIcon = isPos ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
 
+                const hasEulerpool = (data.fair_value !== undefined && data.fair_value !== null) || (data.target_mean !== undefined && data.target_mean !== null);
+                const fairVal = (data.fair_value !== undefined && data.fair_value !== null) ? Number(data.fair_value).toFixed(2) : null;
+                const targetMean = (data.target_mean !== undefined && data.target_mean !== null) ? Number(data.target_mean).toFixed(2) : null;
+                const upsideVal = (data.upside !== undefined && data.upside !== null) ? Number(data.upside).toFixed(1) : null;
+                const upsideIsPos = upsideVal ? parseFloat(upsideVal) >= 0 : true;
+
+                let valuationRowHtml = '';
+                if (fairVal || targetMean || upsideVal) {
+                    valuationRowHtml = `
+                        <div class="smc-stats-row" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.22); border-radius: 10px; padding: 8px 12px; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 10px;">
+                            ${fairVal ? `<div class="smc-stat-col" title="Eulerpool DCF Fair Value Terminal"><span style="color: var(--text-muted); font-size: 11px;">Fair Value (DCF):</span> <strong style="color: #10b981; font-size: 13px;">${curr} ${fairVal}</strong></div>` : ''}
+                            ${targetMean ? `<div class="smc-stat-col" title="Analyst Consensus Target Mean"><span style="color: var(--text-muted); font-size: 11px;">Analyst Target:</span> <strong style="color: #6366f1; font-size: 13px;">${curr} ${targetMean}</strong></div>` : ''}
+                            ${upsideVal ? `<div class="smc-stat-col" title="Consensus Upside Potential"><span style="color: var(--text-muted); font-size: 11px;">Upside:</span> <strong style="color: ${upsideIsPos ? '#10b981' : '#ef4444'}; font-size: 13px;">${upsideIsPos ? '+' : ''}${upsideVal}%</strong></div>` : ''}
+                        </div>
+                    `;
+                }
+
+                const sourceLabel = hasEulerpool ? 'Eulerpool Research &bull; ' + escapeHtml(data.exchange || 'Global') : escapeHtml(data.exchange || 'Market');
+                const footerIntel = hasEulerpool
+                    ? `<span><i class="fa-solid fa-chart-pie"></i> Eulerpool Institutional Research &bull; DCF Valuation Terminal</span><span>${escapeHtml(data.timestamp || 'Live')}</span>`
+                    : `<span><i class="fa-solid fa-shield-halved"></i> Real-time Financial Quote &bull; ${escapeHtml(data.timestamp || 'Live')}</span><span>Exchange Verified</span>`;
+
                 card.innerHTML = `
                     <div class="smc-card-inner">
                         <div class="smc-header">
@@ -6988,7 +7019,7 @@ const skeletonHTML = () => `
                                     <span class="smc-sub">Live Equity Register & Market Quote</span>
                                 </div>
                             </div>
-                            <span class="smc-source-badge">${escapeHtml(data.exchange || 'Market')}</span>
+                            <span class="smc-source-badge">${sourceLabel}</span>
                         </div>
 
                         <div class="smc-stock-hero">
@@ -7005,9 +7036,10 @@ const skeletonHTML = () => `
                             <div class="smc-stat-col">Currency: <strong>${curr}</strong></div>
                         </div>
 
+                        ${valuationRowHtml}
+
                         <div class="cc-footer">
-                            <span><i class="fa-solid fa-shield-halved"></i> Real-time Financial Quote &bull; ${escapeHtml(data.timestamp || 'Live')}</span>
-                            <span>Exchange Verified</span>
+                            ${footerIntel}
                         </div>
                     </div>
                 `;

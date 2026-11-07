@@ -30,3 +30,5 @@ curl-cffi>=0.16.1            # Browser TLS fingerprint impersonation (JA3/JA4)
 markdownify>=1.2.0           # HTML to Markdown conversion engine for Scrapling
 patchright>=1.62.1           # Stealth browser automation engine for Scrapling
 browserforge>=1.2.4          # Realistic modern browser headers & client fingerprints
+
+eulerpool>=1.1.0             # Institutional stock analysis, fair value & equity data API

@@ -2919,8 +2919,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     f"- Current Price: {quote_raw['price']} {quote_raw['currency']}\n"
                     f"- Change: {quote_raw['change']} ({quote_raw['change_percent']}%)\n"
                     f"- Day High: {quote_raw['high']} | Day Low: {quote_raw['low']}\n"
-                    f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n\n"
-                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n"
+                )
+                if quote_raw.get("fair_value"):
+                    fv_val = f"{float(quote_raw['fair_value']):.2f}"
+                    up_val = f"{quote_raw.get('upside', 'N/A')}%"
+                    synth_user_prompt += f"- Eulerpool Fair Value: {fv_val} {quote_raw['currency']} (Upside: {up_val})\n"
+                if quote_raw.get("target_mean"):
+                    synth_user_prompt += f"- Analyst Target Mean: {quote_raw['target_mean']} {quote_raw['currency']}\n"
+                synth_user_prompt += (
+                    f"\nSTRICT INSTRUCTIONS FOR AI RESPONSE:\n"
                     f"1. Return ONLY a clean 1 to 2 sentence executive market commentary summarizing the company's price ({quote_raw['price']} {quote_raw['currency']}), momentum ({quote_raw['change_percent']}%), and sector context.\n"
                     f"2. ABSOLUTELY FORBIDDEN: NEVER output any markdown tables, tabular data, metric lists, bullet points of figures, or card blocks. The interactive equity ticker card is already attached and handles all quote metrics.\n"
                     f"3. You MUST include the following exact stock card widget block at the end of your response:\n"

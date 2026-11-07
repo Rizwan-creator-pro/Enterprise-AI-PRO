@@ -14,6 +14,12 @@ import time
 from typing import Optional, Dict, Any, Tuple, List
 
 # Common stock symbol aliases
+GLOBAL_STOCK_SYMBOLS = {
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "TSLA", "NVDA", "META",
+    "NFLX", "INTC", "AMD", "QCOM", "BABA", "ORCL", "IBM", "CSCO",
+    "CRM", "ADBE", "PYPL", "UBER", "ABNB", "SPOT", "DIS", "NKE"
+}
+
 STOCK_SYMBOL_MAP = {
     # PSX Major Equities
     "shadab": "SHDT",
@@ -419,21 +425,98 @@ def fetch_psx_company(sym: str) -> Optional[Dict[str, Any]]:
         print(f"[PSX Company Scrape Notice for {clean_sym}] {e}")
         return None
 
+def fetch_eulerpool_stock(symbol_or_query: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetches institutional equity research, fair value, price targets,
+    and fundamentals using the Eulerpool SDK (https://eulerpool.com).
+    """
+    import os
+    api_key = os.getenv("EULERPOOL_API_KEY", "eu_prod_1794002761034_8gcodzj7yue").strip()
+    if not api_key:
+        return None
+    try:
+        from eulerpool import Eulerpool
+        client = Eulerpool(api_key=api_key)
+        q = symbol_or_query.strip()
+        search_res = client.equity.search(q=q)
+        results = search_res.get('results', []) if isinstance(search_res, dict) else []
+        if not results:
+            return None
+
+        match = results[0]
+        ticker = match.get('ticker') or q.upper()
+        isin = match.get('isin')
+        name = match.get('name') or ticker
+        currency = match.get('currency', 'USD')
+
+        prof = {}
+        try:
+            prof = client.equity.profile(ticker)
+        except Exception:
+            pass
+
+        pt = {}
+        try:
+            pt = client.equity.price_target(ticker)
+        except Exception:
+            pass
+
+        fv = {}
+        if isin:
+            try:
+                fv = client.fair_value.by_isin(isin)
+            except Exception:
+                pass
+
+        last_price = fv.get('lastPrice')
+        fair_value = fv.get('fairValue')
+        upside = fv.get('upside')
+
+        return {
+            "source": "Eulerpool Research Systems",
+            "symbol": ticker,
+            "company_name": name,
+            "isin": isin,
+            "currency": currency,
+            "sector": prof.get("sector"),
+            "industry": prof.get("industry"),
+            "market_cap": prof.get("mcap"),
+            "employees": prof.get("employees"),
+            "price": last_price,
+            "fair_value": fair_value,
+            "upside": upside,
+            "target_high": pt.get("target_high"),
+            "target_low": pt.get("target_low"),
+            "target_mean": pt.get("target_mean"),
+            "target_median": pt.get("target_median"),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "exchange": "Eulerpool / Global"
+        }
+    except Exception as e:
+        print(f"[Eulerpool Lookup Notice] {e}")
+        return None
+
+
 def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
     """
     Fetches real-time stock quote with multi-tier routing:
     1. Direct PSX DPS Portal (for Pakistani equities e.g. ILP, JKSM, SYS, LUCK, FFC, etc.)
     2. Yahoo Finance Global (for international stocks e.g. AAPL, MSFT, TSLA)
-    3. Firecrawl Live Web Search (for unmapped companies or corporate filings)
+    3. Eulerpool Institutional Intelligence (for Fair Value, Price Targets & Equity Valuations)
+    4. Firecrawl Live Web Search (for unmapped companies or corporate filings)
     """
     sym = symbol_or_query.strip().upper()
     clean_sym = sym.replace(".KA", "")
 
     # 1. Check if it's a known PSX symbol or mapped Pakistani company
+    is_global = clean_sym in GLOBAL_STOCK_SYMBOLS or any(clean_sym == sym_alias for sym_alias in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"])
     is_psx = (
-        clean_sym in STOCK_SYMBOL_MAP.values()
-        or sym.endswith(".KA")
-        or any(k in symbol_or_query.lower() for k in ["spinning", "mills", "cement", "fertilizer", "sugar", "pakistan", "textile"])
+        not is_global
+        and (
+            sym.endswith(".KA")
+            or any(k in symbol_or_query.lower() for k in ["spinning", "mills", "cement", "fertilizer", "sugar", "pakistan", "textile", "psx", "kse"])
+            or (clean_sym in STOCK_SYMBOL_MAP.values() and clean_sym not in GLOBAL_STOCK_SYMBOLS)
+        )
     )
 
     if is_psx:
@@ -442,6 +525,7 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
             return psx_data
 
     # 2. Try Yahoo Finance API
+    quote_res = None
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         yahoo_sym = f"{clean_sym}.KA" if (is_psx and not sym.endswith(".KA")) else sym
@@ -458,7 +542,7 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
                 change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
                 currency = meta.get("currency", "PKR" if is_psx else "USD")
                 company_name = meta.get("longName") or meta.get("shortName") or clean_sym
-                return {
+                quote_res = {
                     "symbol": clean_sym,
                     "company_name": company_name,
                     "price": price,
@@ -473,7 +557,45 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print(f"[Yahoo Finance Error for {sym}] {e}")
 
-    # 3. Firecrawl Live Intelligence Fallback (for unmapped companies)
+    # 3. Eulerpool Institutional Intelligence (Fair Value, Price Targets & Valuation Multiples)
+    if not is_psx:
+        try:
+            ep_data = fetch_eulerpool_stock(clean_sym)
+            if ep_data:
+                if quote_res:
+                    if ep_data.get("fair_value"):
+                        quote_res["fair_value"] = ep_data["fair_value"]
+                    if ep_data.get("target_mean"):
+                        quote_res["target_mean"] = ep_data["target_mean"]
+                    if ep_data.get("upside") is not None:
+                        quote_res["upside"] = ep_data["upside"]
+                    if ep_data.get("sector") and not quote_res.get("sector"):
+                        quote_res["sector"] = ep_data["sector"]
+                    return quote_res
+                elif ep_data.get("price") or ep_data.get("fair_value"):
+                    return {
+                        "symbol": ep_data.get("symbol", clean_sym),
+                        "company_name": ep_data.get("company_name", clean_sym),
+                        "price": ep_data.get("price") or ep_data.get("fair_value"),
+                        "currency": ep_data.get("currency", "USD"),
+                        "change": 0.0,
+                        "change_percent": ep_data.get("upside", 0.0) or 0.0,
+                        "high": ep_data.get("target_high"),
+                        "low": ep_data.get("target_low"),
+                        "fair_value": ep_data.get("fair_value"),
+                        "target_mean": ep_data.get("target_mean"),
+                        "upside": ep_data.get("upside"),
+                        "sector": ep_data.get("sector"),
+                        "timestamp": ep_data.get("timestamp", time.strftime("%Y-%m-%d %H:%M:%S")),
+                        "exchange": "Eulerpool Research Systems"
+                    }
+        except Exception as e:
+            print(f"[Eulerpool Enrichment Notice for {clean_sym}] {e}")
+
+    if quote_res:
+        return quote_res
+
+    # 4. Firecrawl Live Intelligence Fallback (for unmapped companies)
     try:
         from agent.firecrawl_intelligence import search_web
         res = search_web(f"{symbol_or_query} stock price PSX", limit=3)
