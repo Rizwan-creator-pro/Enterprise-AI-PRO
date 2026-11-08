@@ -242,16 +242,25 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     """Detects if user is asking about stock market or specific stock prices, with context memory."""
     t = text.lower().strip()
 
-    # Negative override: queries about maps, leads, places, or directions are NOT stock queries
-    if any(k in t for k in ["google map", "google maps", "g map", "gmap", "map lead", "map leads", "leads", "lead score", "niche"]):
+    # Absolute Negative Override: Queries about non-stock commodities, fuel, weather, currency, or database tables
+    non_stock_keywords = [
+        "fuel", "petrol", "diesel", "cng", "lpg", "kerosene", "oil price", "oil prices",
+        "gold", "silver", "wheat", "flour", "sugar price", "commodity", "commodities",
+        "weather", "temperature", "forecast", "rain", "climate", "aqi",
+        "dollar", "usd", "euro", "gbp", "pkr rate", "dirham", "riyal", "forex", "exchange rate", "currency",
+        "employee", "employees", "department", "salary", "salaries", "attendance", "invoice", "database", "table",
+        "google map", "google maps", "g map", "gmap", "map lead", "map leads", "leads", "lead score", "niche"
+    ]
+    if any(re.search(r'\b' + re.escape(k) + r'\b', t) for k in non_stock_keywords):
+        # Only allow if explicitly asking about stock/shares of a company
         if not any(w in t for w in ["stock", "shares", "equity", "ticker", "nasdaq", "nyse", "psx", "kse"]):
             return None
 
     # Ambiguous names that collide with common words or table names
     ambiguous_names = {"google", "apple", "amazon", "systems", "luck", "waves", "meta", "target", "mari", "engro", "nishat", "shadab"}
     has_stock_indicator = any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in [
-        "stock", "share", "shares", "equity", "price", "rate", "quote", "market",
-        "nasdaq", "nyse", "psx", "kse", "ticker", "dividend", "trading", "worth", "invest", "close", "open", "points"
+        "stock", "share", "shares", "equity", "quote", "market",
+        "nasdaq", "nyse", "psx", "kse", "ticker", "dividend", "trading", "worth", "invest", "close", "points"
     ])
 
     # 1. Check for mapped stock names in current query first (sorted by longest key first)
@@ -266,7 +275,7 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     if m_entity:
         cand = m_entity.group(1).strip()
         cand = re.sub(r'^(the|a|an)\s+', '', cand).strip()
-        if cand and len(cand) > 1 and cand not in ["dollar", "usd", "gold", "bitcoin", "weather", "kse", "psx"]:
+        if cand and len(cand) > 1 and cand not in ["dollar", "usd", "gold", "bitcoin", "weather", "kse", "psx", "fuel", "petrol", "diesel", "oil"]:
             if cand in STOCK_SYMBOL_MAP:
                 return STOCK_SYMBOL_MAP[cand]
             return cand.upper()
@@ -279,11 +288,13 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         if clean_sym in STOCK_SYMBOL_MAP.values() or any(w in t for w in ["stock", "share", "shares", "ticker", "quote"]):
             return sym
 
-    # 4. Contextual memory: if current turn is a follow-up ("is you not search for live data", "check again", "what is its price")
-    is_followup = any(w in t for w in [
-        "search", "live", "site", "psx", "portal", "again", "today", "price", "rate", "it", "its", "why", "check"
-    ])
-    if is_followup and history:
+    # 4. Contextual memory: ONLY trigger if current turn is an explicit follow-up referring to the stock
+    is_explicit_stock_followup = (
+        any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["it", "its", "this company", "this stock", "that company", "that stock", "same stock", "volume", "chart", "dividend", "pe ratio", "eps", "target", "fair value"])
+        or any(phrase in t for w in ["check again", "is it live", "what about volume", "show chart", "refresh rate", "live portal"])
+    )
+    # If the user introduces a new subject/question, NEVER pull previous stock from history
+    if is_explicit_stock_followup and history:
         for msg in reversed(history):
             content = str(msg.get("content", "")).lower()
             for name in sorted(STOCK_SYMBOL_MAP.keys(), key=lambda x: len(x), reverse=True):
@@ -296,7 +307,7 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
                 c = re.sub(r'^(the|a|an)\s+', '', c).strip()
                 if c and c in STOCK_SYMBOL_MAP:
                     return STOCK_SYMBOL_MAP[c]
-                elif c and len(c) > 2 and c not in ["dollar", "usd", "weather"]:
+                elif c and len(c) > 2 and c not in ["dollar", "usd", "weather", "fuel", "petrol"]:
                     return c.upper()
 
     # 5. General PSX market index (KSE100, KSE30) only if not referring to an individual company
@@ -347,7 +358,7 @@ def fetch_psx_company(sym: str) -> Optional[Dict[str, Any]]:
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     html_text = ""
     try:
-        r = requests.get(url, headers=headers, timeout=6)
+        r = requests.get(url, headers=headers, timeout=10)
         if r.ok and "quote__close" in r.text:
             html_text = r.text
     except Exception:
@@ -545,7 +556,14 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
             data = r.json()
             result = data.get("chart", {}).get("result", [{}])[0]
             meta = result.get("meta", {})
-            price = meta.get("regularMarketPrice")
+            m_time = meta.get("regularMarketTime") or 0
+            # Guard against abandoned / stale Yahoo Finance data for PSX stocks (e.g. JKSM.KA from July 2024)
+            is_stale_data = (time.time() - m_time) > (7 * 86400) if m_time else False
+            if is_psx and is_stale_data:
+                print(f"[Yahoo Finance Warning] Stale data for {yahoo_sym} (last update: {m_time}). Rejecting Yahoo fallback.")
+                price = None
+            else:
+                price = meta.get("regularMarketPrice")
             if price is not None and price > 0:
                 prev_close = meta.get("previousClose") or meta.get("chartPreviousClose") or price
                 change = round(price - prev_close, 2) if price and prev_close else 0.0
