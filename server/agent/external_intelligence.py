@@ -429,9 +429,19 @@ def fetch_eulerpool_stock(symbol_or_query: str) -> Optional[Dict[str, Any]]:
     """
     Fetches institutional equity research, fair value, price targets,
     and fundamentals using the Eulerpool SDK (https://eulerpool.com).
+    Supports dynamic key rotation from Oracle APEX table `AI_EXTERNAL_APIS` (type 'FINANCE').
     """
-    import os
-    api_key = os.getenv("EULERPOOL_API_KEY", "eu_prod_1794002761034_8gcodzj7yue").strip()
+    try:
+        from agent.external_apis_manager import get_active_keys_for_type, mark_key_exhausted
+        keys_pool = get_active_keys_for_type("FINANCE")
+    except Exception:
+        import os
+        keys_pool = [{"api_key": os.getenv("EULERPOOL_API_KEY", "eu_prod_1794002761034_8gcodzj7yue").strip()}]
+
+    if not keys_pool:
+        return None
+
+    api_key = keys_pool[0].get("api_key", "").strip()
     if not api_key:
         return None
     try:
