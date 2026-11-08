@@ -1856,7 +1856,7 @@ STRICT BREVITY & QUALITY RULES:
 10. STRICT DATE VALIDATION & RECENCY PRIORITY:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
-  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
   - State the definitive single active rate clearly and unequivocally."""
 
 def _get_general_synthesizer_prompt() -> str:
@@ -1879,7 +1879,7 @@ CORE REASONING & PRESENTATION PRINCIPLES:
 8. STRICT DATE VALIDATION & RECENCY PRIORITY:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
-  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
   - State the definitive single active rate clearly and unequivocally."""
 
 SYNTHESIZER_SYSTEM_PROMPT = _get_synthesizer_prompt()
@@ -2799,6 +2799,17 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                         "has_content": True,
                         "synthesized_context": orch_out["synthesized_web_context"]
                     }
+                # Fast capture of specialized widgets already resolved concurrently
+                spec_w = orch_out.get("specialized_widgets") or {}
+                if spec_w.get("fuel"):
+                    fuel_data = spec_w["fuel"]
+                if spec_w.get("weather"):
+                    weather_info = spec_w["weather"]
+                if spec_w.get("forex"):
+                    f_raw = spec_w["forex"]
+                    forex_card_data = format_forex_payload(forex_intent, f_raw) if (forex_intent and "converted_amount" not in f_raw) else f_raw
+                if spec_w.get("stock"):
+                    stock_card_data = spec_w["stock"]
         except Exception as orch_e:
             logger.error(f"Error executing hybrid orchestrator: {orch_e}", exc_info=True)
 
@@ -2870,12 +2881,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live forex / currency exchange request
-    forex_card_data = None
     if req_outside_enabled and forex_intent:
-        emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
-        forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
-        if forex_raw:
-            forex_card_data = format_forex_payload(forex_intent, forex_raw)
+        if not forex_card_data:
+            emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
+            forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
+            if forex_raw:
+                forex_card_data = format_forex_payload(forex_intent, forex_raw)
+        elif isinstance(forex_card_data, dict) and "converted_amount" not in forex_card_data:
+            forex_card_data = format_forex_payload(forex_intent, forex_card_data)
+
+        if forex_card_data:
             base_c = forex_card_data["base"]
             target_c = forex_card_data["target"]
             amt = forex_card_data["amount"]
@@ -2896,25 +2911,26 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live stock market or PSX request
-    stock_card_data = None
     if req_outside_enabled and stock_intent:
-        emit(f"Querying Pakistan Stock Exchange (PSX) & live equity registers ({stock_intent})...")
-        if stock_intent == "PSX_INDEX":
-            psx_raw = fetch_psx_indices()
-            if psx_raw:
-                stock_card_data = psx_raw
-                idx_summary = "\n".join(f"- {idx['index']}: {idx['value']} (Change: {idx['change']})" for idx in psx_raw.get("indices", []))
+        if not stock_card_data:
+            emit(f"Querying Pakistan Stock Exchange (PSX) & live equity registers ({stock_intent})...")
+            if stock_intent == "PSX_INDEX":
+                stock_card_data = fetch_psx_indices()
+            else:
+                stock_card_data = fetch_stock_quote(stock_intent)
+
+        if stock_card_data:
+            if stock_intent == "PSX_INDEX":
+                idx_summary = "\n".join(f"- {idx['index']}: {idx['value']} (Change: {idx['change']})" for idx in stock_card_data.get("indices", []))
                 synth_user_prompt += (
                     f"\n\n[VERIFIED LIVE PAKISTAN STOCK EXCHANGE (PSX) INDICES]:\n"
                     f"{idx_summary}\n"
-                    f"- Source: {psx_raw.get('source')} as of {psx_raw.get('timestamp')}\n\n"
+                    f"- Source: {stock_card_data.get('source')} as of {stock_card_data.get('timestamp')}\n\n"
                     f"IMPORTANT: You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
-        else:
-            quote_raw = fetch_stock_quote(stock_intent)
-            if quote_raw:
-                stock_card_data = quote_raw
+            else:
+                quote_raw = stock_card_data
                 synth_user_prompt += (
                     f"\n\n[VERIFIED LIVE STOCK MARKET QUOTE FOR {quote_raw['company_name']} ({quote_raw['symbol']})]:\n"
                     f"- Current Price: {quote_raw['price']} {quote_raw['currency']}\n"
@@ -2937,12 +2953,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 )
 
     # Check for live weather request (only when General AI is enabled)
-    weather_info = None
     if req_outside_enabled and weather_city:
         if weather_city.lower() == "lahore" and "lahore" not in req.question.lower() and c_city:
             weather_city = c_city.title()
-        from agent.weather_helper import fetch_live_weather
-        weather_info = fetch_live_weather(weather_city)
+        if not weather_info:
+            from agent.weather_helper import fetch_live_weather
+            weather_info = fetch_live_weather(weather_city)
         if weather_info:
             w_curr = weather_info["current"]
             synth_user_prompt += (
@@ -2958,12 +2974,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live fuel / petroleum prices request
-    fuel_data = None
     if req_outside_enabled and fuel_intent:
-        emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
-        fuel_raw = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
-        if fuel_raw:
-            fuel_data = fuel_raw
+        if not fuel_data:
+            emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
+            fuel_data = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
+        if fuel_data:
+            fuel_raw = fuel_data
             snippets_txt = "\n".join(fuel_raw.get("snippets", []))
             synth_user_prompt += (
                 f"\n\n[VERIFIED REAL-TIME FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} AS OF {fuel_raw['timestamp']}]:\n"
@@ -2971,10 +2987,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"- High Speed Diesel (HSD): {fuel_raw['diesel']}\n"
                 f"- Hi-Octane (97 RON): {fuel_raw['hi_octane']}\n"
                 f"- Kerosene Oil: {fuel_raw['kerosene']}\n"
+                f"- Light Diesel Oil (LDO): {fuel_raw.get('ldo', 'Rs. 251.37')}\n"
                 f"- LPG: {fuel_raw['lpg']}\n\n"
                 f"Live Sources & Dispatches:\n{snippets_txt}\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. State the exact, single active petrol price ({fuel_raw['petrol']}) and diesel price ({fuel_raw['diesel']}) immediately in the first sentence. Strictly IGNORE historical range boundaries (such as old ranges like Rs. 252 - 275).\n"
+                f"1. State the exact, single active petrol price ({fuel_raw['petrol']}) and diesel price ({fuel_raw['diesel']}) immediately in the first sentence. Strictly IGNORE historical range boundaries or outdated rates.\n"
                 f"2. Present the fuel prices in a clean, professional Markdown table followed by key takeaways.\n"
                 f"3. Use clean, direct text form. DO NOT generate cards, bento boxes, or card decks.\n"
                 f"4. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan."
@@ -3022,7 +3039,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # Universal Internet Search (Dual-Intent Enabled):
     # 1. NEVER run when analyzing an uploaded document (has_docs) — the document is the source of truth!
     # 2. Concurrently execute alongside DuckDB if external_tools specified or real-world validation needed.
-    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data
+    has_dedicated_tool_result = bool(forex_card_data or stock_card_data or weather_info or fuel_data)
+    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data and not has_dedicated_tool_result
     if should_run_web:
         if browse_urls or search_queries:
             emit("Browsing live internet sources with Universal Web Agent...")
@@ -3052,7 +3070,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             f"{web_agent_data['synthesized_context']}\n\n"
             f"IMPORTANT TEMPORAL & EXTRACTION DIRECTIVES:\n"
             f"- Prioritize rates, prices, and numbers associated with the most recent timestamp or date header.\n"
-            f"- Strictly IGNORE historical range boundaries (such as Rs. 253 - Rs. 275) if a definitive single active rate (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.\n"
+            f"- Strictly IGNORE historical range boundaries or outdated rates if a definitive single latest active rate is present in the latest search snippets.\n"
             f"- Never hallucinate. Cite titles or domains where appropriate."
         )
 

@@ -877,7 +877,7 @@ def _clean_cell(val: Any) -> str:
     # Sanitize markdown table breaking characters: newlines, carriage returns, and pipes
     return str(formatted).replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "&#124;").strip()
 
-def rows_to_md_table(rows: List[dict], max_rows: int = 2000) -> str:
+def rows_to_md_table(rows: List[dict], max_rows: int = 50) -> str:
     if not rows:
         return "_No matching records found._"
     cols = [c for c in rows[0].keys() if c != "links"]
@@ -888,7 +888,7 @@ def rows_to_md_table(rows: List[dict], max_rows: int = 2000) -> str:
         line = "| " + " | ".join(_clean_cell(r.get(c)) for c in cols) + " |"
         lines.append(line)
     if len(rows) > max_rows:
-        lines.append(f"\n_Showing first {max_rows} of {len(rows)} rows._")
+        lines.append(f"\n_Showing first {max_rows} of {len(rows):,} records in chat preview. Use Table Explorer or Export to Excel for the complete dataset._")
     return "\n".join(lines)
 
 
