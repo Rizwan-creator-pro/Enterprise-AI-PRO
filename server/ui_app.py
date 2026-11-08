@@ -818,11 +818,17 @@ def log_usage(
         "error_message": error_msg[:500] if error_msg else None
     }
 
-    # Write directly to Oracle ADB usage endpoint
+    # Asynchronously dispatch to Oracle ADB without blocking response thread
+    def _async_ords_log(p):
+        try:
+            ords_post(URL_USAGE_LOG, json=p, timeout=5)
+        except Exception as e:
+            logger.debug(f"[ORDS Usage Log Notice] {e}")
+
     try:
-        ords_post(URL_USAGE_LOG, json=payload, timeout=5)
-    except Exception as e:
-        print(f"[ORDS Usage Log Notice] {e}")
+        threading.Thread(target=_async_ords_log, args=(payload,), daemon=True).start()
+    except Exception:
+        pass
 
 # ---------------- User Endpoints & Schema Extraction (Cache 60s) ----------------
 _dataset_cache: Dict[str, Tuple[float, dict]] = {}  # ep_url -> (cached_at, items)
@@ -2128,39 +2134,41 @@ async def run_hybrid_orchestrator(
     if general_ai_enabled:
         external_tool_calls = list(plan.get("external_tools") or [])
 
-        # Safety condition: Auto-inject real-world web/commodity tools ONLY if general_ai_enabled is True
-        is_realworld_query = not has_db_intent or any(
-            kw in question.lower()
-            for kw in [
-                "latest", "current", "release", "version", "update", "today",
-                "news", "price", "vs", "competitor", "online", "weather",
-                "forecast", "dollar", "usd", "pkr", "rate", "stock", "petrol", "fuel"
-            ]
+        # Dedicated intent detection takes precedence over generic web crawling
+        fuel_int = extract_fuel_intent(question)
+        forex_int = extract_forex_intent(question)
+        stock_int = extract_stock_intent(question, history_msgs or [])
+        weather_int = extract_weather_intent(question, default_city=client_city)
+
+        is_weather_context = any(
+            wk in question.lower()
+            for wk in ["weather", "temperature", "forecast", "climate", "mausam", "rain", "humidity", "hot today", "cold today"]
         )
 
-        if is_realworld_query and not any(t.get("tool") == "web_search" for t in external_tool_calls):
-            fuel_int = extract_fuel_intent(question)
-            forex_int = extract_forex_intent(question)
-            stock_int = extract_stock_intent(question, history_msgs or [])
-            weather_int = extract_weather_intent(question, default_city=client_city)
+        has_specialized_intent = bool(fuel_int or forex_int or stock_int or weather_int or is_weather_context)
 
-            is_weather_context = any(
-                wk in question.lower()
-                for wk in ["weather", "temperature", "forecast", "climate", "mausam", "rain", "humidity", "hot today", "cold today"]
-            )
-
-            if fuel_int:
+        if has_specialized_intent:
+            # Purge generic/unfocused web searches from plan to avoid 40-second US crawls
+            external_tool_calls = [t for t in external_tool_calls if t.get("tool") not in ("web_search", "browse_url")]
+            if fuel_int and not any(t.get("tool") == "fuel" for t in external_tool_calls):
                 cntry = fuel_int.get("country") or client_country or "Pakistan"
                 external_tool_calls.append({"tool": "fuel", "country": cntry})
-            elif forex_int:
+            elif forex_int and not any(t.get("tool") == "forex" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
-            elif stock_int:
+            elif stock_int and not any(t.get("tool") == "stock" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "stock", "symbol": stock_int})
-            elif weather_int or is_weather_context:
-                # Dynamically prioritize user's actual live client_city over base Lahore default
+            elif (weather_int or is_weather_context) and not any(t.get("tool") == "weather" for t in external_tool_calls):
                 c_w = weather_int or (client_city.strip() if client_city else None) or "Lahore"
                 external_tool_calls.append({"tool": "weather", "city": c_w})
-            elif not has_db_intent:
+        else:
+            is_realworld_query = not has_db_intent or any(
+                kw in question.lower()
+                for kw in [
+                    "latest", "current", "release", "version", "update", "today",
+                    "news", "price", "vs", "competitor", "online"
+                ]
+            )
+            if is_realworld_query and not has_db_intent and not any(t.get("tool") == "web_search" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "web_search", "query": question})
 
         # Sanitize any plan-generated weather tool calls to auto-localize if defaulting to Lahore
@@ -2240,6 +2248,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     forex_card_data = None
 
     stock_card_data = None
+
+    fuel_data = None
 
     firecrawl_result_data = None
 
