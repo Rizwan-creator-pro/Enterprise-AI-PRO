@@ -3061,6 +3061,167 @@
         .swal2-close { color: var(--text-faint) !important; }
         html[data-theme="dark"] .swal2-popup { box-shadow: 0 10px 40px rgba(0,0,0,.5); }
 
+        /* ===== Sleek Chat Finished Single-Row Notification Toast ===== */
+        .swal2-popup.swal2-toast.chat-finish-toast {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 10px !important;
+            padding: 8px 12px !important;
+            width: auto !important;
+            min-width: 300px !important;
+            max-width: min(580px, calc(100vw - 28px)) !important;
+            height: auto !important;
+            min-height: 44px !important;
+            box-sizing: border-box !important;
+            border-radius: 12px !important;
+            background: var(--surface) !important;
+            border: 1px solid var(--border-color) !important;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28) !important;
+            overflow: hidden !important;
+            user-select: none !important;
+            cursor: pointer !important;
+            transition: transform .15s ease, box-shadow .15s ease !important;
+        }
+        .swal2-popup.swal2-toast.chat-finish-toast:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+        }
+        .chat-finish-toast .swal2-icon {
+            width: 22px !important;
+            height: 22px !important;
+            min-width: 22px !important;
+            margin: 0 !important;
+            border-width: 2px !important;
+            flex-shrink: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .chat-finish-toast .swal2-icon .swal2-icon-content {
+            font-size: 13px !important;
+        }
+        .chat-finish-toast .swal2-icon.swal2-icon-success {
+            border-color: #10b981 !important;
+            color: #10b981 !important;
+        }
+        .chat-finish-toast .swal2-icon.swal2-icon-success [class^='swal2-success-line'] {
+            background-color: #10b981 !important;
+        }
+        .chat-finish-toast .swal2-icon.swal2-icon-success .swal2-success-ring {
+            border-color: rgba(16, 185, 129, 0.25) !important;
+        }
+        .chat-finish-toast .swal2-html-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            text-align: left !important;
+            overflow: hidden !important;
+            white-space: nowrap !important;
+        }
+        .chat-finish-toast .cft-row {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
+            white-space: nowrap !important;
+            line-height: 1.4 !important;
+        }
+        .chat-finish-toast .cft-label {
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            color: var(--text-main) !important;
+            flex-shrink: 0 !important;
+            letter-spacing: -0.01em !important;
+        }
+        .chat-finish-toast .cft-title {
+            font-size: 13px !important;
+            color: var(--text-muted) !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+        }
+        .chat-finish-toast .swal2-actions {
+            margin: 0 !important;
+            padding: 0 !important;
+            flex-shrink: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+        }
+        .chat-finish-toast .swal2-confirm {
+            padding: 4px 12px !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            border-radius: 8px !important;
+            margin: 0 !important;
+            height: 28px !important;
+            line-height: 1 !important;
+            background: #1a73e8 !important;
+            color: #ffffff !important;
+            border: none !important;
+            box-shadow: 0 1px 3px rgba(26, 115, 232, 0.3) !important;
+            cursor: pointer !important;
+            transition: background .15s ease, transform .1s ease !important;
+        }
+        .chat-finish-toast .swal2-confirm:hover {
+            background: #1557b0 !important;
+            transform: scale(1.02) !important;
+        }
+        .chat-finish-toast .swal2-close {
+            position: static !important;
+            width: 22px !important;
+            height: 22px !important;
+            font-size: 15px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: var(--text-faint) !important;
+            border-radius: 6px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: transparent !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: color .15s ease, background .15s ease !important;
+        }
+        .chat-finish-toast .swal2-close:hover {
+            color: var(--text-main) !important;
+            background: var(--sidebar-hover) !important;
+        }
+        .chat-finish-toast .swal2-timer-progress-bar {
+            bottom: 0 !important;
+            height: 2.5px !important;
+            background: #1a73e8 !important;
+            opacity: 0.75 !important;
+        }
+        @media (max-width: 480px) {
+            .swal2-popup.swal2-toast.chat-finish-toast {
+                min-width: 260px !important;
+                max-width: calc(100vw - 20px) !important;
+                padding: 6px 10px !important;
+                gap: 8px !important;
+            }
+            .chat-finish-toast .cft-title {
+                max-width: 140px !important;
+                font-size: 12px !important;
+            }
+            .chat-finish-toast .cft-label {
+                font-size: 12px !important;
+            }
+            .chat-finish-toast .swal2-confirm {
+                padding: 4px 10px !important;
+                font-size: 11.5px !important;
+                height: 26px !important;
+            }
+        }
+
         /* Help modal: full-screen on small viewports */
         @media (max-width: 640px) {
             .swal2-popup.help-popup { width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; margin: 0 !important; display: flex !important; flex-direction: column; }
@@ -7306,9 +7467,41 @@ const skeletonHTML = () => `
             const li = document.querySelector(`#sidebar .history-item[data-sid="${sid}"] .t`);
             const title = (li && li.textContent) || info.title || 'Your chat';
             const body = info.error ? 'The request could not be completed.' : (plainSnippet(info.answer) || 'Your answer is ready.');
-            if (!unfocused && other && window.Swal) {                           // in the app, on another chat: a small toast
-                Swal.fire({ toast: true, position: 'bottom-start', icon: info.error ? 'warning' : 'success', title: info.error ? 'Request failed' : 'Answer ready', text: title, showConfirmButton: true, confirmButtonText: 'Open', confirmButtonColor: '#1a73e8', timer: 9000, timerProgressBar: true })
-                    .then(r => { if (r.isConfirmed) loadSessionMessages(sid, true); });
+            if (!unfocused && other && window.Swal) {                           // in the app, on another chat: sleek single-row toast
+                const safeTitle = escapeHtml(title);
+                const isErr = !!info.error;
+                const statusLabel = isErr ? 'Request failed' : 'Answer ready';
+                Swal.fire({
+                    toast: true,
+                    position: 'bottom-start',
+                    icon: isErr ? 'warning' : 'success',
+                    customClass: {
+                        popup: 'chat-finish-toast',
+                        htmlContainer: 'chat-finish-html'
+                    },
+                    html: `
+                        <div class="cft-row">
+                            <span class="cft-label">${statusLabel}:</span>
+                            <span class="cft-title" title="${safeTitle}">${safeTitle}</span>
+                        </div>
+                    `,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Open',
+                    confirmButtonColor: '#1a73e8',
+                    showCloseButton: true,
+                    timer: 9000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.onclick = (e) => {
+                            if (!e.target.closest('.swal2-close')) {
+                                Swal.close();
+                                loadSessionMessages(sid, true);
+                            }
+                        };
+                    }
+                }).then(r => {
+                    if (r.isConfirmed) loadSessionMessages(sid, true);
+                });
             }
             if (unfocused) {
                 document.title = '● Answer ready · ' + BASE_TITLE;
