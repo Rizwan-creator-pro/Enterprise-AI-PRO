@@ -8700,53 +8700,67 @@ const skeletonHTML = () => `
         let activeSpeechRec = null;
         async function toggleVoice() {
             if (pendingCtrl || voiceBusy) return;
+            // 1. If currently recording, user tapped the red stop button to complete the voice note
+            if (rec) {
+                rec.stop();
+                return;
+            }
             if (activeSpeechRec) {
                 try { activeSpeechRec.stop(); } catch(e) {}
                 activeSpeechRec = null;
                 setVoiceUI('idle');
                 return;
             }
-            if (rec) { rec.stop(); return; }
 
+            // 2. High-Fidelity Continuous Voice Recording (MediaRecorder + Whisper)
+            // Stays active across pauses without auto-stopping until the user explicitly taps the red stop button!
+            if (navigator.mediaDevices && window.MediaRecorder) {
+                startMediaRecorderFallback();
+                return;
+            }
+
+            // 3. Fallback: Web Speech API with continuous mode enabled
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRec) {
                 try {
                     const sr = new SpeechRec();
                     const langCode = (VOICE_LANGS && VOICE_LANGS[voiceLangIdx] && VOICE_LANGS[voiceLangIdx][0]) || 'en-US';
                     sr.lang = langCode === 'ur' ? 'ur-PK' : langCode === 'en' ? 'en-US' : langCode;
-                    sr.interimResults = false;
+                    sr.interimResults = true;
+                    sr.continuous = true;
                     sr.maxAlternatives = 1;
                     sr.onstart = () => {
                         activeSpeechRec = sr;
                         setVoiceUI('recording');
                     };
                     sr.onresult = (ev) => {
-                        const transcript = Array.from(ev.results).map(r => r[0].transcript).join(' ').trim();
-                        if (transcript) {
-                            const i = document.getElementById('userInput');
-                            i.value = (i.value ? i.value + ' ' : '') + transcript;
+                        let finalTranscript = '';
+                        for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+                            if (ev.results[i].isFinal) finalTranscript += ev.results[i][0].transcript + ' ';
+                        }
+                        if (finalTranscript.trim()) {
+                            const inp = document.getElementById('userInput');
+                            inp.value = (inp.value ? inp.value.trim() + ' ' : '') + finalTranscript.trim();
                             autoGrow();
-                            i.focus();
+                            inp.focus();
                         }
                     };
                     sr.onerror = (ev) => {
-                        activeSpeechRec = null;
-                        setVoiceUI('idle');
-                        if (ev.error && ev.error !== 'no-speech' && ev.error !== 'aborted') {
-                            startMediaRecorderFallback();
+                        if (ev.error !== 'no-speech') {
+                            activeSpeechRec = null;
+                            setVoiceUI('idle');
                         }
                     };
                     sr.onend = () => {
+                        // In fallback continuous mode, only idle if user stopped
                         activeSpeechRec = null;
                         setVoiceUI('idle');
                     };
                     sr.start();
                     return;
-                } catch(e) {
-                    // Fall back to server media recorder
-                }
+                } catch(e) {}
             }
-            startMediaRecorderFallback();
+            showError('error', 'Voice input', 'Microphone recording not supported on this browser.');
         }
 
         async function startMediaRecorderFallback() {

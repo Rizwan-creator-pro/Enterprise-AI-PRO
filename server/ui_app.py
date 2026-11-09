@@ -2743,7 +2743,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         has_explicit_cols = any(k in req.question.lower() for k in [
             "columns", "cols", "only", "carry", "select"
         ]) and any(char.isdigit() for char in req.question)
-        if not has_explicit_cols and plan.get("mode") == "raw":
+        has_all_data_kw = any(k in req.question.lower() for k in ["all data", "all columns", "entire table", "everything", "whole table", "full table"])
+        if has_all_data_kw and not has_explicit_cols and plan.get("mode") == "raw":
             plan["select_cols"] = None
 
     # Check for cross-table JOIN execution
@@ -2841,6 +2842,52 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             except Exception as e:
                 print(f"[Query Engine Error] {e}")
                 exec_result = None
+
+    # Check for requested USD / foreign currency conversion on numeric columns (e.g. salaries in USD per employee)
+    q_low = req.question.lower()
+    is_usd_conversion = any(k in q_low for k in [
+        "in usd", "in dollar", "also dollar", "also in dollar", "in $", "into dollar",
+        "to usd", "also in usd", "dollar me", "dollars me", "usd me", "per employee in dollar"
+    ])
+    if is_usd_conversion and exec_result and exec_result.get("table_rows"):
+        try:
+            from agent.external_intelligence import fetch_live_forex
+            fx_raw = fetch_live_forex("USD")
+            usd_rate = fx_raw.get("rate") if (fx_raw and fx_raw.get("rate")) else 276.63
+        except Exception:
+            usd_rate = 276.63
+
+        t_rows = exec_result.get("table_rows") or []
+        if t_rows:
+            cand_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["salary", "pay", "price", "amount"])]
+            if cand_cols:
+                sal_col = cand_cols[0]
+                id_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["name", "full_name", "first_name", "role", "designation", "title", "department"])]
+                if not id_cols:
+                    id_cols = [list(t_rows[0].keys())[0]]
+
+                augmented_rows = []
+                total_pkr = 0.0
+                total_usd = 0.0
+                for r in t_rows:
+                    new_r = {}
+                    for ic in id_cols:
+                        new_r[ic.replace("_", " ").title()] = r.get(ic)
+                    raw_v = qe.parse_number(r.get(sal_col)) or 0.0
+                    total_pkr += raw_v
+                    v_usd = round(raw_v / usd_rate, 2)
+                    total_usd += v_usd
+                    new_r["Salary (PKR)"] = f"Rs. {raw_v:,.0f}" if raw_v.is_integer() else f"Rs. {raw_v:,.2f}"
+                    new_r[f"Salary (USD @ {usd_rate})"] = f"${v_usd:,.2f}"
+                    augmented_rows.append(new_r)
+
+                exec_result["table_rows"] = augmented_rows
+                exec_result["table_md"] = qe.rows_to_md_table(augmented_rows)
+                exec_result["kpis"] = [
+                    {"label": "Total Employees", "value": str(len(augmented_rows)), "sub": "Active Workforce"},
+                    {"label": "Total Payroll (PKR)", "value": f"Rs. {total_pkr:,.0f}", "sub": "Monthly total in PKR"},
+                    {"label": "Total Payroll (USD)", "value": f"${total_usd:,.2f}", "sub": f"Interbank rate: {usd_rate} PKR/USD"}
+                ]
 
     # STAGE 4: Synthesis LLM (Writes crisp summary from small result table)
     emit("Synthesizing concise summary & visualization…")
