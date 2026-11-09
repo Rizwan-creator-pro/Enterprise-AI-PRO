@@ -2250,6 +2250,34 @@ async def run_hybrid_orchestrator(
     }
 
 
+def generate_followup_suggestions(q: str, endpoints: Optional[List[dict]] = None) -> List[str]:
+    """Generates 3 contextual, high-intent follow-up question suggestions (Claude/ChatGPT style)."""
+    q_low = q.lower().strip()
+    if any(k in q_low for k in ["stock", "share price", "psx", "ilp", "jksm", "aapl", "equity"]):
+        return ["Show fair value & price targets", "Compare with PSX sector index", "Latest market announcements"]
+    elif any(k in q_low for k in ["highest salary", "top earner", "highest paid"]):
+        return ["Show lowest salary in our database", "Average salary by department", "List top 5 earners with breakdown"]
+    elif any(k in q_low for k in ["lowest salary", "cheapest salary"]):
+        return ["Who has the highest salary?", "Average salary by department", "Show salary range by city"]
+    elif any(k in q_low for k in ["salary", "payroll", "employee", "staff"]):
+        return ["Who has the highest salary?", "Average salary by department", "Show employee headcount by city"]
+    elif any(k in q_low for k in ["product", "item", "inventory"]):
+        return ["Show low stock products alert", "Most expensive product in stock", "Category-wise product count"]
+    elif any(k in q_low for k in ["fuel", "petrol", "diesel", "cng", "lpg"]):
+        return ["Hi-Octane and LPG prices today", "Weekly fuel price trend", "Petrol price in Lahore"]
+    elif any(k in q_low for k in ["weather", "temperature", "forecast", "climate"]):
+        return ["7-day weather forecast", "Humidity and wind speed", "Hourly rain probability"]
+    elif any(k in q_low for k in ["dollar", "usd", "forex", "exchange rate", "currency"]):
+        return ["Open market cash exchange rate", "USD to PKR weekly trend", "Convert 1,000 USD to PKR"]
+
+    first_tbl = endpoints[0].get("endpoint_name") if endpoints else "database"
+    return [
+        f"Show key metrics and averages for {first_tbl}",
+        "Analyze trends and highlight anomalies",
+        "Export complete executive summary as PDF"
+    ]
+
+
 def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     t_start = time.time()
     kpis_out = []
@@ -3409,6 +3437,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     answer = re.sub(r"(?i)\b(?:note:?\s*)?direct\s+pdf\s+generation\s+is\s+not\s+supported[^\.\n]*(\.|\n|$)", "", answer)
     answer = re.sub(r"(?i)\byou\s+can\s+copy\s+the\s+summary\s+above\s+into\s+your\s+document\s+editor[^\.\n]*(\.|\n|$)", "", answer).strip()
     answer = _force_markers(req.question, answer)
+
+    # Attach smart conversational follow-up chips (Claude/ChatGPT style)
+    followups = generate_followup_suggestions(req.question, endpoints)
+    if followups:
+        answer = re.sub(r":::followup-suggestions[\s\S]*?(?:::|$)", "", answer).strip()
+        answer = f"{answer.strip()}\n\n:::followup-suggestions\n{json.dumps(followups)}\n:::"
 
     if cancelled.is_set(): return None
 

@@ -2446,6 +2446,61 @@
         .smc-idx-chg.pos { color: #22c55e; }
         .smc-idx-chg.neg { color: #ef4444; }
 
+        /* ================= Conversational Follow-up Suggestion Chips (Claude/ChatGPT style) ================= */
+        .msg-followup-tray {
+            margin-top: 14px;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+        .msg-followup-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .msg-followup-label i {
+            color: #3b82f6;
+            font-size: 11px;
+        }
+        .msg-followup-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .msg-followup-pill {
+            background: var(--surface-2, rgba(255, 255, 255, 0.05));
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--text-main);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+        .msg-followup-pill:hover {
+            background: var(--surface);
+            border-color: #3b82f6;
+            color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.15);
+        }
+        .msg-followup-pill i {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
         /* ================= Modern Elevative Theme: Web Intelligence Citation Card ================= */
         .web-intelligence-card { display: none !important; }
         .web-intelligence-card-old {
@@ -7264,6 +7319,12 @@ const skeletonHTML = () => `
                 return '';
             }).trim();
 
+            let followupData = null;
+            text = text.replace(/:::followup-suggestions\s*([\s\S]*?)\s*:::/g, (m, jsonStr) => {
+                try { followupData = JSON.parse(jsonStr.trim()); } catch(e) {}
+                return '';
+            }).trim();
+
             const kinds = [];
             text = text.replace(/\[\[EXPORT:(\w+)\]\]/gi, (m, k) => { k = k.toLowerCase(); k = KIND_ALIAS[k] || k; if (KINDS[k]) kinds.push(k); return ''; }).trim();
             if (!kinds.length) {
@@ -7363,6 +7424,18 @@ const skeletonHTML = () => `
             lastMsg.dataset.ts = ts === undefined ? Date.now() : (ts || '');
             lastMsg._raw = text.replace(/```json[\s\S]*?```/g, '').trim();
             if (meta && meta.meta_stats) lastMsg._metaStats = meta.meta_stats;
+            if (followupData && followupData.length) {
+                const sTray = document.createElement('div');
+                sTray.className = 'msg-followup-tray';
+                sTray.innerHTML = `
+                    <div class="msg-followup-label"><i class="fa-solid fa-sparkles"></i> Suggested next:</div>
+                    <div class="msg-followup-pills">
+                        ${followupData.map(s => `<button type="button" class="msg-followup-pill" onclick="setInput(${JSON.stringify(s)}); sendMessage();"><i class="fa-regular fa-comment-dots"></i> ${escapeHtml(s)}</button>`).join('')}
+                    </div>
+                `;
+                box.appendChild(sTray);
+            }
+
             box.appendChild(buildActions('ai', lastMsg, meta));
 
             if (live) {
