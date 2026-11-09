@@ -297,7 +297,7 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     # 4. Contextual memory: ONLY trigger if current turn is an explicit follow-up referring to the stock
     is_explicit_stock_followup = (
         any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["it", "its", "this company", "this stock", "that company", "that stock", "same stock", "volume", "chart", "dividend", "pe ratio", "eps", "target", "fair value"])
-        or any(phrase in t for w in ["check again", "is it live", "what about volume", "show chart", "refresh rate", "live portal"])
+        or any(w in t for w in ["check again", "is it live", "what about volume", "show chart", "refresh rate", "live portal"])
     )
     # If the user introduces a new subject/question, NEVER pull previous stock from history
     if is_explicit_stock_followup and history:
