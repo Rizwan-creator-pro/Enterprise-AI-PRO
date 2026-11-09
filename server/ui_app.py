@@ -1778,13 +1778,18 @@ RULES:
    - Do NOT set an artificial limit! Leave "limit": null so that ALL authorized records in the table are returned without truncation.
    - Do NOT set "select_cols" to a subset unless specifically requested! Leave "select_cols": null so that ALL columns of the table are preserved. The UI has an automatic Column Questionnaire Card for wide tables (10+ columns). Truncating columns on your own prevents this feature from working!
    - ONLY set "limit": N or "select_cols" if the user explicitly requested specific row counts or column names.
-3. HIGHEST / LOWEST / TOP / BEST / MINIMUM / MAXIMUM:
-   When asked for the highest, maximum, lowest, minimum, top, or best of an entity (e.g. "what is the highest salary", "top employee", "highest salary today", "cheapest product", "who has highest salary"):
-   - Set "target_table" to the relevant table (e.g. "Employees Directory", "PRODUCTS").
-   - Set "mode": "raw"
-   - Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/top, desc: false for lowest/cheapest).
-   - Set "limit": 5 (this ensures the top 5 records and all their context like employee name, job title, department are loaded and available for the synthesizer).
-   If the question asks for Top N or Bottom N (e.g. "top 3", "first 10"), set "limit": N. If the user asks for "all" or does not specify a number, leave "limit": null.
+3. HIGHEST / LOWEST / TOP / BEST / MINIMUM / MAXIMUM / CHEAPEST / MOST EXPENSIVE:
+   - SINGULAR INQUIRIES (e.g. "what is the highest salary", "who has the highest salary", "highest salaried person", "single person with highest salary", "cheapest product", "most expensive product", "lowest salary", "maximum price", "minimum price", "top earner"):
+     * The user is asking for ONE specific record/fact!
+     * Set "target_table" to the relevant table (e.g. "Employees Directory", "PRODUCTS").
+     * Set "mode": "raw"
+     * Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/top, desc: false for lowest/cheapest).
+     * Set "limit": 1 (CRITICAL: MUST BE EXACTLY 1! NEVER return 4 or 5 records when a single person or item is asked!).
+     * Set "chart": null (CRITICAL: NEVER generate a chart for a 1-row singular query).
+   - PLURAL / RANKING / LIST INQUIRIES (e.g. "top 5 highest salaries", "top 3 employees", "top earners", "ranking of salaries", "compare top employees", "first 10"):
+     * Set "limit": N (e.g. 5 or requested number).
+     * If the user asks for "all" or does not specify a number, leave "limit": null.
+     * If comparing 3+ categories or shares, include a "chart" definition.
 4. If comparing categories or breakdowns, use "mode": "aggregate" with appropriate "group_by" and "aggs".
 5. If comparing 3+ categories or shares of a whole, ALWAYS include a "chart" definition. Use "donut" for share of whole, "bar" for comparison, "line" for trends over time.
 6. CHARTS & CATEGORIES: ALWAYS use descriptive human-readable name columns (such as 'full_name', 'product_name', 'business_name', 'name', 'department', 'category', 'city') for "cat_col", "group_by", and chart axes. NEVER use raw numeric IDs ('emp_id', 'product_id', 'id', 'dept_id') as "cat_col".
@@ -2301,8 +2306,31 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             req.outside_db = False
             req.allow_general = False
 
+    # Detect if user asks a pinpoint singular query (e.g. highest salary, single person, cheapest item)
+    # vs a plural or comparative query (e.g. top 5, top earners, ranking)
+    q_low_inq = req.question.lower().strip()
+    is_plural_top = bool(re.search(r'\b(?:top|highest|lowest|first|best)\s+(\d+|five|three|ten|few)\b', q_low_inq)) or any(k in q_low_inq for k in [
+        "top 5", "top 10", "top 3", "top earners", "top products", "ranking", "compare top", "list top", "all highest"
+    ])
+    is_singular_extremum = (
+        any(k in q_low_inq for k in [
+            "highest salary", "who has highest salary", "who has the highest", "highest salaried", "person with highest",
+            "lowest salary", "who has lowest salary", "minimum salary", "maximum salary", "cheapest product", "most expensive product",
+            "most expensive item", "highest price", "lowest price", "top salaried person", "single person", "highest paid"
+        ])
+        or (any(k in q_low_inq for k in ["highest", "lowest", "maximum", "minimum", "cheapest", "most expensive"]) and not is_plural_top and not any(k in q_low_inq for k in ["table form", "all data", "full table", "all rows", "each", "all", "every"]))
+    )
+    is_singular_query = is_singular_extremum and not is_plural_top
+
     depth = (req.response_depth or "medium").lower().strip()
-    if depth == "low":
+    if is_singular_query:
+        synth_max_tokens = 600
+        depth_prompt = (
+            "\n\n[PINPOINT DIRECT INQUIRY DETECTED]\n"
+            "The user's query asks for a single specific fact, metric, or entity (e.g. highest salary, single person, cheapest item).\n"
+            "Deliver an immediate, precise, and crisp direct answer in 1 to 2 sentences. State the exact figure and name immediately without filler or multi-item breakdowns."
+        )
+    elif depth == "low":
         synth_max_tokens = 1200
         depth_prompt = (
             "\n\n[RESPONSE DEPTH: LOW (CONCISE & TOKEN-EFFICIENT)]\n"
@@ -2620,6 +2648,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             # Enforce strict database perimeter when General AI is OFF
             if not req_outside_enabled and plan:
                 plan["external_tools"] = []
+            if is_singular_query and plan:
+                plan["limit"] = 1
+                plan["chart"] = None
             break
         except Exception as e:
             emit(f"{provider['provider_name']} planner failed — trying fallback…")
@@ -2923,7 +2954,14 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             f"Exact Verified Results Table:\n{table_md}\n\n"
             f"Computed Key Metrics:\n{kpis_str}\n\n"
         )
-        if chart_json_str:
+        if is_singular_query or len(exec_result.get("table_rows", [])) == 1:
+            synth_user_prompt += (
+                "STRICT INSTRUCTION FOR SINGULAR INQUIRY:\n"
+                "1. The user asked for a single specific record/fact (e.g. highest salary, single person, cheapest product).\n"
+                "2. Provide an immediate, precise, and crisp direct answer in 1 to 2 sentences stating the exact figure and name.\n"
+                "3. ABSOLUTELY FORBIDDEN: DO NOT output any lists, top 5 breakdowns, or discuss other people/products who were not asked about.\n"
+            )
+        elif chart_json_str:
             synth_user_prompt += f"Verified Chart ECharts Config:\n```json\n{chart_json_str}\n```\n"
     else:
         matched_ep = _match_endpoint(req.question, endpoints)
