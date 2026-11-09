@@ -1819,7 +1819,7 @@ RULES:
 13. HYBRID & UNIVERSAL WEB / EXTERNAL INTELLIGENCE TOOLS: If the question asks for real-time external information (e.g. open web search, browsing arbitrary webpage URLs, weather forecast, currency rates, or stock price) either on its own or COMBINED with an enterprise table:
    - If the user provides a link (URL) or asks to read a website: include {{"tool": "browse_url", "url": "..."}} in "external_tools".
    - If the question asks for live web discovery, news, or general knowledge: include {{"tool": "web_search", "query": "..."}} in "external_tools".
-   - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}.
+   - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}. For stocks, always use official uppercase ticker symbol (e.g. "ILP" for Interloop, "JKSM" for JK Spinning Mills, "SYS" for Systems, "LUCK" for Lucky Cement).
    - You can combine enterprise database analysis with live open-web tools in a single execution plan!
 
 14. REAL-WORLD, COMMODITIES, FUEL & NEWS INQUIRIES: When the user asks about real-world topics, petrol/diesel/fuel rates, gold/silver prices, commodities, inflation, weather, forex/currency, stock market, sports, world events, or anything outside enterprise warehouse tables:
@@ -2155,8 +2155,14 @@ async def run_hybrid_orchestrator(
                 external_tool_calls.append({"tool": "fuel", "country": cntry})
             elif forex_int and not any(t.get("tool") == "forex" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
-            elif stock_int and not any(t.get("tool") == "stock" for t in external_tool_calls):
-                external_tool_calls.append({"tool": "stock", "symbol": stock_int})
+            elif stock_int:
+                stock_found = False
+                for t in external_tool_calls:
+                    if t.get("tool") == "stock":
+                        t["symbol"] = stock_int
+                        stock_found = True
+                if not stock_found:
+                    external_tool_calls.append({"tool": "stock", "symbol": stock_int})
             elif (weather_int or is_weather_context) and not any(t.get("tool") == "weather" for t in external_tool_calls):
                 c_w = weather_int or (client_city.strip() if client_city else None) or "Lahore"
                 external_tool_calls.append({"tool": "weather", "city": c_w})
@@ -3008,6 +3014,14 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     f"3. You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
+        else:
+            synth_user_prompt += (
+                f"\n\n[NOTICE ON LIVE STOCK MARKET DATA FOR {stock_intent}]:\n"
+                f"- Real-time trading feed for {stock_intent} could not be retrieved at this moment.\n\n"
+                f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                f"1. Clearly inform the user that live trading data for {stock_intent} is temporarily unavailable.\n"
+                f"2. ABSOLUTELY FORBIDDEN: NEVER invent, hallucinate, or estimate stock prices, trading volumes, percentages, or tables. Never cite 'PSX official feed' with made-up figures.\n"
+            )
 
     # Check for live weather request (only when General AI is enabled)
     if req_outside_enabled and weather_city:

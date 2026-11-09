@@ -29,11 +29,17 @@ STOCK_SYMBOL_MAP = {
     "shdt": "SHDT",
     "interloop": "ILP",
     "inter loop": "ILP",
+    "interloop limited": "ILP",
+    "interloop ltd": "ILP",
+    "interloop private limited": "ILP",
     "ilp": "ILP",
     "jk spinning": "JKSM",
     "jk spinning mills": "JKSM",
+    "jk spinning mills limited": "JKSM",
+    "jk spinning mills ltd": "JKSM",
     "j.k. spinning": "JKSM",
     "j.k. spinning mills": "JKSM",
+    "j.k. spinning mills limited": "JKSM",
     "jksm": "JKSM",
     "gul ahmed": "GATM",
     "gul ahmed textile": "GATM",
@@ -351,6 +357,86 @@ def fetch_psx_indices() -> Optional[Dict[str, Any]]:
         print(f"[PSX Module Error] {e}")
     return None
 
+def fetch_investify_stock(sym: str) -> Optional[Dict[str, Any]]:
+    """Fetches verified live equity quotes for PSX companies from Investify.pk (resilient against cloud IP firewall blocking)."""
+    clean_sym = sym.upper().replace(".KA", "").strip()
+    url = f"https://investify.pk/stocks/{clean_sym}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        r = requests.get(url, headers=headers, timeout=8)
+        if not r.ok:
+            return None
+        text = r.text
+        price = None
+        change = 0.0
+        change_pct = 0.0
+        comp_name = clean_sym
+        t_str = "Latest trading stance"
+
+        desc_m = re.search(r'"description"\s*:\s*"([^"]+quote of PKR\s*([0-9.,]+)[^"]+)"', text)
+        if desc_m:
+            desc = desc_m.group(1)
+            p_m = re.search(r'quote of PKR\s*([0-9.,]+)', desc)
+            if p_m:
+                price = float(p_m.group(1).replace(",", ""))
+            name_m = re.search(r'^([^(\n]+)', desc)
+            if name_m:
+                comp_name = name_m.group(1).strip()
+            time_m = re.search(r'as of\s*([^(\n]+?)(?:\s*\(Pakistan time\)|\s*,)', desc)
+            if time_m:
+                t_str = f"As of {time_m.group(1).strip()}"
+            chg_m = re.search(r'(up|down)\s+PKR\s*([0-9.,]+)\s*\(([0-9.,]+)%\)', desc, re.IGNORECASE)
+            if chg_m:
+                direction = -1.0 if chg_m.group(1).lower() == "down" else 1.0
+                change = round(direction * float(chg_m.group(2).replace(",", "")), 2)
+                change_pct = round(direction * float(chg_m.group(3).replace(",", "")), 2)
+
+        if price is None:
+            raw_m = re.search(r'([A-Z0-9]+)\s*•\s*PSX Regular\s*([0-9.]+)\s*([+\-0-9.]+)\s*([0-9.]+)\s*%\s*[▼▲]?\s*([0-9A-Z\s:]+)', text)
+            if raw_m:
+                price = float(raw_m.group(2))
+                change = float(raw_m.group(3))
+                change_pct = float(raw_m.group(4))
+                if "-" in raw_m.group(3):
+                    change_pct = -abs(change_pct)
+                t_str = f"As of {raw_m.group(5).strip()}"
+
+        vol_m = re.search(r'>\s*Volume\s*</p>\s*<p[^>]*>([^<]+)</p>', text, re.IGNORECASE)
+        volume = vol_m.group(1).strip() if vol_m else "N/A"
+
+        open_m = re.search(r'>\s*Open\s*</p>\s*<p[^>]*>([0-9.,]+)</p>', text, re.IGNORECASE)
+        open_val = float(open_m.group(1).replace(",", "")) if open_m else price
+
+        high_m = re.search(r'>\s*High\s*</p>\s*<p[^>]*>([0-9.,]+)</p>', text, re.IGNORECASE)
+        high_val = float(high_m.group(1).replace(",", "")) if high_m else None
+
+        low_m = re.search(r'>\s*Low\s*</p>\s*<p[^>]*>([0-9.,]+)</p>', text, re.IGNORECASE)
+        low_val = float(low_m.group(1).replace(",", "")) if low_m else None
+
+        prev_m = re.search(r'>\s*Prev Close\s*</p>\s*<p[^>]*>([0-9.,]+)</p>', text, re.IGNORECASE)
+        prev_close = float(prev_m.group(1).replace(",", "")) if prev_m else price
+
+        if price is not None and price > 0:
+            return {
+                "symbol": clean_sym,
+                "company_name": comp_name,
+                "price": price,
+                "currency": "PKR",
+                "change": change,
+                "change_percent": change_pct,
+                "sector": "PSX Listed Equity",
+                "open": open_val,
+                "high": high_val,
+                "low": low_val,
+                "prev_close": prev_close,
+                "volume": volume,
+                "timestamp": t_str,
+                "exchange": "Pakistan Stock Exchange (PSX)"
+            }
+    except Exception as e:
+        print(f"[Investify Scrape Notice for {clean_sym}] {e}")
+    return None
+
 def fetch_psx_company(sym: str) -> Optional[Dict[str, Any]]:
     """Scrapes official real-time company stock quote directly from PSX Data Portal with Scrapling stealth fallback."""
     clean_sym = sym.upper().replace(".KA", "").strip()
@@ -521,26 +607,34 @@ def fetch_eulerpool_stock(symbol_or_query: str) -> Optional[Dict[str, Any]]:
 def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
     """
     Fetches real-time stock quote with multi-tier routing:
-    1. Direct PSX DPS Portal (for Pakistani equities e.g. ILP, JKSM, SYS, LUCK, FFC, etc.)
-    2. Yahoo Finance Global (for international stocks e.g. AAPL, MSFT, TSLA)
-    3. Eulerpool Institutional Intelligence (for Fair Value, Price Targets & Equity Valuations)
-    4. Firecrawl Live Web Search (for unmapped companies or corporate filings)
+    1. Investify.pk Real-time Feed (Resilient against cloud datacenter/Render firewall drops)
+    2. Direct PSX DPS Portal (for Pakistani equities e.g. ILP, JKSM, SYS, LUCK, FFC, etc.)
+    3. Yahoo Finance Global (for international stocks e.g. AAPL, MSFT, TSLA)
+    4. Eulerpool Institutional Intelligence (for Fair Value, Price Targets & Equity Valuations)
+    5. Firecrawl Live Web Search (for unmapped companies or corporate filings)
     """
-    sym = symbol_or_query.strip().upper()
-    clean_sym = sym.replace(".KA", "")
+    q_norm = symbol_or_query.strip().lower()
+    clean_sym = STOCK_SYMBOL_MAP.get(q_norm) or symbol_or_query.strip().upper().replace(".KA", "")
+    sym = clean_sym
 
     # 1. Check if it's a known PSX symbol or mapped Pakistani company
     is_global = clean_sym in GLOBAL_STOCK_SYMBOLS or any(clean_sym == sym_alias for sym_alias in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"])
     is_psx = (
         not is_global
         and (
-            sym.endswith(".KA")
-            or any(k in symbol_or_query.lower() for k in ["spinning", "mills", "cement", "fertilizer", "sugar", "pakistan", "textile", "psx", "kse"])
+            symbol_or_query.strip().upper().endswith(".KA")
+            or any(k in symbol_or_query.lower() for k in ["spinning", "mills", "cement", "fertilizer", "sugar", "pakistan", "textile", "psx", "kse", "interloop"])
             or (clean_sym in STOCK_SYMBOL_MAP.values() and clean_sym not in GLOBAL_STOCK_SYMBOLS)
         )
     )
 
     if is_psx:
+        # Tier 1A: Investify.pk (Primary resilient scraper for Render cloud hosting)
+        inv_data = fetch_investify_stock(clean_sym)
+        if inv_data and inv_data.get("price") is not None and inv_data["price"] > 0:
+            return inv_data
+
+        # Tier 1B: PSX Data Portal
         psx_data = fetch_psx_company(clean_sym)
         if psx_data and psx_data.get("price") is not None and psx_data["price"] > 0:
             return psx_data
