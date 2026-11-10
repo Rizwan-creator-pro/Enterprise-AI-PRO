@@ -41,3 +41,8 @@ scratch/
 .DS_Store
 Thumbs.db
 backup_*
+
+# User Memory & Sandbox runtime data
+server/data/
+server/agent/__pycache__/
+
