@@ -74,7 +74,7 @@ def extract_urls_from_text(text: str) -> List[str]:
     return clean_urls
 
 
-async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.0) -> Dict[str, Any]:
+async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 4.0) -> Dict[str, Any]:
     """
     Universally reads ANY URL on the internet without hardcoded scrapers or selectors.
     Multi-tier stealth extraction pipeline:
@@ -199,14 +199,31 @@ async def read_any_url(url: str, max_chars: int = 4500, timeout_sec: float = 12.
 
 def universal_web_search(query: str, max_results: int = 5) -> List[Dict[str, str]]:
     """
-    Performs an open-web search using DuckDuckGo with resilient Google News/Web RSS fallback.
+    Performs an open-web search using high-speed Firecrawl Cloud Search,
+    with DuckDuckGo and Google News/Web RSS fallback.
     Returns list of dicts with 'title', 'href', 'body'.
     """
     if not query.strip():
         return []
 
     results = []
-    # Primary: DuckDuckGo
+    # Tier 1: Fast Firecrawl Cloud Search (Direct Google/Web Index)
+    try:
+        from agent.firecrawl_intelligence import search_web
+        fc_res = search_web(query.strip(), limit=max_results)
+        if fc_res and fc_res.get("success") and fc_res.get("results"):
+            for item in fc_res["results"]:
+                u = item.get("url", "")
+                t = item.get("title", "")
+                b = item.get("description", "") or item.get("markdown", "")
+                if u and (t or b):
+                    results.append({"title": t, "href": u, "body": b[:500]})
+            if results:
+                return results
+    except Exception:
+        pass
+
+    # Tier 2: DuckDuckGo
     if HAS_DDGS:
         try:
             with DDGS() as ddgs:
@@ -231,7 +248,7 @@ def universal_web_search(query: str, max_results: int = 5) -> List[Dict[str, str
             gl = "PK" if is_pk else "US"
             rss_url = f"https://news.google.com/rss/search?q={q_enc}&hl={hl}&gl={gl}&ceid={gl}:en"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            resp = httpx.get(rss_url, headers=headers, timeout=8.0, follow_redirects=True)
+            resp = httpx.get(rss_url, headers=headers, timeout=3.5, follow_redirects=True)
             if resp.status_code == 200:
                 import xml.etree.ElementTree as ET
                 root = ET.fromstring(resp.content)
@@ -288,7 +305,7 @@ def universal_news_search(query: str, max_results: int = 4) -> List[Dict[str, st
             gl = "PK" if is_pk else "US"
             rss_url = f"https://news.google.com/rss/search?q={q_enc}&hl={hl}&gl={gl}&ceid={gl}:en"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            resp = httpx.get(rss_url, headers=headers, timeout=8.0, follow_redirects=True)
+            resp = httpx.get(rss_url, headers=headers, timeout=3.5, follow_redirects=True)
             if resp.status_code == 200:
                 import xml.etree.ElementTree as ET
                 root = ET.fromstring(resp.content)
@@ -334,7 +351,7 @@ async def universal_internet_agent_async(
     search_queries: Optional[List[str]] = None,
     direct_urls: Optional[List[str]] = None,
     include_news: bool = False,
-    max_pages_to_read: int = 3
+    max_pages_to_read: int = 1
 ) -> Dict[str, Any]:
     """
     Unified Internet Intelligence Agent:
@@ -389,7 +406,7 @@ async def universal_internet_agent_async(
     context_blocks = [
         "### REAL-TIME TEMPORAL EXTRACTION DIRECTIVE (STRICT DATE VALIDATION):\n"
         "- MANDATORY: Prioritize numbers, prices, and rates associated with the most recent timestamp or date header (e.g. today, hours ago, current month/year).\n"
-        "- HISTORICAL RANGE REJECTION: Strictly IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.\n"
+        "- HISTORICAL RANGE REJECTION: Strictly IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.\n"
         "- State the verified current active number directly and unequivocally."
     ]
 
@@ -431,7 +448,7 @@ def universal_internet_agent(
     search_queries: Optional[List[str]] = None,
     direct_urls: Optional[List[str]] = None,
     include_news: bool = False,
-    max_pages_to_read: int = 3
+    max_pages_to_read: int = 1
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper for universal_internet_agent_async.

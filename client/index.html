@@ -136,29 +136,17 @@
         }
         html[data-theme="light"] .input-wrapper { background: transparent; }
 
-        /* Gemini black theme: cosmic radial glow centered on new chat */
-        html[data-theme="dark"] .main-content.empty-chat {
-            background-color: #131314 !important;
-            background-image: radial-gradient(ellipse 72% 58% at 50% 46%, rgba(24, 80, 205, 0.58) 0%, rgba(18, 56, 155, 0.32) 34%, rgba(13, 32, 95, 0.12) 58%, rgba(19, 19, 20, 0) 78%) !important;
-            background-repeat: no-repeat !important;
-            background-attachment: fixed !important;
-        }
+        /* Clean background for empty-chat (no blue cosmic glow) */
+        html[data-theme="dark"] .main-content.empty-chat,
         html[data-theme="dark"] #bootSkel .bk-app .main-content {
             background-color: #131314 !important;
-            background-image: radial-gradient(ellipse 72% 58% at 50% 46%, rgba(24, 80, 205, 0.58) 0%, rgba(18, 56, 155, 0.32) 34%, rgba(13, 32, 95, 0.12) 58%, rgba(19, 19, 20, 0) 78%) !important;
-            background-repeat: no-repeat !important;
+            background-image: none !important;
         }
 
-        html[data-theme="light"] .main-content.empty-chat {
-            background-color: #f8fafd;
-            background-image: radial-gradient(ellipse 75% 65% at 50% 50%, rgba(210, 227, 252, 0.50) 0%, rgba(228, 238, 253, 0.22) 45%, rgba(248, 250, 253, 0) 75%) !important;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }
+        html[data-theme="light"] .main-content.empty-chat,
         html[data-theme="light"] #bootSkel .bk-app .main-content {
-            background-color: #f8fafd;
-            background-image: radial-gradient(ellipse 75% 65% at 50% 50%, rgba(210, 227, 252, 0.50) 0%, rgba(228, 238, 253, 0.22) 45%, rgba(248, 250, 253, 0) 75%) !important;
-            background-repeat: no-repeat;
+            background-color: #ffffff !important;
+            background-image: none !important;
         }
 
         /* Gemini Black Theme with Claude Serif Font & Crisp White Contrast */
@@ -1954,8 +1942,8 @@
         @media (max-width: 768px) {
             .sidebar { position: absolute; height: 100%; transform: translateX(-100%); box-shadow: 4px 0 24px rgba(0,0,0,0.2); }
             .sidebar.open { transform: translateX(0); }
-            .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1; pointer-events: auto; visibility: visible; }
-            .sidebar:not(.open) ~ .sidebar-backdrop { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+            .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; }
+            .sidebar:not(.open) ~ .sidebar-backdrop:not(.show) { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; display: none !important; }
             .menu-toggle { display: block; }
             .top-bar { padding: 8px 12px; gap: 8px; }
             .brand-title { font-size: 14px; gap: 4px; white-space: nowrap; }
@@ -2457,6 +2445,61 @@
         .smc-idx-chg { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
         .smc-idx-chg.pos { color: #22c55e; }
         .smc-idx-chg.neg { color: #ef4444; }
+
+        /* ================= Conversational Follow-up Suggestion Chips (Claude/ChatGPT style) ================= */
+        .msg-followup-tray {
+            margin-top: 14px;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+        .msg-followup-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .msg-followup-label i {
+            color: #3b82f6;
+            font-size: 11px;
+        }
+        .msg-followup-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .msg-followup-pill {
+            background: var(--surface-2, rgba(255, 255, 255, 0.05));
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--text-main);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+        .msg-followup-pill:hover {
+            background: var(--surface);
+            border-color: #3b82f6;
+            color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.15);
+        }
+        .msg-followup-pill i {
+            font-size: 11px;
+            opacity: 0.7;
+        }
 
         /* ================= Modern Elevative Theme: Web Intelligence Citation Card ================= */
         .web-intelligence-card { display: none !important; }
@@ -3061,6 +3104,165 @@
         .swal2-close { color: var(--text-faint) !important; }
         html[data-theme="dark"] .swal2-popup { box-shadow: 0 10px 40px rgba(0,0,0,.5); }
 
+        /* ===== Sleek Native Single-Row Chat Finish Toast ===== */
+        .chat-finish-toast-card {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            z-index: 10050;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 12px 7px 14px;
+            min-width: 320px;
+            max-width: min(560px, calc(100vw - 32px));
+            height: 44px;
+            box-sizing: border-box;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.38);
+            color: var(--text-main);
+            font-family: inherit;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(16px);
+            pointer-events: none;
+            visibility: hidden;
+            transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
+            overflow: hidden;
+            user-select: none;
+        }
+        .chat-finish-toast-card.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+            visibility: visible;
+        }
+        .chat-finish-toast-card:hover {
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .cft-icon-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            font-size: 16px;
+        }
+        .cft-icon-wrap.ok { color: #10b981; }
+        .cft-icon-wrap.err { color: #ef4444; }
+
+        .cft-body {
+            flex: 1 1 auto;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-align: left;
+        }
+        .cft-status {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            flex-shrink: 0;
+            letter-spacing: -0.01em;
+        }
+        .cft-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .cft-open-btn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 12px;
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-2);
+            color: var(--text-main);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s ease;
+            outline: none;
+            box-shadow: none;
+        }
+        .cft-open-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text-main);
+            border-color: var(--text-muted);
+            transform: scale(1.02);
+        }
+        .cft-open-btn:active {
+            transform: scale(0.97);
+        }
+        .cft-close-btn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: transparent;
+            color: var(--text-faint);
+            font-size: 18px;
+            line-height: 1;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: color .15s ease, background .15s ease;
+            padding: 0;
+            margin-left: 2px;
+        }
+        .cft-close-btn:hover {
+            color: var(--text-main);
+            background: var(--sidebar-hover);
+        }
+        .cft-progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2.5px;
+            background: #10b981;
+            width: 100%;
+            transform-origin: left;
+            transition: transform 8s linear;
+        }
+        @media (max-width: 480px) {
+            .chat-finish-toast-card {
+                bottom: 16px;
+                left: 12px;
+                right: 12px;
+                max-width: calc(100vw - 24px);
+                min-width: 0;
+                padding: 6px 10px;
+                gap: 8px;
+            }
+            .cft-text {
+                max-width: 120px;
+                font-size: 12px;
+            }
+            .cft-status {
+                font-size: 12px;
+            }
+            .cft-open-btn {
+                padding: 3px 9px;
+                height: 25px;
+                font-size: 11px;
+            }
+        }
+
         /* Help modal: full-screen on small viewports */
         @media (max-width: 640px) {
             .swal2-popup.help-popup { width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; margin: 0 !important; display: flex !important; flex-direction: column; }
@@ -3396,9 +3598,9 @@
         /* ===== Credit Badges & Provider Tags ===== */
         .provider-tag { display: none !important; }
         /* ===== Mobile Sidebar Backdrop ===== */
-        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 95; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .2s ease, visibility .2s ease; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-        .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1; pointer-events: auto; visibility: visible; }
-        .sidebar:not(.open) ~ .sidebar-backdrop { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; }
+        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 95; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .2s ease, visibility .2s ease; }
+        .sidebar.open ~ .sidebar-backdrop, .sidebar-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
+        .sidebar:not(.open) ~ .sidebar-backdrop:not(.show) { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; display: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
         /* ===== Sidebar Search Bar ===== */
         .sidebar-search-wrap { position: relative; margin: 2px 14px 10px; display: flex; align-items: center; }
@@ -3832,8 +4034,8 @@
         .prompt-nav-toggle:hover, .prompt-nav-toggle.active { background: var(--sidebar-bg); color: var(--accent-blue); border-color: var(--accent-blue); }
         @media (max-width: 520px) { .prompt-nav-toggle span { display: none; } .prompt-nav-toggle { padding: 8px 10px; } }
 
-        .prompt-nav-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 120; opacity: 0; pointer-events: none; transition: opacity .25s ease; backdrop-filter: blur(2px); }
-        .prompt-nav-backdrop.show { opacity: 1; pointer-events: auto; }
+        .prompt-nav-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 120; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .25s ease; }
+        .prompt-nav-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
 
         .prompt-nav-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 340px; max-width: 85vw; background: var(--surface); border-left: 1px solid var(--border-color); z-index: 130; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -4px 0 24px var(--shadow-color); }
         .prompt-nav-drawer.open { transform: translateX(0); }
@@ -3856,10 +4058,10 @@
 
         /* ---- Claude-Style Chat Artifacts & Shared Media Drawer ---- */
         .chat-artifacts-backdrop {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
-            z-index: 129; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            z-index: 129; opacity: 0; pointer-events: none; visibility: hidden; display: none; transition: opacity .2s ease;
         }
-        .chat-artifacts-backdrop.show { opacity: 1; pointer-events: auto; }
+        .chat-artifacts-backdrop.show { opacity: 1 !important; pointer-events: auto !important; visibility: visible !important; display: block !important; backdrop-filter: blur(2px) !important; -webkit-backdrop-filter: blur(2px) !important; }
 
         .chat-artifacts-drawer {
             position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 90vw;
@@ -4599,9 +4801,9 @@
                 padding: 4px 10px !important;
             }
             .chat-container {
-                padding: 16px 20px 32px 20px !important;
-                padding-left: max(20px, env(safe-area-inset-left)) !important;
-                padding-right: max(20px, env(safe-area-inset-right)) !important;
+                padding: 12px 14px 28px 14px !important;
+                padding-left: max(14px, env(safe-area-inset-left)) !important;
+                padding-right: max(14px, env(safe-area-inset-right)) !important;
             }
         }
 
@@ -5270,7 +5472,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
                 const sb = document.getElementById('sidebar');
                 const bd = document.getElementById('sidebarBackdrop');
                 const open = sb.classList.toggle('open');
-                if (bd) bd.classList.toggle('show', open);
+                if (bd) {
+                    bd.classList.toggle('show', open);
+                    bd.style.display = open ? 'block' : 'none';
+                }
                 return;
             }
             const collapsed = document.getElementById('appLayout').classList.toggle('sb-collapsed');
@@ -5282,9 +5487,9 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const bd = document.getElementById('sidebarBackdrop');
             if (bd) {
                 bd.classList.remove('show');
+                bd.style.display = 'none';
                 bd.style.opacity = '0';
                 bd.style.pointerEvents = 'none';
-                setTimeout(() => { if (bd) { bd.style.opacity = ''; bd.style.pointerEvents = ''; } }, 200);
             }
         }
         try { if (localStorage.getItem('ai_sb_collapsed') === '1') document.getElementById('appLayout').classList.add('sb-collapsed'); } catch (e) {}
@@ -5308,7 +5513,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const isOpen = drawer.classList.contains('open');
             const willOpen = force !== undefined ? !!force : !isOpen;
             drawer.classList.toggle('open', willOpen);
-            if (backdrop) backdrop.classList.toggle('show', willOpen);
+            if (backdrop) {
+                backdrop.classList.toggle('show', willOpen);
+                backdrop.style.display = willOpen ? 'block' : 'none';
+            }
             if (toggleBtn) toggleBtn.classList.toggle('active', willOpen);
             if (willOpen) {
                 const searchInp = document.getElementById('promptSearchInput');
@@ -5419,7 +5627,10 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             const isOpen = drawer.classList.contains('open');
             const willOpen = force !== undefined ? !!force : !isOpen;
             drawer.classList.toggle('open', willOpen);
-            if (backdrop) backdrop.classList.toggle('show', willOpen);
+            if (backdrop) {
+                backdrop.classList.toggle('show', willOpen);
+                backdrop.style.display = willOpen ? 'block' : 'none';
+            }
             if (toggleBtn) toggleBtn.classList.toggle('active', willOpen);
             if (willOpen) {
                 refreshChatArtifacts();
@@ -6978,6 +7189,28 @@ const skeletonHTML = () => `
                 const chgSign = isPos ? '+' : '';
                 const chgIcon = isPos ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
 
+                const hasEulerpool = (data.fair_value !== undefined && data.fair_value !== null) || (data.target_mean !== undefined && data.target_mean !== null);
+                const fairVal = (data.fair_value !== undefined && data.fair_value !== null) ? Number(data.fair_value).toFixed(2) : null;
+                const targetMean = (data.target_mean !== undefined && data.target_mean !== null) ? Number(data.target_mean).toFixed(2) : null;
+                const upsideVal = (data.upside !== undefined && data.upside !== null) ? Number(data.upside).toFixed(1) : null;
+                const upsideIsPos = upsideVal ? parseFloat(upsideVal) >= 0 : true;
+
+                let valuationRowHtml = '';
+                if (fairVal || targetMean || upsideVal) {
+                    valuationRowHtml = `
+                        <div class="smc-stats-row" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.22); border-radius: 10px; padding: 8px 12px; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 10px;">
+                            ${fairVal ? `<div class="smc-stat-col" title="Eulerpool DCF Fair Value Terminal"><span style="color: var(--text-muted); font-size: 11px;">Fair Value (DCF):</span> <strong style="color: #10b981; font-size: 13px;">${curr} ${fairVal}</strong></div>` : ''}
+                            ${targetMean ? `<div class="smc-stat-col" title="Analyst Consensus Target Mean"><span style="color: var(--text-muted); font-size: 11px;">Analyst Target:</span> <strong style="color: #6366f1; font-size: 13px;">${curr} ${targetMean}</strong></div>` : ''}
+                            ${upsideVal ? `<div class="smc-stat-col" title="Consensus Upside Potential"><span style="color: var(--text-muted); font-size: 11px;">Upside:</span> <strong style="color: ${upsideIsPos ? '#10b981' : '#ef4444'}; font-size: 13px;">${upsideIsPos ? '+' : ''}${upsideVal}%</strong></div>` : ''}
+                        </div>
+                    `;
+                }
+
+                const sourceLabel = hasEulerpool ? 'Eulerpool Research &bull; ' + escapeHtml(data.exchange || 'Global') : escapeHtml(data.exchange || 'Market');
+                const footerIntel = hasEulerpool
+                    ? `<span><i class="fa-solid fa-chart-pie"></i> Eulerpool Institutional Research &bull; DCF Valuation Terminal</span><span>${escapeHtml(data.timestamp || 'Live')}</span>`
+                    : `<span><i class="fa-solid fa-shield-halved"></i> Real-time Financial Quote &bull; ${escapeHtml(data.timestamp || 'Live')}</span><span>Exchange Verified</span>`;
+
                 card.innerHTML = `
                     <div class="smc-card-inner">
                         <div class="smc-header">
@@ -6988,7 +7221,7 @@ const skeletonHTML = () => `
                                     <span class="smc-sub">Live Equity Register & Market Quote</span>
                                 </div>
                             </div>
-                            <span class="smc-source-badge">${escapeHtml(data.exchange || 'Market')}</span>
+                            <span class="smc-source-badge">${sourceLabel}</span>
                         </div>
 
                         <div class="smc-stock-hero">
@@ -7005,9 +7238,10 @@ const skeletonHTML = () => `
                             <div class="smc-stat-col">Currency: <strong>${curr}</strong></div>
                         </div>
 
+                        ${valuationRowHtml}
+
                         <div class="cc-footer">
-                            <span><i class="fa-solid fa-shield-halved"></i> Real-time Financial Quote &bull; ${escapeHtml(data.timestamp || 'Live')}</span>
-                            <span>Exchange Verified</span>
+                            ${footerIntel}
                         </div>
                     </div>
                 `;
@@ -7082,6 +7316,12 @@ const skeletonHTML = () => `
             let kpisData = null;
             text = text.replace(/:::kpi-deck\s*([\s\S]*?)\s*:::/g, (m, jsonStr) => {
                 try { kpisData = JSON.parse(jsonStr.trim()); } catch(e) {}
+                return '';
+            }).trim();
+
+            let followupData = null;
+            text = text.replace(/:::followup-suggestions\s*([\s\S]*?)\s*:::/g, (m, jsonStr) => {
+                try { followupData = JSON.parse(jsonStr.trim()); } catch(e) {}
                 return '';
             }).trim();
 
@@ -7184,6 +7424,18 @@ const skeletonHTML = () => `
             lastMsg.dataset.ts = ts === undefined ? Date.now() : (ts || '');
             lastMsg._raw = text.replace(/```json[\s\S]*?```/g, '').trim();
             if (meta && meta.meta_stats) lastMsg._metaStats = meta.meta_stats;
+            if (followupData && followupData.length) {
+                const sTray = document.createElement('div');
+                sTray.className = 'msg-followup-tray';
+                sTray.innerHTML = `
+                    <div class="msg-followup-label"><i class="fa-solid fa-sparkles"></i> Suggested next:</div>
+                    <div class="msg-followup-pills">
+                        ${followupData.map(s => `<button type="button" class="msg-followup-pill" onclick="setInput(${JSON.stringify(s)}); sendMessage();"><i class="fa-regular fa-comment-dots"></i> ${escapeHtml(s)}</button>`).join('')}
+                    </div>
+                `;
+                box.appendChild(sTray);
+            }
+
             box.appendChild(buildActions('ai', lastMsg, meta));
 
             if (live) {
@@ -7264,6 +7516,85 @@ const skeletonHTML = () => `
             const w = document.querySelector('#appLayout .input-wrapper'); w.insertBefore(bar, w.firstChild);
         }
         const plainSnippet = t => String(t || '').replace(/```[\s\S]*?```/g, ' ').replace(/\[\[EXPORT:\w+\]\]/gi, ' ').replace(/[|#*_`>-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 110);
+        let _cftTimer = null;
+        function showChatFinishToast(sid, title, isErr) {
+            let toast = document.getElementById('chatFinishToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'chatFinishToast';
+                toast.className = 'chat-finish-toast-card';
+                toast.innerHTML = `
+                    <div class="cft-icon-wrap" id="cftIcon"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="cft-body">
+                        <strong class="cft-status" id="cftStatus">Answer ready:</strong>
+                        <span class="cft-text" id="cftText"></span>
+                    </div>
+                    <button type="button" class="cft-open-btn" id="cftOpenBtn">Open</button>
+                    <button type="button" class="cft-close-btn" id="cftCloseBtn" aria-label="Close">&times;</button>
+                    <div class="cft-progress-bar" id="cftProgress"></div>
+                `;
+                document.body.appendChild(toast);
+            }
+
+            const iconWrap = document.getElementById('cftIcon');
+            const statusEl = document.getElementById('cftStatus');
+            const textEl = document.getElementById('cftText');
+            const openBtn = document.getElementById('cftOpenBtn');
+            const closeBtn = document.getElementById('cftCloseBtn');
+            const prog = document.getElementById('cftProgress');
+
+            if (iconWrap) {
+                iconWrap.className = 'cft-icon-wrap ' + (isErr ? 'err' : 'ok');
+                iconWrap.innerHTML = `<i class="fa-solid ${isErr ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>`;
+            }
+            if (statusEl) statusEl.textContent = (isErr ? 'Request failed' : 'Answer ready') + ':';
+            if (textEl) {
+                textEl.textContent = title || 'Your chat';
+                textEl.title = title || '';
+            }
+
+            const openChat = (e) => {
+                if (e) e.stopPropagation();
+                hideChatFinishToast();
+                loadSessionMessages(sid, true);
+            };
+
+            toast.onclick = openChat;
+            if (openBtn) openBtn.onclick = openChat;
+            if (closeBtn) {
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hideChatFinishToast();
+                };
+            }
+
+            toast.classList.remove('show');
+            if (prog) {
+                prog.style.transition = 'none';
+                prog.style.transform = 'scaleX(1)';
+                prog.style.background = isErr ? '#ef4444' : '#10b981';
+            }
+
+            void toast.offsetHeight;
+
+            toast.classList.add('show');
+            if (prog) {
+                prog.style.transition = 'transform 8s linear';
+                prog.style.transform = 'scaleX(0)';
+            }
+
+            if (_cftTimer) clearTimeout(_cftTimer);
+            _cftTimer = setTimeout(() => {
+                hideChatFinishToast();
+            }, 8000);
+        }
+
+        function hideChatFinishToast() {
+            if (_cftTimer) { clearTimeout(_cftTimer); _cftTimer = null; }
+            const toast = document.getElementById('chatFinishToast');
+            if (toast) toast.classList.remove('show');
+        }
+
         const finishedSeen = {};
         function onChatFinished(sid, info = {}) {
             const now = Date.now(); if (finishedSeen[sid] && now - finishedSeen[sid] < 4000) return; finishedSeen[sid] = now;   // the stream, the status poll and the sidebar poll can all report the same finish
@@ -7274,9 +7605,8 @@ const skeletonHTML = () => `
             const li = document.querySelector(`#sidebar .history-item[data-sid="${sid}"] .t`);
             const title = (li && li.textContent) || info.title || 'Your chat';
             const body = info.error ? 'The request could not be completed.' : (plainSnippet(info.answer) || 'Your answer is ready.');
-            if (!unfocused && other && window.Swal) {                           // in the app, on another chat: a small toast
-                Swal.fire({ toast: true, position: 'bottom-start', icon: info.error ? 'warning' : 'success', title: info.error ? 'Request failed' : 'Answer ready', text: title, showConfirmButton: true, confirmButtonText: 'Open', confirmButtonColor: '#1a73e8', timer: 9000, timerProgressBar: true })
-                    .then(r => { if (r.isConfirmed) loadSessionMessages(sid, true); });
+            if (!unfocused && other) {                           // in the app, on another chat: sleek custom single-row toast
+                showChatFinishToast(sid, title, !!info.error);
             }
             if (unfocused) {
                 document.title = '● Answer ready · ' + BASE_TITLE;
@@ -7818,8 +8148,8 @@ const skeletonHTML = () => `
                     };
                 }
 
-                // If table has 10 or more columns, attach Claude-style Column Questionnaire Card
-                if (data.head && data.head.length >= 10) {
+                // If table has 10 or more columns and more than 2 rows, attach Claude-style Column Questionnaire Card
+                if (data.head && data.head.length >= 10 && data.rows && data.rows.length > 2) {
                     const prevEl = block.previousElementSibling;
                     if (!prevEl || !prevEl.classList.contains('claude-col-questionnaire')) {
                         const qCard = buildTableColumnQuestionnaire(block, t, data, title);
@@ -8443,53 +8773,67 @@ const skeletonHTML = () => `
         let activeSpeechRec = null;
         async function toggleVoice() {
             if (pendingCtrl || voiceBusy) return;
+            // 1. If currently recording, user tapped the red stop button to complete the voice note
+            if (rec) {
+                rec.stop();
+                return;
+            }
             if (activeSpeechRec) {
                 try { activeSpeechRec.stop(); } catch(e) {}
                 activeSpeechRec = null;
                 setVoiceUI('idle');
                 return;
             }
-            if (rec) { rec.stop(); return; }
 
+            // 2. High-Fidelity Continuous Voice Recording (MediaRecorder + Whisper)
+            // Stays active across pauses without auto-stopping until the user explicitly taps the red stop button!
+            if (navigator.mediaDevices && window.MediaRecorder) {
+                startMediaRecorderFallback();
+                return;
+            }
+
+            // 3. Fallback: Web Speech API with continuous mode enabled
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRec) {
                 try {
                     const sr = new SpeechRec();
                     const langCode = (VOICE_LANGS && VOICE_LANGS[voiceLangIdx] && VOICE_LANGS[voiceLangIdx][0]) || 'en-US';
                     sr.lang = langCode === 'ur' ? 'ur-PK' : langCode === 'en' ? 'en-US' : langCode;
-                    sr.interimResults = false;
+                    sr.interimResults = true;
+                    sr.continuous = true;
                     sr.maxAlternatives = 1;
                     sr.onstart = () => {
                         activeSpeechRec = sr;
                         setVoiceUI('recording');
                     };
                     sr.onresult = (ev) => {
-                        const transcript = Array.from(ev.results).map(r => r[0].transcript).join(' ').trim();
-                        if (transcript) {
-                            const i = document.getElementById('userInput');
-                            i.value = (i.value ? i.value + ' ' : '') + transcript;
+                        let finalTranscript = '';
+                        for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+                            if (ev.results[i].isFinal) finalTranscript += ev.results[i][0].transcript + ' ';
+                        }
+                        if (finalTranscript.trim()) {
+                            const inp = document.getElementById('userInput');
+                            inp.value = (inp.value ? inp.value.trim() + ' ' : '') + finalTranscript.trim();
                             autoGrow();
-                            i.focus();
+                            inp.focus();
                         }
                     };
                     sr.onerror = (ev) => {
-                        activeSpeechRec = null;
-                        setVoiceUI('idle');
-                        if (ev.error && ev.error !== 'no-speech' && ev.error !== 'aborted') {
-                            startMediaRecorderFallback();
+                        if (ev.error !== 'no-speech') {
+                            activeSpeechRec = null;
+                            setVoiceUI('idle');
                         }
                     };
                     sr.onend = () => {
+                        // In fallback continuous mode, only idle if user stopped
                         activeSpeechRec = null;
                         setVoiceUI('idle');
                     };
                     sr.start();
                     return;
-                } catch(e) {
-                    // Fall back to server media recorder
-                }
+                } catch(e) {}
             }
-            startMediaRecorderFallback();
+            showError('error', 'Voice input', 'Microphone recording not supported on this browser.');
         }
 
         async function startMediaRecorderFallback() {

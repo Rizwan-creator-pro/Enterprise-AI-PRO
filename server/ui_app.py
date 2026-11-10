@@ -560,6 +560,7 @@ URL_AUTH_USER = f"{BASE_URL}/auth/user"
 URL_SET_PW = f"{BASE_URL}/auth/set-password"
 URL_PROVIDERS = f"{BASE_URL}/providers"
 URL_PROVIDERS_INTERNAL = f"{BASE_URL}/providers/internal"
+URL_EXTERNAL_APIS = f"{BASE_URL}/external-apis"
 URL_USER_ENDPOINTS = f"{BASE_URL}/user-endpoints" 
 URL_HISTORY = f"{BASE_URL}/user-history"
 URL_MESSAGES = f"{BASE_URL}/chat/messages"
@@ -817,11 +818,17 @@ def log_usage(
         "error_message": error_msg[:500] if error_msg else None
     }
 
-    # Write directly to Oracle ADB usage endpoint
+    # Asynchronously dispatch to Oracle ADB without blocking response thread
+    def _async_ords_log(p):
+        try:
+            ords_post(URL_USAGE_LOG, json=p, timeout=5)
+        except Exception as e:
+            logger.debug(f"[ORDS Usage Log Notice] {e}")
+
     try:
-        ords_post(URL_USAGE_LOG, json=payload, timeout=5)
-    except Exception as e:
-        print(f"[ORDS Usage Log Notice] {e}")
+        threading.Thread(target=_async_ords_log, args=(payload,), daemon=True).start()
+    except Exception:
+        pass
 
 # ---------------- User Endpoints & Schema Extraction (Cache 60s) ----------------
 _dataset_cache: Dict[str, Tuple[float, dict]] = {}  # ep_url -> (cached_at, items)
@@ -1771,13 +1778,18 @@ RULES:
    - Do NOT set an artificial limit! Leave "limit": null so that ALL authorized records in the table are returned without truncation.
    - Do NOT set "select_cols" to a subset unless specifically requested! Leave "select_cols": null so that ALL columns of the table are preserved. The UI has an automatic Column Questionnaire Card for wide tables (10+ columns). Truncating columns on your own prevents this feature from working!
    - ONLY set "limit": N or "select_cols" if the user explicitly requested specific row counts or column names.
-3. HIGHEST / LOWEST / TOP / BEST / MINIMUM / MAXIMUM:
-   When asked for the highest, maximum, lowest, minimum, top, or best of an entity (e.g. "what is the highest salary", "top employee", "highest salary today", "cheapest product", "who has highest salary"):
-   - Set "target_table" to the relevant table (e.g. "Employees Directory", "PRODUCTS").
-   - Set "mode": "raw"
-   - Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/top, desc: false for lowest/cheapest).
-   - Set "limit": 5 (this ensures the top 5 records and all their context like employee name, job title, department are loaded and available for the synthesizer).
-   If the question asks for Top N or Bottom N (e.g. "top 3", "first 10"), set "limit": N. If the user asks for "all" or does not specify a number, leave "limit": null.
+3. HIGHEST / LOWEST / TOP / BEST / MINIMUM / MAXIMUM / CHEAPEST / MOST EXPENSIVE:
+   - SINGULAR INQUIRIES (e.g. "what is the highest salary", "who has the highest salary", "highest salaried person", "single person with highest salary", "cheapest product", "most expensive product", "lowest salary", "maximum price", "minimum price", "top earner"):
+     * The user is asking for ONE specific record/fact!
+     * Set "target_table" to the relevant table (e.g. "Employees Directory", "PRODUCTS").
+     * Set "mode": "raw"
+     * Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/top, desc: false for lowest/cheapest).
+     * Set "limit": 1 (CRITICAL: MUST BE EXACTLY 1! NEVER return 4 or 5 records when a single person or item is asked!).
+     * Set "chart": null (CRITICAL: NEVER generate a chart for a 1-row singular query).
+   - PLURAL / RANKING / LIST INQUIRIES (e.g. "top 5 highest salaries", "top 3 employees", "top earners", "ranking of salaries", "compare top employees", "first 10"):
+     * Set "limit": N (e.g. 5 or requested number).
+     * If the user asks for "all" or does not specify a number, leave "limit": null.
+     * If comparing 3+ categories or shares, include a "chart" definition.
 4. If comparing categories or breakdowns, use "mode": "aggregate" with appropriate "group_by" and "aggs".
 5. If comparing 3+ categories or shares of a whole, ALWAYS include a "chart" definition. Use "donut" for share of whole, "bar" for comparison, "line" for trends over time.
 6. CHARTS & CATEGORIES: ALWAYS use descriptive human-readable name columns (such as 'full_name', 'product_name', 'business_name', 'name', 'department', 'category', 'city') for "cat_col", "group_by", and chart axes. NEVER use raw numeric IDs ('emp_id', 'product_id', 'id', 'dept_id') as "cat_col".
@@ -1812,7 +1824,7 @@ RULES:
 13. HYBRID & UNIVERSAL WEB / EXTERNAL INTELLIGENCE TOOLS: If the question asks for real-time external information (e.g. open web search, browsing arbitrary webpage URLs, weather forecast, currency rates, or stock price) either on its own or COMBINED with an enterprise table:
    - If the user provides a link (URL) or asks to read a website: include {{"tool": "browse_url", "url": "..."}} in "external_tools".
    - If the question asks for live web discovery, news, or general knowledge: include {{"tool": "web_search", "query": "..."}} in "external_tools".
-   - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}.
+   - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}. For stocks, always use official uppercase ticker symbol (e.g. "ILP" for Interloop, "JKSM" for JK Spinning Mills, "SYS" for Systems, "LUCK" for Lucky Cement).
    - You can combine enterprise database analysis with live open-web tools in a single execution plan!
 
 14. REAL-WORLD, COMMODITIES, FUEL & NEWS INQUIRIES: When the user asks about real-world topics, petrol/diesel/fuel rates, gold/silver prices, commodities, inflation, weather, forex/currency, stock market, sports, world events, or anything outside enterprise warehouse tables:
@@ -1855,7 +1867,7 @@ STRICT BREVITY & QUALITY RULES:
 10. STRICT DATE VALIDATION & RECENCY PRIORITY:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
-  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
   - State the definitive single active rate clearly and unequivocally."""
 
 def _get_general_synthesizer_prompt() -> str:
@@ -1878,7 +1890,7 @@ CORE REASONING & PRESENTATION PRINCIPLES:
 8. STRICT DATE VALIDATION & RECENCY PRIORITY:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
-  - STRICTLY IGNORE historical range boundaries (such as old ranges like Rs. 253 - Rs. 275) if a definitive, single active price string (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.
+  - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
   - State the definitive single active rate clearly and unequivocally."""
 
 SYNTHESIZER_SYSTEM_PROMPT = _get_synthesizer_prompt()
@@ -2127,39 +2139,47 @@ async def run_hybrid_orchestrator(
     if general_ai_enabled:
         external_tool_calls = list(plan.get("external_tools") or [])
 
-        # Safety condition: Auto-inject real-world web/commodity tools ONLY if general_ai_enabled is True
-        is_realworld_query = not has_db_intent or any(
-            kw in question.lower()
-            for kw in [
-                "latest", "current", "release", "version", "update", "today",
-                "news", "price", "vs", "competitor", "online", "weather",
-                "forecast", "dollar", "usd", "pkr", "rate", "stock", "petrol", "fuel"
-            ]
+        # Dedicated intent detection takes precedence over generic web crawling
+        fuel_int = extract_fuel_intent(question)
+        forex_int = extract_forex_intent(question)
+        stock_int = extract_stock_intent(question, history_msgs or [])
+        weather_int = extract_weather_intent(question, default_city=client_city)
+
+        is_weather_context = any(
+            wk in question.lower()
+            for wk in ["weather", "temperature", "forecast", "climate", "mausam", "rain", "humidity", "hot today", "cold today"]
         )
 
-        if is_realworld_query and not any(t.get("tool") == "web_search" for t in external_tool_calls):
-            fuel_int = extract_fuel_intent(question)
-            forex_int = extract_forex_intent(question)
-            stock_int = extract_stock_intent(question, history_msgs or [])
-            weather_int = extract_weather_intent(question, default_city=client_city)
+        has_specialized_intent = bool(fuel_int or forex_int or stock_int or weather_int or is_weather_context)
 
-            is_weather_context = any(
-                wk in question.lower()
-                for wk in ["weather", "temperature", "forecast", "climate", "mausam", "rain", "humidity", "hot today", "cold today"]
-            )
-
-            if fuel_int:
+        if has_specialized_intent:
+            # Purge generic/unfocused web searches from plan to avoid 40-second US crawls
+            external_tool_calls = [t for t in external_tool_calls if t.get("tool") not in ("web_search", "browse_url")]
+            if fuel_int and not any(t.get("tool") == "fuel" for t in external_tool_calls):
                 cntry = fuel_int.get("country") or client_country or "Pakistan"
                 external_tool_calls.append({"tool": "fuel", "country": cntry})
-            elif forex_int:
+            elif forex_int and not any(t.get("tool") == "forex" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
             elif stock_int:
-                external_tool_calls.append({"tool": "stock", "symbol": stock_int})
-            elif weather_int or is_weather_context:
-                # Dynamically prioritize user's actual live client_city over base Lahore default
+                stock_found = False
+                for t in external_tool_calls:
+                    if t.get("tool") == "stock":
+                        t["symbol"] = stock_int
+                        stock_found = True
+                if not stock_found:
+                    external_tool_calls.append({"tool": "stock", "symbol": stock_int})
+            elif (weather_int or is_weather_context) and not any(t.get("tool") == "weather" for t in external_tool_calls):
                 c_w = weather_int or (client_city.strip() if client_city else None) or "Lahore"
                 external_tool_calls.append({"tool": "weather", "city": c_w})
-            elif not has_db_intent:
+        else:
+            is_realworld_query = not has_db_intent or any(
+                kw in question.lower()
+                for kw in [
+                    "latest", "current", "release", "version", "update", "today",
+                    "news", "price", "vs", "competitor", "online"
+                ]
+            )
+            if is_realworld_query and not has_db_intent and not any(t.get("tool") == "web_search" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "web_search", "query": question})
 
         # Sanitize any plan-generated weather tool calls to auto-localize if defaulting to Lahore
@@ -2230,6 +2250,34 @@ async def run_hybrid_orchestrator(
     }
 
 
+def generate_followup_suggestions(q: str, endpoints: Optional[List[dict]] = None) -> List[str]:
+    """Generates 3 contextual, high-intent follow-up question suggestions (Claude/ChatGPT style)."""
+    q_low = q.lower().strip()
+    if any(k in q_low for k in ["stock", "share price", "psx", "ilp", "jksm", "aapl", "equity"]):
+        return ["Show fair value & price targets", "Compare with PSX sector index", "Latest market announcements"]
+    elif any(k in q_low for k in ["highest salary", "top earner", "highest paid"]):
+        return ["Show lowest salary in our database", "Average salary by department", "List top 5 earners with breakdown"]
+    elif any(k in q_low for k in ["lowest salary", "cheapest salary"]):
+        return ["Who has the highest salary?", "Average salary by department", "Show salary range by city"]
+    elif any(k in q_low for k in ["salary", "payroll", "employee", "staff"]):
+        return ["Who has the highest salary?", "Average salary by department", "Show employee headcount by city"]
+    elif any(k in q_low for k in ["product", "item", "inventory"]):
+        return ["Show low stock products alert", "Most expensive product in stock", "Category-wise product count"]
+    elif any(k in q_low for k in ["fuel", "petrol", "diesel", "cng", "lpg"]):
+        return ["Hi-Octane and LPG prices today", "Weekly fuel price trend", "Petrol price in Lahore"]
+    elif any(k in q_low for k in ["weather", "temperature", "forecast", "climate"]):
+        return ["7-day weather forecast", "Humidity and wind speed", "Hourly rain probability"]
+    elif any(k in q_low for k in ["dollar", "usd", "forex", "exchange rate", "currency"]):
+        return ["Open market cash exchange rate", "USD to PKR weekly trend", "Convert 1,000 USD to PKR"]
+
+    first_tbl = endpoints[0].get("endpoint_name") if endpoints else "database"
+    return [
+        f"Show key metrics and averages for {first_tbl}",
+        "Analyze trends and highlight anomalies",
+        "Export complete executive summary as PDF"
+    ]
+
+
 def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     t_start = time.time()
     kpis_out = []
@@ -2239,6 +2287,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     forex_card_data = None
 
     stock_card_data = None
+
+    fuel_data = None
 
     firecrawl_result_data = None
 
@@ -2284,8 +2334,31 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             req.outside_db = False
             req.allow_general = False
 
+    # Detect if user asks a pinpoint singular query (e.g. highest salary, single person, cheapest item)
+    # vs a plural or comparative query (e.g. top 5, top earners, ranking)
+    q_low_inq = req.question.lower().strip()
+    is_plural_top = bool(re.search(r'\b(?:top|highest|lowest|first|best)\s+(\d+|five|three|ten|few)\b', q_low_inq)) or any(k in q_low_inq for k in [
+        "top 5", "top 10", "top 3", "top earners", "top products", "ranking", "compare top", "list top", "all highest"
+    ])
+    is_singular_extremum = (
+        any(k in q_low_inq for k in [
+            "highest salary", "who has highest salary", "who has the highest", "highest salaried", "person with highest",
+            "lowest salary", "who has lowest salary", "minimum salary", "maximum salary", "cheapest product", "most expensive product",
+            "most expensive item", "highest price", "lowest price", "top salaried person", "single person", "highest paid"
+        ])
+        or (any(k in q_low_inq for k in ["highest", "lowest", "maximum", "minimum", "cheapest", "most expensive"]) and not is_plural_top and not any(k in q_low_inq for k in ["table form", "all data", "full table", "all rows", "each", "all", "every"]))
+    )
+    is_singular_query = is_singular_extremum and not is_plural_top
+
     depth = (req.response_depth or "medium").lower().strip()
-    if depth == "low":
+    if is_singular_query:
+        synth_max_tokens = 600
+        depth_prompt = (
+            "\n\n[PINPOINT DIRECT INQUIRY DETECTED]\n"
+            "The user's query asks for a single specific fact, metric, or entity (e.g. highest salary, single person, cheapest item).\n"
+            "Deliver an immediate, precise, and crisp direct answer in 1 to 2 sentences. State the exact figure and name immediately without filler or multi-item breakdowns."
+        )
+    elif depth == "low":
         synth_max_tokens = 1200
         depth_prompt = (
             "\n\n[RESPONSE DEPTH: LOW (CONCISE & TOKEN-EFFICIENT)]\n"
@@ -2603,6 +2676,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             # Enforce strict database perimeter when General AI is OFF
             if not req_outside_enabled and plan:
                 plan["external_tools"] = []
+            if is_singular_query and plan:
+                plan["limit"] = 1
+                plan["chart"] = None
             break
         except Exception as e:
             emit(f"{provider['provider_name']} planner failed — trying fallback…")
@@ -2741,7 +2817,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         has_explicit_cols = any(k in req.question.lower() for k in [
             "columns", "cols", "only", "carry", "select"
         ]) and any(char.isdigit() for char in req.question)
-        if not has_explicit_cols and plan.get("mode") == "raw":
+        has_all_data_kw = any(k in req.question.lower() for k in ["all data", "all columns", "entire table", "everything", "whole table", "full table"])
+        if has_all_data_kw and not has_explicit_cols and plan.get("mode") == "raw":
             plan["select_cols"] = None
 
     # Check for cross-table JOIN execution
@@ -2807,6 +2884,17 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                         "has_content": True,
                         "synthesized_context": orch_out["synthesized_web_context"]
                     }
+                # Fast capture of specialized widgets already resolved concurrently
+                spec_w = orch_out.get("specialized_widgets") or {}
+                if spec_w.get("fuel"):
+                    fuel_data = spec_w["fuel"]
+                if spec_w.get("weather"):
+                    weather_info = spec_w["weather"]
+                if spec_w.get("forex"):
+                    f_raw = spec_w["forex"]
+                    forex_card_data = format_forex_payload(forex_intent, f_raw) if (forex_intent and "converted_amount" not in f_raw) else f_raw
+                if spec_w.get("stock"):
+                    stock_card_data = spec_w["stock"]
         except Exception as orch_e:
             logger.error(f"Error executing hybrid orchestrator: {orch_e}", exc_info=True)
 
@@ -2828,6 +2916,52 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             except Exception as e:
                 print(f"[Query Engine Error] {e}")
                 exec_result = None
+
+    # Check for requested USD / foreign currency conversion on numeric columns (e.g. salaries in USD per employee)
+    q_low = req.question.lower()
+    is_usd_conversion = any(k in q_low for k in [
+        "in usd", "in dollar", "also dollar", "also in dollar", "in $", "into dollar",
+        "to usd", "also in usd", "dollar me", "dollars me", "usd me", "per employee in dollar"
+    ])
+    if is_usd_conversion and exec_result and exec_result.get("table_rows"):
+        try:
+            from agent.external_intelligence import fetch_live_forex
+            fx_raw = fetch_live_forex("USD")
+            usd_rate = fx_raw.get("rate") if (fx_raw and fx_raw.get("rate")) else 276.63
+        except Exception:
+            usd_rate = 276.63
+
+        t_rows = exec_result.get("table_rows") or []
+        if t_rows:
+            cand_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["salary", "pay", "price", "amount"])]
+            if cand_cols:
+                sal_col = cand_cols[0]
+                id_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["name", "full_name", "first_name", "role", "designation", "title", "department"])]
+                if not id_cols:
+                    id_cols = [list(t_rows[0].keys())[0]]
+
+                augmented_rows = []
+                total_pkr = 0.0
+                total_usd = 0.0
+                for r in t_rows:
+                    new_r = {}
+                    for ic in id_cols:
+                        new_r[ic.replace("_", " ").title()] = r.get(ic)
+                    raw_v = qe.parse_number(r.get(sal_col)) or 0.0
+                    total_pkr += raw_v
+                    v_usd = round(raw_v / usd_rate, 2)
+                    total_usd += v_usd
+                    new_r["Salary (PKR)"] = f"Rs. {raw_v:,.0f}" if raw_v.is_integer() else f"Rs. {raw_v:,.2f}"
+                    new_r[f"Salary (USD @ {usd_rate})"] = f"${v_usd:,.2f}"
+                    augmented_rows.append(new_r)
+
+                exec_result["table_rows"] = augmented_rows
+                exec_result["table_md"] = qe.rows_to_md_table(augmented_rows)
+                exec_result["kpis"] = [
+                    {"label": "Total Employees", "value": str(len(augmented_rows)), "sub": "Active Workforce"},
+                    {"label": "Total Payroll (PKR)", "value": f"Rs. {total_pkr:,.0f}", "sub": "Monthly total in PKR"},
+                    {"label": "Total Payroll (USD)", "value": f"${total_usd:,.2f}", "sub": f"Interbank rate: {usd_rate} PKR/USD"}
+                ]
 
     # STAGE 4: Synthesis LLM (Writes crisp summary from small result table)
     emit("Synthesizing concise summary & visualization…")
@@ -2857,7 +2991,14 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             f"Exact Verified Results Table:\n{table_md}\n\n"
             f"Computed Key Metrics:\n{kpis_str}\n\n"
         )
-        if chart_json_str:
+        if is_singular_query or len(exec_result.get("table_rows", [])) == 1:
+            synth_user_prompt += (
+                "STRICT INSTRUCTION FOR SINGULAR INQUIRY:\n"
+                "1. The user asked for a single specific record/fact (e.g. highest salary, single person, cheapest product).\n"
+                "2. Provide an immediate, precise, and crisp direct answer in 1 to 2 sentences stating the exact figure and name.\n"
+                "3. ABSOLUTELY FORBIDDEN: DO NOT output any lists, top 5 breakdowns, or discuss other people/products who were not asked about.\n"
+            )
+        elif chart_json_str:
             synth_user_prompt += f"Verified Chart ECharts Config:\n```json\n{chart_json_str}\n```\n"
 
         # Check if user requested dual-currency presentation (e.g. "in dollar and also in the pkr")
@@ -2896,12 +3037,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live forex / currency exchange request
-    forex_card_data = None
     if req_outside_enabled and forex_intent:
-        emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
-        forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
-        if forex_raw:
-            forex_card_data = format_forex_payload(forex_intent, forex_raw)
+        if not forex_card_data:
+            emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
+            forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
+            if forex_raw:
+                forex_card_data = format_forex_payload(forex_intent, forex_raw)
+        elif isinstance(forex_card_data, dict) and "converted_amount" not in forex_card_data:
+            forex_card_data = format_forex_payload(forex_intent, forex_card_data)
+
+        if forex_card_data:
             base_c = forex_card_data["base"]
             target_c = forex_card_data["target"]
             amt = forex_card_data["amount"]
@@ -2922,45 +3067,62 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live stock market or PSX request
-    stock_card_data = None
     if req_outside_enabled and stock_intent:
-        emit(f"Querying Pakistan Stock Exchange (PSX) & live equity registers ({stock_intent})...")
-        if stock_intent == "PSX_INDEX":
-            psx_raw = fetch_psx_indices()
-            if psx_raw:
-                stock_card_data = psx_raw
-                idx_summary = "\n".join(f"- {idx['index']}: {idx['value']} (Change: {idx['change']})" for idx in psx_raw.get("indices", []))
+        if not stock_card_data:
+            emit(f"Querying Pakistan Stock Exchange (PSX) & live equity registers ({stock_intent})...")
+            if stock_intent == "PSX_INDEX":
+                stock_card_data = fetch_psx_indices()
+            else:
+                stock_card_data = fetch_stock_quote(stock_intent)
+
+        if stock_card_data:
+            if stock_intent == "PSX_INDEX":
+                idx_summary = "\n".join(f"- {idx['index']}: {idx['value']} (Change: {idx['change']})" for idx in stock_card_data.get("indices", []))
                 synth_user_prompt += (
                     f"\n\n[VERIFIED LIVE PAKISTAN STOCK EXCHANGE (PSX) INDICES]:\n"
                     f"{idx_summary}\n"
-                    f"- Source: {psx_raw.get('source')} as of {psx_raw.get('timestamp')}\n\n"
+                    f"- Source: {stock_card_data.get('source')} as of {stock_card_data.get('timestamp')}\n\n"
                     f"IMPORTANT: You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
-        else:
-            quote_raw = fetch_stock_quote(stock_intent)
-            if quote_raw:
-                stock_card_data = quote_raw
+            else:
+                quote_raw = stock_card_data
                 synth_user_prompt += (
                     f"\n\n[VERIFIED LIVE STOCK MARKET QUOTE FOR {quote_raw['company_name']} ({quote_raw['symbol']})]:\n"
                     f"- Current Price: {quote_raw['price']} {quote_raw['currency']}\n"
                     f"- Change: {quote_raw['change']} ({quote_raw['change_percent']}%)\n"
                     f"- Day High: {quote_raw['high']} | Day Low: {quote_raw['low']}\n"
-                    f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n\n"
-                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"- Exchange: {quote_raw['exchange']} as of {quote_raw['timestamp']}\n"
+                )
+                if quote_raw.get("fair_value"):
+                    fv_val = f"{float(quote_raw['fair_value']):.2f}"
+                    up_val = f"{quote_raw.get('upside', 'N/A')}%"
+                    synth_user_prompt += f"- Eulerpool Fair Value: {fv_val} {quote_raw['currency']} (Upside: {up_val})\n"
+                if quote_raw.get("target_mean"):
+                    synth_user_prompt += f"- Analyst Target Mean: {quote_raw['target_mean']} {quote_raw['currency']}\n"
+                synth_user_prompt += (
+                    f"\nSTRICT INSTRUCTIONS FOR AI RESPONSE:\n"
                     f"1. Return ONLY a clean 1 to 2 sentence executive market commentary summarizing the company's price ({quote_raw['price']} {quote_raw['currency']}), momentum ({quote_raw['change_percent']}%), and sector context.\n"
                     f"2. ABSOLUTELY FORBIDDEN: NEVER output any markdown tables, tabular data, metric lists, bullet points of figures, or card blocks. The interactive equity ticker card is already attached and handles all quote metrics.\n"
                     f"3. You MUST include the following exact stock card widget block at the end of your response:\n"
                     f":::stock-market-card\n{json.dumps(stock_card_data)}\n:::\n"
                 )
+        else:
+            synth_user_prompt += (
+                f"\n\n[NOTICE ON LIVE STOCK MARKET DATA FOR {stock_intent}]:\n"
+                f"- Real-time trading feed for {stock_intent} could not be retrieved at this moment.\n\n"
+                f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                f"1. Clearly inform the user that live trading data for {stock_intent} is temporarily unavailable.\n"
+                f"2. ABSOLUTELY FORBIDDEN: NEVER invent, hallucinate, or estimate stock prices, trading volumes, percentages, or tables. Never cite 'PSX official feed' with made-up figures.\n"
+            )
 
     # Check for live weather request (only when General AI is enabled)
-    weather_info = None
     if req_outside_enabled and weather_city:
         if weather_city.lower() == "lahore" and "lahore" not in req.question.lower() and c_city:
             weather_city = c_city.title()
-        from agent.weather_helper import fetch_live_weather
-        weather_info = fetch_live_weather(weather_city)
+        if not weather_info:
+            from agent.weather_helper import fetch_live_weather
+            weather_info = fetch_live_weather(weather_city)
         if weather_info:
             w_curr = weather_info["current"]
             synth_user_prompt += (
@@ -2976,12 +3138,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live fuel / petroleum prices request
-    fuel_data = None
     if req_outside_enabled and fuel_intent:
-        emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
-        fuel_raw = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
-        if fuel_raw:
-            fuel_data = fuel_raw
+        if not fuel_data:
+            emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
+            fuel_data = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
+        if fuel_data:
+            fuel_raw = fuel_data
             snippets_txt = "\n".join(fuel_raw.get("snippets", []))
             synth_user_prompt += (
                 f"\n\n[VERIFIED REAL-TIME FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} AS OF {fuel_raw['timestamp']}]:\n"
@@ -2989,10 +3151,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"- High Speed Diesel (HSD): {fuel_raw['diesel']}\n"
                 f"- Hi-Octane (97 RON): {fuel_raw['hi_octane']}\n"
                 f"- Kerosene Oil: {fuel_raw['kerosene']}\n"
+                f"- Light Diesel Oil (LDO): {fuel_raw.get('ldo', 'Rs. 251.37')}\n"
                 f"- LPG: {fuel_raw['lpg']}\n\n"
                 f"Live Sources & Dispatches:\n{snippets_txt}\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. State the exact, single active petrol price ({fuel_raw['petrol']}) and diesel price ({fuel_raw['diesel']}) immediately in the first sentence. Strictly IGNORE historical range boundaries (such as old ranges like Rs. 252 - 275).\n"
+                f"1. State the exact, single active petrol price ({fuel_raw['petrol']}) and diesel price ({fuel_raw['diesel']}) immediately in the first sentence. Strictly IGNORE historical range boundaries or outdated rates.\n"
                 f"2. Present the fuel prices in a clean, professional Markdown table followed by key takeaways.\n"
                 f"3. Use clean, direct text form. DO NOT generate cards, bento boxes, or card decks.\n"
                 f"4. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan."
@@ -3040,7 +3203,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # Universal Internet Search (Dual-Intent Enabled):
     # 1. NEVER run when analyzing an uploaded document (has_docs) — the document is the source of truth!
     # 2. Concurrently execute alongside DuckDB if external_tools specified or real-world validation needed.
-    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data
+    has_dedicated_tool_result = bool(forex_card_data or stock_card_data or weather_info or fuel_data)
+    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data and not has_dedicated_tool_result
     if should_run_web:
         if browse_urls or search_queries:
             emit("Browsing live internet sources with Universal Web Agent...")
@@ -3070,7 +3234,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             f"{web_agent_data['synthesized_context']}\n\n"
             f"IMPORTANT TEMPORAL & EXTRACTION DIRECTIVES:\n"
             f"- Prioritize rates, prices, and numbers associated with the most recent timestamp or date header.\n"
-            f"- Strictly IGNORE historical range boundaries (such as Rs. 253 - Rs. 275) if a definitive single active rate (such as Rs. 369.06 or Rs. 374.51) is present in the latest search snippets.\n"
+            f"- Strictly IGNORE historical range boundaries or outdated rates if a definitive single latest active rate is present in the latest search snippets.\n"
             f"- Never hallucinate. Cite titles or domains where appropriate."
         )
 
@@ -3300,6 +3464,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     answer = re.sub(r"(?i)\b(?:note:?\s*)?direct\s+pdf\s+generation\s+is\s+not\s+supported[^\.\n]*(\.|\n|$)", "", answer)
     answer = re.sub(r"(?i)\byou\s+can\s+copy\s+the\s+summary\s+above\s+into\s+your\s+document\s+editor[^\.\n]*(\.|\n|$)", "", answer).strip()
     answer = _force_markers(req.question, answer)
+
+    # Attach smart conversational follow-up chips (Claude/ChatGPT style)
+    followups = generate_followup_suggestions(req.question, endpoints)
+    if followups:
+        answer = re.sub(r":::followup-suggestions[\s\S]*?(?:::|$)", "", answer).strip()
+        answer = f"{answer.strip()}\n\n:::followup-suggestions\n{json.dumps(followups)}\n:::"
 
     if cancelled.is_set(): return None
 

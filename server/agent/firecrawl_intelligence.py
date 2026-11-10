@@ -47,7 +47,16 @@ def get_firecrawl_client():
         return _firecrawl_client
 
     _ensure_env()
-    api_key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
+    api_key = ""
+    try:
+        from agent.external_apis_manager import get_active_keys_for_type
+        keys = get_active_keys_for_type("SEARCH")
+        if keys:
+            api_key = str(keys[0].get("api_key") or "").strip()
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
     try:
         from firecrawl import Firecrawl
         if api_key:
