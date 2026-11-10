@@ -2624,6 +2624,72 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         other_vision = [vp for vp in vision_providers if req.provider_id is None or str(vp.get("provider_id")) != str(req.provider_id)]
         providers = user_picked + other_vision + [p for p in providers if p not in vision_providers]
 
+    # =========================================================================
+    # STAGE 0: Enterprise AI Hub 3.0 Universal Routing Core
+    # Decouples general conversational/coding/tutoring inquiries from the SQL planner
+    # =========================================================================
+    from agent.universal_router import classify_query_route, QueryRoute, UNIVERSAL_ASSISTANT_SYSTEM_PROMPT
+    from agent.model_router import model_router
+
+    route_info = classify_query_route(
+        question=req.question,
+        endpoints=endpoints,
+        history=history_msgs,
+        general_ai_enabled=req_outside_enabled,
+        has_images=has_images,
+        has_docs=has_docs
+    )
+    detected_route = route_info["route"]
+
+    # Dedicated Universal Conversational Pipeline (ChatGPT-Style Direct Route)
+    if detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not (req_outside_enabled and any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"])):
+        emit("Formulating comprehensive response…")
+        universal_messages = [{"role": "system", "content": UNIVERSAL_ASSISTANT_SYSTEM_PROMPT + depth_prompt}]
+        universal_messages.extend(history_msgs)
+
+        user_content = req.question
+        if has_images:
+            img_blocks = []
+            for img in req.images:
+                img_url = img.get("url") if isinstance(img, dict) else str(img)
+                b64 = _ensure_image_base64_for_llm(img_url)
+                if b64:
+                    img_blocks.append({"type": "image_url", "image_url": {"url": b64}})
+            img_blocks.append({"type": "text", "text": user_content})
+            universal_messages.append({"role": "user", "content": img_blocks})
+        else:
+            universal_messages.append({"role": "user", "content": user_content})
+
+        try:
+            content, usage, provider_used = model_router.call_with_resilience(
+                messages=universal_messages,
+                task_type="general",
+                preferred_provider_id=req.provider_id,
+                max_tokens=synth_max_tokens if 'synth_max_tokens' in locals() else 2200,
+                temperature=0.7 if depth == "high" else 0.2,
+                requires_vision=has_images,
+                emit_func=emit
+            )
+            total_tokens_used = usage.get("total_tokens", 0)
+
+            # Attach smart conversational follow-up chips
+            followups = generate_followup_suggestions(req.question, endpoints)
+            if followups:
+                content = f"{content.strip()}\n\n:::followup-suggestions\n{json.dumps(followups)}\n:::"
+
+            _save_and_record(req, content, t_start, provider_used, total_tokens_used)
+            return {
+                "answer": content,
+                "provider_used": provider_used,
+                "kpis": [],
+                "meta_stats": {
+                    "tokens": total_tokens_used,
+                    "ms": int((time.time() - t_start) * 1000)
+                }
+            }
+        except Exception as e:
+            logger.warning(f"[Universal Conversational Route Notice] Falling back to standard pipeline: {e}")
+
     # STAGE 1: Small Compact Schema (~400 tokens) built from catalog without downloading rows
     schema_overview = _build_schema_catalog(endpoints)
 
