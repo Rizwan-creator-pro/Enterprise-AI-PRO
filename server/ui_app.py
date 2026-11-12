@@ -3717,25 +3717,42 @@ def get_chat_attachments_endpoint(session_id: str, request: Request):
 
     items = []
     seen_keys = set()
+    seen_gids = set()
+    seen_names = set()
 
     # 1. Try Oracle ORDS attachments table
     try:
         res = ords_get(f"{URL_ATTACHMENTS}/{session_id}", timeout=6)
         if res.ok:
             for it in res.json().get("items", []):
+                fname = (it.get("file_name") or "").strip().lower()
+                g_id = it.get("gdrive_file_id")
+                if not g_id and it.get("gdrive_web_link"):
+                    m_gid = re.search(r'(?:file/d/|id=|/file/)([a-zA-Z0-9_-]{20,})', str(it.get("gdrive_web_link")))
+                    if m_gid:
+                        g_id = m_gid.group(1)
+                        it["gdrive_file_id"] = g_id
+
+                # Deduplicate by Google Drive file id if available
+                if g_id and g_id in seen_gids:
+                    continue
+                # Deduplicate by normalized file name
+                if fname and fname in seen_names and (g_id or it.get("gdrive_web_link")):
+                    continue
+
                 key = (it.get("file_name") or "") + (it.get("gdrive_web_link") or "")
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    g_id = it.get("gdrive_file_id")
-                    if not g_id and it.get("gdrive_web_link"):
-                        m_gid = re.search(r'(?:file/d/|id=|/file/)([a-zA-Z0-9_-]{20,})', str(it.get("gdrive_web_link")))
-                        if m_gid:
-                            g_id = m_gid.group(1)
-                            it["gdrive_file_id"] = g_id
-                    if g_id:
-                        it["thumbnail_url"] = f"/api/gdrive/file/{g_id}"
-                        it["display_url"] = f"/api/gdrive/file/{g_id}"
-                    items.append(it)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                if g_id:
+                    seen_gids.add(g_id)
+                if fname:
+                    seen_names.add(fname)
+
+                if g_id:
+                    it["thumbnail_url"] = f"/api/gdrive/file/{g_id}"
+                    it["display_url"] = f"/api/gdrive/file/{g_id}"
+                items.append(it)
     except Exception:
         pass
 
