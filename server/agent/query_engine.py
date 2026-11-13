@@ -1113,16 +1113,24 @@ def execute_plan(dataset: List[dict], plan: dict) -> dict:
 
     # Auto-generate chart if query is aggregate with multiple categories, or if user asked for a chart
     if not chart_obj and table_rows and len(table_rows) >= 2:
-        cat_c = find_best_category_col(table_rows[0], (plan.get("group_by") or [None])[0])
-        val_cs = find_best_value_cols(table_rows[0], cat_c)
-        if val_cs:
-            chart_obj = build_echarts(
-                chart_type="donut" if len(table_rows) <= 6 else "bar",
-                title=f"{val_cs[0].replace('_', ' ').title()} by {str(cat_c).replace('_', ' ').title()}",
-                data_rows=table_rows,
-                cat_col=str(cat_c),
-                val_cols=val_cs[:2]
-            )
+        # Avoid unreadable 30+ bar charts on raw data dumps unless explicitly requested in plan
+        can_auto_chart = (mode in ("aggregate", "pivot")) or (len(table_rows) <= 12)
+        if "chart" in plan and plan.get("chart") is None:
+            can_auto_chart = False
+        elif plan.get("chart"):
+            can_auto_chart = True
+
+        if can_auto_chart:
+            cat_c = find_best_category_col(table_rows[0], (plan.get("group_by") or [None])[0])
+            val_cs = find_best_value_cols(table_rows[0], cat_c)
+            if val_cs:
+                chart_obj = build_echarts(
+                    chart_type="donut" if len(table_rows) <= 6 else "bar",
+                    title=f"{val_cs[0].replace('_', ' ').title()} by {str(cat_c).replace('_', ' ').title()}",
+                    data_rows=table_rows,
+                    cat_col=str(cat_c),
+                    val_cols=val_cs[:2]
+                )
 
     # Step 6: KPIs
     kpis = compute_kpis(table_rows if plan.get("limit") else (rows if mode == "raw" else table_rows))

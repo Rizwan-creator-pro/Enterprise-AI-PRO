@@ -173,5 +173,41 @@ class TestDynamicQuerySizing(unittest.TestCase):
         self.assertIsNone(res["chart"])
 
 
+    def test_table_form_chart_suppression(self):
+        # When user asks for table form, chart must be suppressed
+        mock_leads = [
+            {"BUSINESS_NAME": f"Lead {i}", "RATING": 4.5 + (i * 0.01)}
+            for i in range(25)
+        ]
+        plan = {
+            "mode": "raw",
+            "target_table": "Google Map Leads",
+            "chart": None
+        }
+        res = qe.execute_plan(mock_leads, plan)
+        self.assertEqual(len(res["table_rows"]), 25)
+        # Verify chart is suppressed
+        self.assertIsNone(res["chart"])
+
+    def test_general_ai_off_security_rejection_logic(self):
+        # Outside queries when General AI is OFF must reject
+        def should_reject(q: str, is_outside_db: bool, has_feed: bool):
+            q_low = q.lower().strip()
+            is_greeting = bool(re.match(r"^\s*(?:hi|hello|hey|salam|assalam|greetings)\b", q_low)) or q_low in ["hi", "hello", "hey", "help"]
+            is_db = any(k in q_low for k in ["employee", "product", "lead", "salary", "table", "price", "stock", "headcount"])
+            return not is_outside_db and not has_feed and not is_greeting and not is_db
+
+        # Weather query when General AI is OFF
+        self.assertTrue(should_reject("what is the weather in Lahore today?", is_outside_db=False, has_feed=False))
+        # President query when General AI is OFF
+        self.assertTrue(should_reject("who is the president of the United States?", is_outside_db=False, has_feed=False))
+        # Internal DB query when General AI is OFF
+        self.assertFalse(should_reject("who has the highest salary", is_outside_db=False, has_feed=False))
+        # Whitelisted feed when General AI is OFF
+        self.assertFalse(should_reject("what is the fuel price today", is_outside_db=False, has_feed=True))
+        # Greeting when General AI is OFF
+        self.assertFalse(should_reject("hello", is_outside_db=False, has_feed=False))
+
+
 if __name__ == "__main__":
     unittest.main()

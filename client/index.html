@@ -8334,8 +8334,8 @@ const skeletonHTML = () => `
                     };
                 }
 
-                // If table has 10 or more columns, attach Claude-style Column Questionnaire Card
-                if (data.head && data.head.length >= 10) {
+                // If table has 10 or more columns and more than 1 row, attach Claude-style Column Questionnaire Card
+                if (data.head && data.head.length >= 10 && data.body && data.body.length > 1) {
                     const prevEl = block.previousElementSibling;
                     if (!prevEl || !prevEl.classList.contains('claude-col-questionnaire')) {
                         const qCard = buildTableColumnQuestionnaire(block, t, data, title);

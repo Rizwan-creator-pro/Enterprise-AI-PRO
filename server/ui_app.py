@@ -2878,7 +2878,38 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 "meta_stats": {"tokens": total_tokens_used, "ms": int((time.time() - t_start) * 1000), "cost": 0}
             }
 
-    if plan and not is_outside_db and plan.get("outside_rejected") and not has_whitelisted_feed:
+    # Deterministic check if inquiry is related to authorized enterprise database
+    is_greeting = bool(re.match(r"^\s*(?:hi|hello|hey|salam|assalam|greetings)\b", req.question.lower().strip())) or req.question.lower().strip() in ["hi", "hello", "hey", "help", "who are you", "what can you do"]
+
+    is_db_related = bool(
+        matched_in_q
+        or matched_eps_in_q
+        or has_history_table
+        or (plan and plan.get("target_table") and _match_endpoint(str(plan.get("target_table")), endpoints))
+        or any(k in req.question.lower() for k in [
+            "table", "tables", "record", "records", "row", "rows", "column", "columns",
+            "employee", "employees", "staff", "salary", "salaries", "payroll", "headcount", "worker", "workers", "dept", "department", "departments",
+            "product", "products", "item", "items", "pricing", "price", "stock", "catalog", "inventory",
+            "lead", "leads", "business", "rating", "ratings", "review", "reviews", "phone", "address", "gmap", "google map"
+        ])
+    )
+
+    should_reject_outside = (
+        not is_outside_db
+        and not has_whitelisted_feed
+        and not has_docs
+        and not has_images
+        and not is_greeting
+        and (
+            weather_city is not None
+            or firecrawl_intent is not None
+            or (plan and plan.get("outside_rejected"))
+            or not is_db_related
+            or (plan and plan.get("mode") == "direct_answer" and not plan.get("target_table"))
+        )
+    )
+
+    if should_reject_outside:
         pol_msg = (
             "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
             "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
@@ -2958,6 +2989,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     )
     if is_table_form_request and plan:
         plan["limit"] = None
+        plan["chart"] = None
         has_explicit_cols = any(k in req.question.lower() for k in [
             "columns", "cols", "only", "carry", "select"
         ]) and any(char.isdigit() for char in req.question)
@@ -3166,6 +3198,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         exec_result["kpis"] = qe.compute_kpis(exec_result["table_rows"])
         if explicit_requested_limit == 1:
             exec_result["chart"] = None
+    elif is_table_form_request and exec_result:
+        exec_result["chart"] = None
 
     # STAGE 4: Synthesis LLM (Writes crisp summary from small result table)
     emit("Synthesizing concise summary & visualization…")
@@ -3645,6 +3679,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         answer = f"{answer.strip()}\n\n:::web-intelligence\n{json.dumps(wic_payload)}\n:::"
 
     kpis_out = exec_result.get("kpis") if exec_result else []
+    # Strip solitary, uninformative "Total Records: 1" card
+    if kpis_out and len(kpis_out) == 1 and kpis_out[0].get("label") in ("Total Records", "Total Record") and str(kpis_out[0].get("value")) in ("1", "1.0"):
+        kpis_out = []
     # Avoid card overload: Only generate kpis_out if user explicitly requested a KPI deck or multi-table overview
     user_wants_deck = any(k in req.question.lower() for k in ["kpi", "bento", "metric card", "overview deck", "dashboard"])
     if not kpis_out and has_docs and req.documents and user_wants_deck:
