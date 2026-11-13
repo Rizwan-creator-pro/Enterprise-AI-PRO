@@ -64,6 +64,35 @@ class TestUniversalRouter(unittest.TestCase):
         self.assertEqual(res_off["route"], QueryRoute.ENTERPRISE_DATA)
         self.assertIn("Strict internal database mode", res_off["reason"])
 
+        # Weather is blocked when General AI is OFF
+        res_weather = classify_query_route("what is the weather today", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_weather["route"], QueryRoute.ENTERPRISE_DATA)
+
+        # Foreign non-PSX stock (e.g. Apple / AAPL) is blocked when General AI is OFF
+        res_aapl = classify_query_route("what is the stock price of Apple AAPL", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_aapl["route"], QueryRoute.ENTERPRISE_DATA)
+
+    def test_whitelisted_feeds_when_general_ai_off(self):
+        # 1. Currency / Forex feed is allowed when General AI is OFF
+        res_fx = classify_query_route("USD to PKR weekly trend", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_fx["route"], QueryRoute.WEB_RESEARCH)
+        self.assertIsNotNone(res_fx["forex_intent"])
+
+        # 2. Fuel feed is allowed when General AI is OFF
+        res_fuel = classify_query_route("what is the petrol price today", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_fuel["route"], QueryRoute.WEB_RESEARCH)
+        self.assertIsNotNone(res_fuel["fuel_intent"])
+
+        # 3. PSX Stock feed is allowed when General AI is OFF
+        res_psx = classify_query_route("what is the share price of OGDC on PSX", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_psx["route"], QueryRoute.WEB_RESEARCH)
+        self.assertEqual(res_psx["stock_intent"], "OGDC")
+
+        # General AI ON enables weather and external web
+        res_weather_on = classify_query_route("what is the weather today", self.mock_endpoints, general_ai_enabled=True)
+        self.assertEqual(res_weather_on["route"], QueryRoute.WEB_RESEARCH)
+        self.assertIsNotNone(res_weather_on["weather_intent"])
+
     def test_universal_conversational_routing(self):
         # Coding question
         res_code = classify_query_route("write a python script to parse JSON and sort by key", self.mock_endpoints)

@@ -119,32 +119,56 @@ def classify_query_route(
             "reason": "Enterprise database table, column, or entity reference detected"
         }
 
-    # 4. Web Research & External Real-World Tools (gated by General AI toggle)
+    # 4. Whitelisted Business Feeds (Forex, Fuel, PSX) & Web Research
+    from agent.external_intelligence import (
+        extract_forex_intent,
+        extract_stock_intent,
+        extract_fuel_intent,
+        is_psx_stock
+    )
+
+    forex_intent = extract_forex_intent(q)
+    fuel_intent = extract_fuel_intent(q)
+    stock_intent = extract_stock_intent(q, history or [])
+
+    # If General AI is OFF, filter stock_intent strictly to PSX (Pakistan Stock Exchange)
+    if not general_ai_enabled and stock_intent:
+        if not is_psx_stock(stock_intent):
+            stock_intent = None
+
+    has_whitelisted_feed = bool(forex_intent or fuel_intent or stock_intent)
+
+    if has_whitelisted_feed:
+        return {
+            "route": QueryRoute.WEB_RESEARCH,
+            "forex_intent": forex_intent,
+            "stock_intent": stock_intent,
+            "fuel_intent": fuel_intent,
+            "weather_intent": None,
+            "has_url": False,
+            "reason": "Whitelisted enterprise business feed detected (Forex, Fuel, or PSX)"
+        }
+
+    # Open-world web research, live weather, external URLs (strictly gated by General AI toggle)
     if general_ai_enabled:
-        from agent.external_intelligence import (
-            extract_forex_intent,
-            extract_stock_intent,
-            extract_fuel_intent
-        )
         from agent.weather_helper import extract_weather_intent
 
-        forex_intent = extract_forex_intent(q)
-        stock_intent = extract_stock_intent(q, history or [])
-        fuel_intent = extract_fuel_intent(q)
         weather_intent = extract_weather_intent(q)
+        if not weather_intent and any(k in q_lower for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
+            weather_intent = "auto"
         has_url = bool(re.search(r"https?://\S+", q))
 
         has_web_kw = any(k in q_lower for k in [
             "search online", "search web", "browse", "latest news", "current price",
-            "weather", "forecast", "petrol price", "fuel price", "dollar rate", "stock price"
+            "weather", "forecast", "dollar rate", "stock price"
         ])
 
-        if forex_intent or stock_intent or fuel_intent or weather_intent or has_url or has_web_kw:
+        if weather_intent or has_url or has_web_kw:
             return {
                 "route": QueryRoute.WEB_RESEARCH,
-                "forex_intent": forex_intent,
-                "stock_intent": stock_intent,
-                "fuel_intent": fuel_intent,
+                "forex_intent": None,
+                "stock_intent": None,
+                "fuel_intent": None,
                 "weather_intent": weather_intent,
                 "has_url": has_url,
                 "reason": "Real-time web research, market feed, or external intelligence detected"

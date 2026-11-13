@@ -156,7 +156,8 @@ def extract_forex_intent(text: str) -> Optional[Dict[str, Any]]:
     
     intent_triggers = [
         "rate", "price", "convert", "conversion", "how much", "worth", "today", "now", "currently",
-        "vs", "to", "in", "kitna", "kitne", "aaj", "bhav", "chal raha", "kya hai", "equal"
+        "vs", "to", "in", "kitna", "kitne", "aaj", "bhav", "chal raha", "kya hai", "equal",
+        "trend", "trends", "weekly", "daily", "monthly", "chart", "history", "forecast"
     ]
     if not any(k in t for k in intent_triggers):
         return None
@@ -341,6 +342,27 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         return "PSX_INDEX"
 
     return None
+
+
+def is_psx_stock(symbol_or_query: str) -> bool:
+    """Checks if a stock symbol or company name refers to the Pakistan Stock Exchange (PSX)."""
+    if not symbol_or_query:
+        return False
+    s = str(symbol_or_query).strip()
+    if s.upper() in ["PSX", "KSE", "PSX_INDEX", "KSE-100", "KSE100"]:
+        return True
+    clean_s = s.upper().replace(".KA", "")
+    if clean_s in GLOBAL_STOCK_SYMBOLS:
+        return False
+    if clean_s in STOCK_SYMBOL_MAP.values():
+        return True
+    s_low = s.lower()
+    if any(k in s_low for k in ["psx", "kse", "karachi stock", "pakistan stock"]):
+        return True
+    for name in STOCK_SYMBOL_MAP.keys():
+        if name in s_low:
+            return True
+    return False
 
 def fetch_psx_indices() -> Optional[Dict[str, Any]]:
     """Scrapes official live Pakistan Stock Exchange (PSX) indices directly from PSX Data Portal."""

@@ -2193,16 +2193,32 @@ async def run_hybrid_orchestrator(
                     if client_city and client_city.strip():
                         tool_call["city"] = client_city.strip().title()
     else:
-        # STRICT PERIMETER: If general_ai_enabled is False, strictly forbid any external web tool fallbacks
-        # and force the execution plan to stay contained inside the local database scope.
+        # WHITELISTED ENTERPRISE FEEDS: When general_ai_enabled is False, only allow
+        # the 3 verified real-time business feeds: Fuel, Forex, and PSX stocks/indices.
+        from agent.external_intelligence import is_psx_stock
         external_tool_calls = []
-        if plan:
-            plan["external_tools"] = []
-            if plan.get("mode") == "direct_answer" and not plan.get("target_table"):
-                matched_ep = _match_endpoint(question, endpoints)
-                if matched_ep:
-                    plan["target_table"] = matched_ep.get("endpoint_name")
-                    plan["mode"] = "raw"
+        fuel_int = extract_fuel_intent(question)
+        forex_int = extract_forex_intent(question)
+        stock_int = extract_stock_intent(question, history_msgs or [])
+
+        if stock_int and not is_psx_stock(stock_int):
+            stock_int = None
+
+        if fuel_int:
+            cntry = fuel_int.get("country") or client_country or "Pakistan"
+            external_tool_calls.append({"tool": "fuel", "country": cntry})
+        elif forex_int:
+            external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
+        elif stock_int:
+            external_tool_calls.append({"tool": "stock", "symbol": stock_int})
+        else:
+            if plan:
+                plan["external_tools"] = []
+                if plan.get("mode") == "direct_answer" and not plan.get("target_table"):
+                    matched_ep = _match_endpoint(question, endpoints)
+                    if matched_ep:
+                        plan["target_table"] = matched_ep.get("endpoint_name")
+                        plan["mode"] = "raw"
 
     # 3. Dispatch external tool tasks concurrently
     for idx, tool_call in enumerate(external_tool_calls):
@@ -2442,53 +2458,49 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             orch_question = f"{req.question} in {c_country}"
             logger.info(f"[Geo Localization] Auto-localized commodity query: '{req.question}' -> '{orch_question}'")
 
+    # 3 Whitelisted Enterprise Feeds: Currency/Forex, Pakistan Fuel Prices, and PSX (Pakistan Stock Exchange)
+    # These 3 live business utilities are accessible even when General AI is switched OFF.
+    from agent.external_intelligence import is_psx_stock
+    forex_intent = extract_forex_intent(orch_question)
+    stock_intent = extract_stock_intent(orch_question, history_msgs)
+    fuel_intent = extract_fuel_intent(orch_question)
+
+    if not req_outside_enabled and stock_intent:
+        if not is_psx_stock(stock_intent):
+            stock_intent = None
+
+    has_whitelisted_feed = bool(forex_intent or fuel_intent or stock_intent)
+
     if req_outside_enabled:
         can_search_ext = True
         is_outside_db = True
-        forex_intent = extract_forex_intent(orch_question)
-        stock_intent = extract_stock_intent(orch_question, history_msgs)
         weather_city = extract_weather_intent(orch_question, default_city=c_city)
         if not weather_city and any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
             weather_city = c_city.title() if c_city else "Lahore"
-        fuel_intent = extract_fuel_intent(orch_question)
         firecrawl_intent = detect_firecrawl_intent(orch_question)
         direct_urls = extract_urls_from_text(orch_question)
     else:
         can_search_ext = False
-        is_outside_db = False
-        forex_intent = None
-        stock_intent = None
+        is_outside_db = has_whitelisted_feed
         weather_city = None
-        fuel_intent = None
         firecrawl_intent = None
         direct_urls = []
 
-    # If General AI is strictly OFF, enforce internal database isolation
+    # If General AI is strictly OFF, enforce internal database & whitelisted feed isolation
     if not req_outside_enabled and not has_images and not has_docs and not is_pure_math_expression(req.question):
-        chk_weather = extract_weather_intent(req.question)
-        chk_forex = extract_forex_intent(req.question)
-        chk_stock = extract_stock_intent(req.question, history_msgs)
-        chk_fuel = extract_fuel_intent(req.question)
-        chk_urls = extract_urls_from_text(req.question)
         chk_matched = _match_endpoint(req.question, endpoints)
-        has_ext_kw = any(k in req.question.lower() for k in [
-            "weather", "forecast", "temperature", "rain", "climate", "dollar", "usd", "pkr", "forex",
-            "exchange rate", "currency", "stock price", "psx", "kse", "nasdaq", "crypto", "bitcoin",
-            "president", "prime minister", "celebrity", "cricket", "who is", "what is the capital",
-            "petrol", "diesel", "fuel", "gas price", "gold price", "silver price"
-        ])
-        is_outside_inquiry = bool((chk_weather or chk_forex or chk_stock or chk_fuel or chk_urls or has_ext_kw) and not chk_matched)
-        if is_outside_inquiry:
+        if not chk_matched and not has_whitelisted_feed:
             pol_msg = (
                 "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
-                "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise database tables:\n"
+                "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
                 "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
                 "- **PRODUCTS** (Products, pricing, stock, categories)\n"
-                "- **Google Map Leads** (Business leads, contact information, ratings)\n\n"
-                "External live data (such as live weather forecasts, currency/forex exchange rates, stock market updates, and internet search) is disabled.\n\n"
-                "👉 **To get live weather, dollar/forex rates, stock prices, or browse the web, please turn General AI ON in the bottom toolbar.**"
+                "- **Google Map Leads** (Business leads, contact information, ratings)\n"
+                "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
+                "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
+                "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
             )
-            emit("General AI is switched off — strictly restricted to internal database tables.")
+            emit("General AI is switched off — restricted to internal tables and verified business feeds.")
             _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=0)
             return {
                 "answer": pol_msg,
@@ -2704,13 +2716,13 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     total_cost = 0.0
 
     planner_prompt = PLANNER_SYSTEM_PROMPT.replace("{schema}", schema_overview)
-    if is_outside_db:
+    if is_outside_db or has_whitelisted_feed:
         planner_prompt += (
-            "\n9. GENERAL KNOWLEDGE / OUTSIDE DB: If the question does NOT relate to any authorized database table or column and asks for general external knowledge, weather, forex, or open-web topics, output: {\"mode\": \"direct_answer\"}"
+            "\n9. GENERAL KNOWLEDGE / BUSINESS FEEDS: If the question does NOT relate to any authorized database table or column and asks for live currency exchange, fuel prices, PSX market data, or general external knowledge, output: {\"mode\": \"direct_answer\"}"
         )
     else:
         planner_prompt += (
-            "\n9. STRICT INTERNAL DATABASE MODE: General AI / Outside Search is DISABLED. You MUST ONLY plan queries against the authorized tables ({schema}). If the question cannot be answered from the authorized tables, output: {\"mode\": \"direct_answer\", \"outside_rejected\": true}"
+            "\n9. STRICT INTERNAL DATABASE MODE: General AI / Outside Search is DISABLED. You MUST ONLY plan queries against the authorized tables ({schema}). If the question asks for live currency exchange (USD/PKR), fuel prices, or PSX stocks, output: {\"mode\": \"direct_answer\"}. If the question cannot be answered from the authorized tables or these 3 feeds, output: {\"mode\": \"direct_answer\", \"outside_rejected\": true}"
         )
 
     planner_messages = [
@@ -2808,15 +2820,16 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 "meta_stats": {"tokens": total_tokens_used, "ms": int((time.time() - t_start) * 1000), "cost": 0}
             }
 
-    if plan and not is_outside_db and plan.get("outside_rejected"):
+    if plan and not is_outside_db and plan.get("outside_rejected") and not has_whitelisted_feed:
         pol_msg = (
             "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
-            "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise database tables:\n"
+            "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
             "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
             "- **PRODUCTS** (Products, pricing, stock, categories)\n"
-            "- **Google Map Leads** (Business leads, contact information, ratings)\n\n"
-            "Your inquiry does not relate to these authorized tables.\n\n"
-            "👉 **To ask general questions, get live weather, forex rates, stock prices, or browse the web, please turn General AI ON in the bottom toolbar.**"
+            "- **Google Map Leads** (Business leads, contact information, ratings)\n"
+            "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
+            "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
+            "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
         )
         emit("Question outside authorized database scope — General AI is OFF.")
         _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=total_tokens_used)
@@ -2989,9 +3002,13 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # Check for requested USD / foreign currency conversion on numeric columns (e.g. salaries in USD per employee)
     q_low = req.question.lower()
     is_usd_conversion = any(k in q_low for k in [
-        "in usd", "in dollar", "also dollar", "also in dollar", "in $", "into dollar",
-        "to usd", "also in usd", "dollar me", "dollars me", "usd me", "per employee in dollar"
-    ])
+        "in usd", "in dollar", "in dollars", "also dollar", "also in dollar", "the dollar also", "dollar also", "dollars also",
+        "and dollar", "and dollars", "and the dollar", "and in dollar", "and in dollars", "and in usd",
+        "in $", "into dollar", "to usd", "also in usd", "dollar me", "dollars me", "usd me", "per employee in dollar"
+    ]) or (
+        any(k in q_low for k in ["usd", "dollar", "dollars", "$"]) and
+        any(k in q_low for k in ["salary", "salaries", "pay", "payroll", "earner", "earners", "wage", "wages"])
+    )
     if is_usd_conversion and exec_result and exec_result.get("table_rows"):
         try:
             from agent.external_intelligence import fetch_live_forex
@@ -3106,7 +3123,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live forex / currency exchange request
-    if req_outside_enabled and forex_intent:
+    if forex_intent:
         if not forex_card_data:
             emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
             forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
@@ -3136,7 +3153,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live stock market or PSX request
-    if req_outside_enabled and stock_intent:
+    if stock_intent:
         if not stock_card_data:
             emit(f"Querying Pakistan Stock Exchange (PSX) & live equity registers ({stock_intent})...")
             if stock_intent == "PSX_INDEX":
@@ -3207,7 +3224,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live fuel / petroleum prices request
-    if req_outside_enabled and fuel_intent:
+    if fuel_intent:
         if not fuel_data:
             emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
             fuel_data = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
@@ -3471,14 +3488,14 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     if req_outside_enabled and weather_info:
         answer = re.sub(r":::google-weather[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::google-weather\n{json.dumps(weather_info)}\n:::"
-    if req_outside_enabled and forex_card_data:
+    if forex_card_data:
         answer = re.sub(r":::currency-converter[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::currency-converter\n{json.dumps(forex_card_data)}\n:::"
-    if req_outside_enabled and stock_card_data:
+    if stock_card_data:
         answer = re.sub(r":::stock-market-card[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::stock-market-card\n{json.dumps(stock_card_data)}\n:::"
 
-    if req_outside_enabled and (forex_card_data or stock_card_data or weather_info):
+    if forex_card_data or stock_card_data or (req_outside_enabled and weather_info):
         # Eliminate card box overload: Strip all manual markdown tables, multi-row conversion metrics,
         # and enforce ONLY a clean 1-2 sentence executive market commentary alongside the specialized widget.
         widget_blocks = re.findall(r":::(?:currency-converter|stock-market-card|google-weather)[\s\S]*?:::", answer)
