@@ -4676,6 +4676,78 @@
             background: rgba(26,115,232,0.18);
             color: var(--accent-blue);
         }
+        .tb-pagesize-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .tb-pagesize-pop {
+            left: 8px !important;
+            right: auto !important;
+            min-width: 140px !important;
+            padding: 5px !important;
+            border-radius: 10px !important;
+            z-index: 70 !important;
+        }
+        .tb-pagesize-pop .pop-item {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            gap: 8px !important;
+            justify-content: space-between !important;
+        }
+        .tb-pagesize-pop .pop-item.active {
+            color: var(--accent-blue) !important;
+            font-weight: 600 !important;
+            background: rgba(26, 115, 232, 0.1) !important;
+        }
+        .tb-pagesize-pop .pop-item .fa-check {
+            font-size: 11px;
+            color: var(--accent-blue);
+        }
+
+        /* Column Header Sorting Styles */
+        .table-wrap th.sortable {
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: background-color .15s ease, color .15s ease;
+        }
+        .table-wrap th.sortable:hover {
+            background: color-mix(in srgb, var(--surface-2) 75%, var(--text-main));
+            color: var(--text-main);
+        }
+        .table-wrap th .th-title-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 100%;
+        }
+        .table-wrap th.num .th-title-wrap {
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .table-wrap th .tb-sort-ico {
+            display: inline-flex;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-faint);
+            opacity: 0.45;
+            transition: opacity .15s ease, color .15s ease;
+            flex-shrink: 0;
+        }
+        .table-wrap th.sortable:hover .tb-sort-ico {
+            opacity: 0.9;
+            color: var(--text-muted);
+        }
+        .table-wrap th.sort-asc .tb-sort-ico,
+        .table-wrap th.sort-desc .tb-sort-ico {
+            opacity: 1;
+            color: var(--accent-blue);
+        }
+        .table-wrap th.sort-asc .th-title,
+        .table-wrap th.sort-desc .th-title {
+            color: var(--accent-blue);
+        }
 
         /* ===== Mobile Responsiveness Enforcement (Screen-fit & No Hidden Prompt Elements) ===== */
         @media (max-width: 768px) {
@@ -8065,8 +8137,12 @@ const skeletonHTML = () => `
             const ths = [...t.querySelectorAll('thead th')];
             const visibleIndices = ths.map((th, i) => th.style.display !== 'none' ? i : -1).filter(i => i >= 0);
             const isFiltered = visibleIndices.length < ths.length && visibleIndices.length > 0;
+            const getThTitle = th => {
+                const titleSpan = th.querySelector('.th-title');
+                return (titleSpan ? titleSpan.textContent : th.textContent).trim();
+            };
             return {
-                head: isFiltered ? visibleIndices.map(i => ths[i].textContent.trim()) : ths.map(th => th.textContent.trim()),
+                head: isFiltered ? visibleIndices.map(i => getThTitle(ths[i])) : ths.map(getThTitle),
                 body: [...t.querySelectorAll('tbody tr')].map(tr => {
                     const tds = [...tr.querySelectorAll('td')];
                     return isFiltered ? visibleIndices.map(i => tds[i] ? tds[i].textContent.trim() : '') : tds.map(td => td.textContent.trim());
@@ -8206,7 +8282,7 @@ const skeletonHTML = () => `
                         rows.forEach(tr => { if (tr.children[i]) tr.children[i].classList.add('num'); });
                 });
                 const block = document.createElement('div'); block.className = 'table-block';
-                block.innerHTML = `<div class="tb-bar"><span class="tb-meta"><i class="fa-solid fa-table"></i><span class="tb-count"></span><span class="tb-row-filter-pill" style="display:none;"></span><span class="tb-col-filter-pill" style="display:none;"><i class="fa-solid fa-sliders"></i> Filtered &bull; Reset</span><span class="tb-hidden-pill" style="display:none;"><i class="fa-solid fa-eye-slash"></i> Hidden &bull; Click to show</span></span>
+                block.innerHTML = `<div class="tb-bar"><span class="tb-meta"><i class="fa-solid fa-table"></i><span class="tb-count"></span><div class="tb-pagesize-wrap" style="display:none;"><button type="button" class="tb-row-filter-pill" title="Click to change page size"><i class="fa-solid fa-list-ol"></i> <span class="tb-pagesize-txt"></span> <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:3px;opacity:0.7;"></i></button><div class="pop pop-down tb-pagesize-pop"><div class="pop-label" style="font-size:10px;padding:4px 8px 2px;">Rows per page</div><div class="tb-pagesize-options"></div></div></div><span class="tb-col-filter-pill" style="display:none;"><i class="fa-solid fa-sliders"></i> Filtered &bull; Reset</span><span class="tb-hidden-pill" style="display:none;"><i class="fa-solid fa-eye-slash"></i> Hidden &bull; Click to show</span></span>
                     <div class="tb-tools">
                         <button type="button" class="tb-more" title="More" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
                         <div class="pop pop-down">
@@ -8284,32 +8360,192 @@ const skeletonHTML = () => `
                 menu.querySelectorAll('.pop-item').forEach(it => it.onclick = () => { closeMenus(); actions[it.dataset.a](); });
                 requestAnimationFrame(() => { if (wrap.scrollHeight > wrap.clientHeight + 4) { exp.hidden = false; sep.hidden = false; } });
 
-                // Row count toggle pill handler for tables with > 10 rows
+                // ===== Page Size Management (10 / 25 / 50 / 100 / All) =====
+                const pageSizeWrap = block.querySelector('.tb-pagesize-wrap');
                 const rowFilterPill = block.querySelector('.tb-row-filter-pill');
-                if (rowFilterPill && data.body && data.body.length > 10) {
-                    const totalRows = data.body.length;
-                    let showingLimited = true;
-                    const updateRowDisplay = () => {
-                        const trs = t.querySelectorAll('tbody tr');
-                        trs.forEach((tr, idx) => {
-                            tr.style.display = (showingLimited && idx >= 10) ? 'none' : '';
-                        });
-                        if (showingLimited) {
-                            rowFilterPill.style.display = 'inline-flex';
-                            rowFilterPill.innerHTML = `<i class="fa-solid fa-list-ol"></i> <span>10 of ${totalRows} rows</span> &bull; <strong style="text-decoration:underline;">Show All</strong>`;
-                            rowFilterPill.title = `Click to show all ${totalRows} rows`;
-                        } else {
-                            rowFilterPill.style.display = 'inline-flex';
-                            rowFilterPill.innerHTML = `<i class="fa-solid fa-list-ol"></i> <span>All ${totalRows} rows</span> &bull; <strong style="text-decoration:underline;">Show 10</strong>`;
-                            rowFilterPill.title = 'Click to collapse to 10 rows';
+                const pagesizePop = block.querySelector('.tb-pagesize-pop');
+                const pagesizeOptions = block.querySelector('.tb-pagesize-options');
+                const totalRows = data.body.length;
+
+                const availableSizes = [10];
+                if (totalRows > 20) availableSizes.push(25);
+                if (totalRows > 45) availableSizes.push(50);
+                if (totalRows > 90) availableSizes.push(100);
+                availableSizes.push('all');
+
+                let currentSize = totalRows > 10 ? 10 : 'all';
+
+                const updateRowDisplay = () => {
+                    const limit = currentSize === 'all' ? Infinity : currentSize;
+                    const trs = t.querySelectorAll('tbody tr');
+                    trs.forEach((tr, idx) => {
+                        tr.style.display = idx < limit ? '' : 'none';
+                    });
+
+                    if (pageSizeWrap && totalRows > 10) {
+                        pageSizeWrap.style.display = 'inline-flex';
+                        const labelSpan = block.querySelector('.tb-pagesize-txt');
+                        if (labelSpan) {
+                            labelSpan.textContent = currentSize === 'all'
+                                ? `All ${totalRows} rows`
+                                : `${Math.min(limit, totalRows)} of ${totalRows} rows`;
                         }
-                    };
+
+                        if (pagesizeOptions) {
+                            pagesizeOptions.innerHTML = availableSizes.map(sz => {
+                                const isAct = sz === currentSize;
+                                const lbl = sz === 'all' ? `All (${totalRows})` : `${sz} rows`;
+                                return `<div class="pop-item ${isAct ? 'active' : ''}" data-sz="${sz}"><span>${lbl}</span>${isAct ? '<i class="fa-solid fa-check"></i>' : ''}</div>`;
+                            }).join('');
+
+                            pagesizeOptions.querySelectorAll('.pop-item').forEach(it => {
+                                it.onclick = ev => {
+                                    ev.stopPropagation();
+                                    const sz = it.dataset.sz;
+                                    currentSize = sz === 'all' ? 'all' : parseInt(sz, 10);
+                                    closeMenus();
+                                    updateRowDisplay();
+                                    syncQuestionnaireCard();
+                                };
+                            });
+                        }
+                    }
+                };
+
+                const syncQuestionnaireCard = () => {
+                    const qCard = block.previousElementSibling;
+                    if (qCard && qCard.classList.contains('claude-col-questionnaire')) {
+                        const rowPillTxt = qCard.querySelector('.cq-row-pill-text');
+                        if (rowPillTxt) {
+                            if (currentSize === 'all') {
+                                rowPillTxt.textContent = 'Show 10 rows';
+                            } else {
+                                const currIdx = availableSizes.indexOf(currentSize);
+                                const nextSz = availableSizes[(currIdx + 1) % availableSizes.length];
+                                rowPillTxt.textContent = nextSz === 'all' ? `Show all (${totalRows})` : `Show ${nextSz} rows`;
+                            }
+                        }
+                    }
+                };
+
+                block._cyclePageSize = () => {
+                    const currIdx = availableSizes.indexOf(currentSize);
+                    const nextIdx = (currIdx + 1) % availableSizes.length;
+                    currentSize = availableSizes[nextIdx];
                     updateRowDisplay();
+                    syncQuestionnaireCard();
+                };
+
+                block._setPageSize = sz => {
+                    currentSize = sz;
+                    updateRowDisplay();
+                    syncQuestionnaireCard();
+                };
+
+                if (rowFilterPill && totalRows > 10) {
                     rowFilterPill.onclick = ev => {
                         ev.stopPropagation();
-                        showingLimited = !showingLimited;
-                        updateRowDisplay();
+                        toggleMenu(pagesizePop, ev);
                     };
+                }
+
+                updateRowDisplay();
+
+                // ===== 1-Click Client-Side Column Header Sorting =====
+                const parseCellForSort = val => {
+                    if (val === null || val === undefined) return { type: 'empty', val: '' };
+                    const s = String(val).trim();
+                    if (!s || s === '-' || s === '—' || s === 'N/A' || s === 'null') return { type: 'empty', val: '' };
+                    if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(s) || /^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/.test(s)) {
+                        const d = Date.parse(s);
+                        if (!isNaN(d)) return { type: 'date', val: d };
+                    }
+                    const stripped = s.replace(/,/g, '').replace(/^[^\d+-]+/, '').replace(/[^\d.]+$/, '').trim();
+                    if (stripped !== '' && !isNaN(Number(stripped)) && /^[-+]?\d+(\.\d+)?$/.test(stripped)) {
+                        return { type: 'num', val: Number(stripped) };
+                    }
+                    return { type: 'text', val: s.toLowerCase(), raw: s };
+                };
+
+                const compareCells = (cellA, cellB, dir) => {
+                    const a = parseCellForSort(cellA);
+                    const b = parseCellForSort(cellB);
+                    if (a.type === 'empty' && b.type === 'empty') return 0;
+                    if (a.type === 'empty') return 1;
+                    if (b.type === 'empty') return -1;
+                    let res = 0;
+                    if (a.type === 'num' && b.type === 'num') {
+                        res = a.val - b.val;
+                    } else if (a.type === 'date' && b.type === 'date') {
+                        res = a.val - b.val;
+                    } else {
+                        const strA = a.type === 'text' ? a.raw : String(a.val);
+                        const strB = b.type === 'text' ? b.raw : String(b.val);
+                        res = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+                    }
+                    return dir === 'asc' ? res : -res;
+                };
+
+                const thead = t.querySelector('thead');
+                const tbody = t.querySelector('tbody');
+                if (thead && tbody) {
+                    const ths = thead.querySelectorAll('th');
+                    const allTrs = tbody.querySelectorAll('tr');
+                    allTrs.forEach((tr, i) => { tr.dataset.origIdx = i; });
+
+                    let activeSortCol = -1;
+                    let activeSortDir = 'none';
+
+                    ths.forEach((th, colIdx) => {
+                        th.classList.add('sortable');
+                        const rawTitle = th.textContent.trim();
+                        th.title = `Click to sort by ${rawTitle}`;
+                        th.innerHTML = `<div class="th-title-wrap"><span class="th-title">${rawTitle}</span><span class="tb-sort-ico"><i class="fa-solid fa-sort"></i></span></div>`;
+
+                        th.onclick = ev => {
+                            ev.stopPropagation();
+                            closeMenus();
+
+                            const isNumCol = th.classList.contains('num');
+                            if (activeSortCol === colIdx) {
+                                if (activeSortDir === (isNumCol ? 'desc' : 'asc')) {
+                                    activeSortDir = isNumCol ? 'asc' : 'desc';
+                                } else if (activeSortDir === (isNumCol ? 'asc' : 'desc')) {
+                                    activeSortDir = 'none';
+                                } else {
+                                    activeSortDir = isNumCol ? 'desc' : 'asc';
+                                }
+                            } else {
+                                activeSortCol = colIdx;
+                                activeSortDir = isNumCol ? 'desc' : 'asc';
+                            }
+
+                            ths.forEach((otherTh, i) => {
+                                otherTh.classList.remove('sort-asc', 'sort-desc');
+                                const ico = otherTh.querySelector('.tb-sort-ico i');
+                                if (i === activeSortCol && activeSortDir !== 'none') {
+                                    otherTh.classList.add(activeSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+                                    if (ico) ico.className = activeSortDir === 'asc' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down';
+                                } else {
+                                    if (ico) ico.className = 'fa-solid fa-sort';
+                                }
+                            });
+
+                            const trs = [...tbody.querySelectorAll('tr')];
+                            if (activeSortDir === 'none') {
+                                trs.sort((a, b) => parseInt(a.dataset.origIdx || 0, 10) - parseInt(b.dataset.origIdx || 0, 10));
+                            } else {
+                                trs.sort((a, b) => {
+                                    const valA = a.children[colIdx] ? a.children[colIdx].textContent : '';
+                                    const valB = b.children[colIdx] ? b.children[colIdx].textContent : '';
+                                    return compareCells(valA, valB, activeSortDir);
+                                });
+                            }
+
+                            trs.forEach(tr => tbody.appendChild(tr));
+                            updateRowDisplay();
+                        };
+                    });
                 }
 
                 // Reset pill click handler
@@ -8405,8 +8641,8 @@ const skeletonHTML = () => `
                             <i class="fa-solid fa-sliders"></i> Customize columns <i class="fa-solid fa-chevron-down cq-chev"></i>
                         </button>
                         ${rowCount > 10 ? `
-                        <button type="button" class="cq-pill cq-pill-rows" data-preset="rows-toggle" title="Toggle between first 10 rows and all rows">
-                            <i class="fa-solid fa-list-ol"></i> <span class="cq-row-pill-text">Show 10 rows</span>
+                        <button type="button" class="cq-pill cq-pill-rows" data-preset="rows-toggle" title="Cycle through page sizes (10 / 25 / 50 / All)">
+                            <i class="fa-solid fa-list-ol"></i> <span class="cq-row-pill-text">Show 25 rows</span>
                         </button>` : ''}
                     </div>
 
@@ -8483,12 +8719,11 @@ const skeletonHTML = () => `
                 pill.onclick = () => {
                     const preset = pill.dataset.preset;
                     if (preset === 'rows-toggle') {
-                        const rowPill = block.querySelector('.tb-row-filter-pill');
-                        if (rowPill) {
-                            rowPill.click();
-                            const isShowingAll = rowPill.textContent.includes('Show 10');
-                            const rowPillTxt = pill.querySelector('.cq-row-pill-text');
-                            if (rowPillTxt) rowPillTxt.textContent = isShowingAll ? 'Show 10 rows' : 'Show all rows';
+                        if (typeof block._cyclePageSize === 'function') {
+                            block._cyclePageSize();
+                        } else {
+                            const rowPill = block.querySelector('.tb-row-filter-pill');
+                            if (rowPill) rowPill.click();
                         }
                         return;
                     }
