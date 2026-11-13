@@ -4657,7 +4657,7 @@
             .cq-sub { font-size: 11.5px; }
             .cq-pill { padding: 5px 9px; font-size: 11px; }
         }
-        .tb-col-filter-pill {
+        .tb-col-filter-pill, .tb-row-filter-pill {
             display: inline-flex;
             align-items: center;
             gap: 5px;
@@ -4670,10 +4670,11 @@
             border: 1px solid var(--border-color);
             cursor: pointer;
             font-weight: 500;
-            transition: background .15s;
+            transition: background .15s, color .15s;
         }
-        .tb-col-filter-pill:hover {
-            background: rgba(26,115,232,0.22);
+        .tb-col-filter-pill:hover, .tb-row-filter-pill:hover {
+            background: rgba(26,115,232,0.18);
+            color: var(--accent-blue);
         }
 
         /* ===== Mobile Responsiveness Enforcement (Screen-fit & No Hidden Prompt Elements) ===== */
@@ -8205,7 +8206,7 @@ const skeletonHTML = () => `
                         rows.forEach(tr => { if (tr.children[i]) tr.children[i].classList.add('num'); });
                 });
                 const block = document.createElement('div'); block.className = 'table-block';
-                block.innerHTML = `<div class="tb-bar"><span class="tb-meta"><i class="fa-solid fa-table"></i><span class="tb-count"></span><span class="tb-col-filter-pill" style="display:none;"><i class="fa-solid fa-sliders"></i> Filtered &bull; Reset</span><span class="tb-hidden-pill" style="display:none;"><i class="fa-solid fa-eye-slash"></i> Hidden &bull; Click to show</span></span>
+                block.innerHTML = `<div class="tb-bar"><span class="tb-meta"><i class="fa-solid fa-table"></i><span class="tb-count"></span><span class="tb-row-filter-pill" style="display:none;"></span><span class="tb-col-filter-pill" style="display:none;"><i class="fa-solid fa-sliders"></i> Filtered &bull; Reset</span><span class="tb-hidden-pill" style="display:none;"><i class="fa-solid fa-eye-slash"></i> Hidden &bull; Click to show</span></span>
                     <div class="tb-tools">
                         <button type="button" class="tb-more" title="More" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
                         <div class="pop pop-down">
@@ -8283,6 +8284,34 @@ const skeletonHTML = () => `
                 menu.querySelectorAll('.pop-item').forEach(it => it.onclick = () => { closeMenus(); actions[it.dataset.a](); });
                 requestAnimationFrame(() => { if (wrap.scrollHeight > wrap.clientHeight + 4) { exp.hidden = false; sep.hidden = false; } });
 
+                // Row count toggle pill handler for tables with > 10 rows
+                const rowFilterPill = block.querySelector('.tb-row-filter-pill');
+                if (rowFilterPill && data.body && data.body.length > 10) {
+                    const totalRows = data.body.length;
+                    let showingLimited = true;
+                    const updateRowDisplay = () => {
+                        const trs = t.querySelectorAll('tbody tr');
+                        trs.forEach((tr, idx) => {
+                            tr.style.display = (showingLimited && idx >= 10) ? 'none' : '';
+                        });
+                        if (showingLimited) {
+                            rowFilterPill.style.display = 'inline-flex';
+                            rowFilterPill.innerHTML = `<i class="fa-solid fa-list-ol"></i> <span>10 of ${totalRows} rows</span> &bull; <strong style="text-decoration:underline;">Show All</strong>`;
+                            rowFilterPill.title = `Click to show all ${totalRows} rows`;
+                        } else {
+                            rowFilterPill.style.display = 'inline-flex';
+                            rowFilterPill.innerHTML = `<i class="fa-solid fa-list-ol"></i> <span>All ${totalRows} rows</span> &bull; <strong style="text-decoration:underline;">Show 10</strong>`;
+                            rowFilterPill.title = 'Click to collapse to 10 rows';
+                        }
+                    };
+                    updateRowDisplay();
+                    rowFilterPill.onclick = ev => {
+                        ev.stopPropagation();
+                        showingLimited = !showingLimited;
+                        updateRowDisplay();
+                    };
+                }
+
                 // Reset pill click handler
                 const filterResetPill = block.querySelector('.tb-col-filter-pill');
                 if (filterResetPill) {
@@ -8305,8 +8334,8 @@ const skeletonHTML = () => `
                     };
                 }
 
-                // If table has 10 or more columns and more than 2 rows, attach Claude-style Column Questionnaire Card
-                if (data.head && data.head.length >= 10 && data.rows && data.rows.length > 2) {
+                // If table has 10 or more columns, attach Claude-style Column Questionnaire Card
+                if (data.head && data.head.length >= 10) {
                     const prevEl = block.previousElementSibling;
                     if (!prevEl || !prevEl.classList.contains('claude-col-questionnaire')) {
                         const qCard = buildTableColumnQuestionnaire(block, t, data, title);
@@ -8375,6 +8404,10 @@ const skeletonHTML = () => `
                         <button type="button" class="cq-pill cq-pill-toggle-custom" data-preset="custom">
                             <i class="fa-solid fa-sliders"></i> Customize columns <i class="fa-solid fa-chevron-down cq-chev"></i>
                         </button>
+                        ${rowCount > 10 ? `
+                        <button type="button" class="cq-pill cq-pill-rows" data-preset="rows-toggle" title="Toggle between first 10 rows and all rows">
+                            <i class="fa-solid fa-list-ol"></i> <span class="cq-row-pill-text">Show 10 rows</span>
+                        </button>` : ''}
                     </div>
 
                     <div class="cq-custom-drawer" style="display:none;">
@@ -8449,13 +8482,23 @@ const skeletonHTML = () => `
             q.querySelectorAll('.cq-pill').forEach(pill => {
                 pill.onclick = () => {
                     const preset = pill.dataset.preset;
+                    if (preset === 'rows-toggle') {
+                        const rowPill = block.querySelector('.tb-row-filter-pill');
+                        if (rowPill) {
+                            rowPill.click();
+                            const isShowingAll = rowPill.textContent.includes('Show 10');
+                            const rowPillTxt = pill.querySelector('.cq-row-pill-text');
+                            if (rowPillTxt) rowPillTxt.textContent = isShowingAll ? 'Show 10 rows' : 'Show all rows';
+                        }
+                        return;
+                    }
                     if (preset === 'custom') {
                         const isOpen = drawer.style.display !== 'none';
                         drawer.style.display = isOpen ? 'none' : 'flex';
                         toggleBtn.classList.toggle('open', !isOpen);
                         return;
                     }
-                    q.querySelectorAll('.cq-pill').forEach(p => p.classList.remove('active'));
+                    q.querySelectorAll('.cq-pill:not(.cq-pill-rows)').forEach(p => p.classList.remove('active'));
                     pill.classList.add('active');
                     if (preset === 'all') {
                         setSelection(data.head.map((_, i) => i));

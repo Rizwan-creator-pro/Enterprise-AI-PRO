@@ -1785,12 +1785,12 @@ RULES:
    - Do NOT set "select_cols" to a subset unless specifically requested! Leave "select_cols": null so that ALL columns of the table are preserved. The UI has an automatic Column Questionnaire Card for wide tables (10+ columns). Truncating columns on your own prevents this feature from working!
    - ONLY set "limit": N or "select_cols" if the user explicitly requested specific row counts or column names.
 3. HIGHEST / LOWEST / TOP / BEST / MINIMUM / MAXIMUM / CHEAPEST / MOST EXPENSIVE:
-   - SINGULAR INQUIRIES (e.g. "what is the highest salary", "who has the highest salary", "highest salaried person", "single person with highest salary", "cheapest product", "most expensive product", "lowest salary", "maximum price", "minimum price", "top earner"):
+   - SINGULAR INQUIRIES (e.g. "give me the expensive product", "the expensive product", "expensive product", "cheapest product", "priciest product", "costliest product", "what is the highest salary", "who has the highest salary", "highest salaried person", "single person with highest salary", "lowest salary", "maximum price", "minimum price", "top earner", "who earns the most", "cheapest item"):
      * The user is asking for ONE specific record/fact!
      * Set "target_table" to the relevant table (e.g. "Employees Directory", "PRODUCTS").
      * Set "mode": "raw"
-     * Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/top, desc: false for lowest/cheapest).
-     * Set "limit": 1 (CRITICAL: MUST BE EXACTLY 1! NEVER return 4 or 5 records when a single person or item is asked!).
+     * Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/expensive/top, desc: false for lowest/cheapest).
+     * Set "limit": 1 (CRITICAL: MUST BE EXACTLY 1! NEVER return 4, 5, or all records when a single person or item is asked!).
      * Set "chart": null (CRITICAL: NEVER generate a chart for a 1-row singular query).
    - PLURAL / RANKING / LIST INQUIRIES (e.g. "top 5 highest salaries", "top 3 employees", "top earners", "ranking of salaries", "compare top employees", "first 10"):
      * Set "limit": N (e.g. 5 or requested number).
@@ -2357,20 +2357,49 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             req.allow_general = False
 
     # Detect if user asks a pinpoint singular query (e.g. highest salary, single person, cheapest item)
-    # vs a plural or comparative query (e.g. top 5, top earners, ranking)
+    # Evaluation of inquiry scope: singular pinpoint fact vs requested row limit vs broad overview
     q_low_inq = req.question.lower().strip()
-    is_plural_top = bool(re.search(r'\b(?:top|highest|lowest|first|best)\s+(\d+|five|three|ten|few)\b', q_low_inq)) or any(k in q_low_inq for k in [
-        "top 5", "top 10", "top 3", "top earners", "top products", "ranking", "compare top", "list top", "all highest"
+
+    # Check for explicit row count requested by user (e.g. "top 3", "first 5", "top ten")
+    word_to_num = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+    m_num = re.search(r'\b(?:top|first|highest|lowest|best|priciest|cheapest|limit)\s+(\d+)\b', q_low_inq)
+    m_word = re.search(r'\b(?:top|first|highest|lowest|best)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b', q_low_inq)
+    explicit_requested_limit = int(m_num.group(1)) if m_num else (word_to_num.get(m_word.group(1)) if m_word else None)
+
+    is_plural_top = (explicit_requested_limit is not None and explicit_requested_limit > 1) or any(k in q_low_inq for k in [
+        "top 5", "top 10", "top 3", "top earners", "top products", "top leads", "ranking", "compare top",
+        "list top", "all highest", "all lowest", "breakdown", "table form", "all data", "full table",
+        "all rows", "each", "all products", "all employees", "all leads", "overview"
     ])
+
+    singular_superlative_patterns = [
+        r'\b(?:the|a|an|which|who|what)?\s*(?:most\s+)?(?:expensive|cheapest|costliest|priciest)\s+(?:product|item|offering|package|solution|catalog)\b',
+        r'\b(?:the|a|an|which|who|what)?\s*(?:highest|lowest|maximum|minimum|top|best)\s+(?:salary|paid|earner|income|wage|pay|compensation|price|rating|score|review)\b',
+        r'\b(?:who|which)\s+(?:has|earns|gets|holds|is)\s+(?:the\s+)?(?:highest|lowest|max|maximum|min|minimum|most|cheapest|best|top|expensive)\b',
+        r'\b(?:who|which)\s+is\s+(?:the\s+)?(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\b',
+        r'\b(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\s+(?:one|single|individual|employee|staff|worker|product|item|lead)\b',
+        r'\b(?:give|show|tell|get|find|display)\s+(?:me\s+)?(?:the\s+)?(?:most\s+)?(?:expensive|cheapest|costliest|priciest|highest|lowest|top|best)\s+(?:product|item|employee|staff|earner|lead)\b'
+    ]
+    has_singular_pattern = any(bool(re.search(p, q_low_inq)) for p in singular_superlative_patterns)
+
+    singular_keywords = [
+        "highest salary", "lowest salary", "minimum salary", "maximum salary",
+        "cheapest product", "most expensive product", "expensive product", "the expensive product",
+        "priciest product", "costliest product", "highest price", "lowest price",
+        "highest paid", "lowest paid", "top earner", "single person", "single product", "single lead",
+        "best rated", "highest rating", "top lead", "best lead"
+    ]
+
     is_singular_extremum = (
-        any(k in q_low_inq for k in [
-            "highest salary", "who has highest salary", "who has the highest", "highest salaried", "person with highest",
-            "lowest salary", "who has lowest salary", "minimum salary", "maximum salary", "cheapest product", "most expensive product",
-            "most expensive item", "highest price", "lowest price", "top salaried person", "single person", "highest paid"
-        ])
-        or (any(k in q_low_inq for k in ["highest", "lowest", "maximum", "minimum", "cheapest", "most expensive"]) and not is_plural_top and not any(k in q_low_inq for k in ["table form", "all data", "full table", "all rows", "each", "all", "every"]))
+        explicit_requested_limit == 1
+        or has_singular_pattern
+        or any(k in q_low_inq for k in singular_keywords)
+        or (
+            any(k in q_low_inq for k in ["highest", "lowest", "maximum", "minimum", "cheapest", "most expensive", "expensive product", "top earner", "top product"])
+            and not is_plural_top
+        )
     )
-    is_singular_query = is_singular_extremum and not is_plural_top
+    is_singular_query = bool(is_singular_extremum and not is_plural_top)
 
     depth = (req.response_depth or "medium").lower().strip()
     if is_singular_query:
@@ -2773,6 +2802,21 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             if is_singular_query and plan:
                 plan["limit"] = 1
                 plan["chart"] = None
+                if not plan.get("order_by"):
+                    if any(k in q_low_inq for k in ["expensive", "priciest", "costliest", "highest price"]):
+                        plan["order_by"] = [{"col": "PRICE", "desc": True}]
+                    elif any(k in q_low_inq for k in ["cheapest", "lowest price"]):
+                        plan["order_by"] = [{"col": "PRICE", "desc": False}]
+                    elif any(k in q_low_inq for k in ["highest salary", "top earner", "highest paid", "max salary", "highest income"]):
+                        plan["order_by"] = [{"col": "SALARY", "desc": True}]
+                    elif any(k in q_low_inq for k in ["lowest salary", "minimum salary", "lowest paid", "min salary"]):
+                        plan["order_by"] = [{"col": "SALARY", "desc": False}]
+                    elif any(k in q_low_inq for k in ["rating", "best rated", "highest rating", "top lead", "best lead"]):
+                        plan["order_by"] = [{"col": "RATING", "desc": True}]
+            elif explicit_requested_limit and plan:
+                plan["limit"] = explicit_requested_limit
+                if explicit_requested_limit == 1:
+                    plan["chart"] = None
             break
         except Exception as e:
             emit(f"{provider['provider_name']} planner failed — trying fallback…")
@@ -2902,11 +2946,15 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                         "table_md": t_md
                     })
 
-    is_table_form_request = any(k in req.question.lower() for k in [
-        "table form", "in table", "all data", "as a table", "table format",
-        "show table", "give me data", "show data", "list data", "in the table form",
-        "g map", "google map", "table data", "give me the"
-    ])
+    is_table_form_request = (
+        not is_singular_query
+        and explicit_requested_limit is None
+        and any(k in req.question.lower() for k in [
+            "table form", "in table", "all data", "as a table", "table format",
+            "show table", "give me data", "show data", "list data", "in the table form",
+            "g map table", "google map table", "table data", "entire table", "full table"
+        ])
+    )
     if is_table_form_request and plan:
         plan["limit"] = None
         has_explicit_cols = any(k in req.question.lower() for k in [
@@ -3061,6 +3109,33 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     {"label": "Total Payroll (PKR)", "value": f"Rs. {total_pkr:,.0f}", "sub": "Monthly total in PKR"},
                     {"label": "Total Payroll (USD)", "value": f"${total_usd:,.2f}", "sub": f"Interbank rate: {usd_rate} PKR/USD"}
                 ]
+
+    # Dynamic Response Sizing & Pinpoint Directness Post-Processing:
+    if is_singular_query and exec_result and exec_result.get("table_rows"):
+        exec_result["table_rows"] = exec_result["table_rows"][:1]
+        exec_result["table_md"] = qe.rows_to_md_table(exec_result["table_rows"])
+        exec_result["chart"] = None
+        # Pinpoint single entity KPIs instead of whole-catalog aggregates
+        r0 = exec_result["table_rows"][0]
+        pinpoint_kpis = []
+        name_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["name", "title", "product", "business", "employee"])]
+        metric_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["price", "salary", "rating", "amount", "cost"])]
+        sub_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["category", "department", "city", "status", "stock"])]
+        if name_keys:
+            pinpoint_kpis.append({"label": name_keys[0].replace("_", " ").title(), "value": str(r0[name_keys[0]]), "sub": "Requested Entity"})
+        if metric_keys:
+            val_raw = r0[metric_keys[0]]
+            val_str = f"Rs. {val_raw:,.0f}" if isinstance(val_raw, (int, float)) else str(val_raw)
+            pinpoint_kpis.append({"label": metric_keys[0].replace("_", " ").title(), "value": val_str, "sub": "Extremum Value"})
+        if sub_keys:
+            pinpoint_kpis.append({"label": sub_keys[0].replace("_", " ").title(), "value": str(r0[sub_keys[0]]), "sub": "Classification"})
+        exec_result["kpis"] = pinpoint_kpis
+    elif explicit_requested_limit and exec_result and exec_result.get("table_rows"):
+        exec_result["table_rows"] = exec_result["table_rows"][:explicit_requested_limit]
+        exec_result["table_md"] = qe.rows_to_md_table(exec_result["table_rows"])
+        exec_result["kpis"] = qe.compute_kpis(exec_result["table_rows"])
+        if explicit_requested_limit == 1:
+            exec_result["chart"] = None
 
     # STAGE 4: Synthesis LLM (Writes crisp summary from small result table)
     emit("Synthesizing concise summary & visualization…")
