@@ -1037,6 +1037,137 @@ KNOWN_COLUMNS = {
     "Google Map Leads": "id (int), business_name (text), niche (text), location (text), phone (text), email (text), website (text), rating (number), reviews_count (int), lead_score (int), priority (text), maps_url (text)"
 }
 
+def _is_dataset_inventory_query(text: str) -> bool:
+    """Detect if the user is asking what data/tables/datasets exist or can be queried."""
+    t = (text or "").lower().strip()
+    patterns = [
+        r"\bwhat\s+(?:data|tables?|datasets?|sources?|information)\s+(?:do\s+you\s+have|you\s+have|is\s+available|are\s+available|can\s+i\s+query|do\s+we\s+have|exist)\b",
+        r"\bwhat\s+(?:kind\s+of\s+data|type\s+of\s+data)\s+(?:do\s+you\s+have|is\s+available|can\s+we\s+query)\b",
+        r"\b(?:list|show|view|tell\s+me)\s+(?:all\s+)?(?:the\s+)?(?:available\s+)?(?:tables?|datasets?|data\s+sources?|databases?)\b",
+        r"\b(?:what\s+can\s+you\s+(?:query|analyze|access|show)|what\s+do\s+you\s+know\s+about)\b",
+        r"\bwhat\s+(?:data|tables?|datasets?)\s+(?:are\s+there|exist|are\s+present)\b",
+        r"^(?:what\s+data\s+you\s+have|what\s+data\s+do\s+you\s+have|what\s+tables|available\s+tables|list\s+tables|show\s+tables|show\s+data|what\s+data)\??$"
+    ]
+    return any(re.search(pat, t) for pat in patterns)
+
+def _build_security_policy_message(endpoints: List[dict]) -> str:
+    """Build a 100% dynamic Security Policy message listing only the tables authorized for the current user."""
+    TABLE_DESCRIPTIONS = {
+        "Employees Directory": "Staff details, designations, salaries, departments",
+        "PRODUCTS": "Products, pricing, stock, categories",
+        "Google Map Leads": "Business leads, contact information, ratings"
+    }
+    table_lines = []
+    seen = set()
+    for ep in (endpoints or []):
+        name = ep.get("endpoint_name") or ep.get("ENDPOINT_NAME") or ep.get("name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        desc = TABLE_DESCRIPTIONS.get(name)
+        if not desc:
+            cols = KNOWN_COLUMNS.get(name, "")
+            if cols:
+                first_few = [c.split()[0] for c in cols.split(",")[:4]]
+                desc = ", ".join(first_few)
+            else:
+                desc = ep.get("description") or "Authorized enterprise dataset"
+        table_lines.append(f"- **{name}** ({desc})")
+
+    if not table_lines:
+        table_lines.append("- *(No enterprise tables currently assigned to your account)*")
+
+    tables_str = "\n".join(table_lines)
+
+    return (
+        "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
+        "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
+        f"{tables_str}\n"
+        "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
+        "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
+        "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
+    )
+
+def _handle_dataset_inventory_query(endpoints: List[dict], req_outside_enabled: bool) -> str:
+    """Generate an authoritative, dynamic overview of the user's authorized tables."""
+    TABLE_DESCRIPTIONS = {
+        "Employees Directory": "Staff directory, employee designations, salaries, hiring dates, and departments",
+        "PRODUCTS": "Product catalog, unit pricing, inventory stock quantities, and categories",
+        "Google Map Leads": "B2B local business leads, ratings, review counts, and contact details"
+    }
+    SAMPLE_QUERIES = {
+        "Employees Directory": [
+            "\"What is the highest salary in our database?\"",
+            "\"Compare average salary across departments\"",
+            "\"Show all employees in the IT department\""
+        ],
+        "PRODUCTS": [
+            "\"Show all products in stock with their unit prices\"",
+            "\"Which product has the highest price?\"",
+            "\"List products by category\""
+        ],
+        "Google Map Leads": [
+            "\"Top rated leads in Lahore\"",
+            "\"List leads with highest review count\""
+        ]
+    }
+
+    table_blocks = []
+    sample_queries = []
+    seen = set()
+    for ep in (endpoints or []):
+        name = ep.get("endpoint_name") or ep.get("ENDPOINT_NAME") or ep.get("name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        desc = TABLE_DESCRIPTIONS.get(name) or ep.get("description") or "Authorized enterprise dataset"
+        cols = KNOWN_COLUMNS.get(name, "")
+        if cols:
+            col_list = [c.split()[0] for c in cols.split(",")[:8]]
+            col_str = ", ".join(f"`{c}`" for c in col_list)
+            if len(cols.split(",")) > 8:
+                col_str += f", and {len(cols.split(',')) - 8} more columns"
+            col_line = f"  * **Available Fields:** {col_str}\n"
+        else:
+            col_line = ""
+        table_blocks.append(f"• **{name}**\n  * **Overview:** {desc}\n{col_line}")
+        if name in SAMPLE_QUERIES:
+            sample_queries.extend(SAMPLE_QUERIES[name][:2])
+
+    if not table_blocks:
+        tables_text = "*(No enterprise database tables are currently assigned to your account. Please check user permissions in Oracle APEX.)*\n"
+    else:
+        tables_text = "\n".join(table_blocks)
+
+    if not sample_queries:
+        sample_queries = [
+            "\"What is the highest salary in our database?\"",
+            "\"Show all products in stock with their unit prices\""
+        ]
+
+    samples_rendered = "\n".join(f"- *{sq}*" for sq in sample_queries[:4])
+
+    ext_text = ""
+    if req_outside_enabled:
+        ext_text = (
+            "\n🌐 **General AI is Active:** You can also ask open-web research questions, fetch live global weather, "
+            "or explore market benchmarks."
+        )
+    else:
+        ext_text = (
+            "\n📈 **Verified Business Feeds:** You can also query real-time **Forex exchange rates** (State Bank / Interbank), "
+            "**Pakistan Fuel rates** (OGRA / PSO), and **PSX stock quotes** (Pakistan Stock Exchange)."
+        )
+
+    return (
+        f"### 🗄️ Available Enterprise Datasets\n\n"
+        f"You have authorized access to the following live enterprise data sources:\n\n"
+        f"{tables_text}\n"
+        f"**Sample queries you can try:**\n"
+        f"{samples_rendered}\n"
+        f"{ext_text}"
+    )
+
 def _match_endpoint_with_history(text: str, endpoints: List[dict], history_msgs: list = None) -> Optional[dict]:
     ep = _match_endpoint(text, endpoints)
     if ep:
@@ -2521,7 +2652,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # If General AI is strictly OFF, enforce internal database & whitelisted feed isolation
     if not req_outside_enabled and not has_images and not has_docs and not is_pure_math_expression(req.question):
         chk_matched = _match_endpoint_with_history(req.question, endpoints, history_msgs)
-        if not chk_matched and not has_whitelisted_feed:
+        if not chk_matched and not has_whitelisted_feed and not _is_dataset_inventory_query(req.question):
             chk_weather = extract_weather_intent(req.question)
             chk_urls = extract_urls_from_text(req.question)
             has_ext_kw = any(k in req.question.lower() for k in [
@@ -2532,16 +2663,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             ])
             is_explicit_outside = bool(chk_weather or chk_urls or has_ext_kw)
             if is_explicit_outside:
-                pol_msg = (
-                    "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
-                    "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
-                    "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
-                    "- **PRODUCTS** (Products, pricing, stock, categories)\n"
-                    "- **Google Map Leads** (Business leads, contact information, ratings)\n"
-                    "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
-                    "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
-                    "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
-                )
+                pol_msg = _build_security_policy_message(endpoints)
                 emit("General AI is switched off — restricted to internal tables and verified business feeds.")
                 _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=0)
                 return {
@@ -2555,6 +2677,18 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         return {
             "answer": "No authorized data sources were found for your user account. Please check user permissions in Oracle APEX.",
             "provider_used": "System",
+            "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
+        }
+
+    # Fast path: instant authorized datasets / schema inventory response
+    if _is_dataset_inventory_query(req.question):
+        emit("Retrieving your authorized enterprise datasets...")
+        inv_msg = _handle_dataset_inventory_query(endpoints, req_outside_enabled)
+        _save_and_record(req, inv_msg, t_start, provider_used="Schema Intelligence", total_tokens=0)
+        return {
+            "answer": inv_msg,
+            "provider_used": "Schema Intelligence",
+            "kpis": [],
             "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
         }
 
@@ -2885,9 +3019,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         matched_in_q
         or matched_eps_in_q
         or has_history_table
+        or _is_dataset_inventory_query(req.question)
         or (plan and plan.get("target_table") and _match_endpoint(str(plan.get("target_table")), endpoints))
         or any(k in req.question.lower() for k in [
             "table", "tables", "record", "records", "row", "rows", "column", "columns",
+            "data", "dataset", "datasets", "database", "databases", "schema", "source", "sources",
             "employee", "employees", "staff", "salary", "salaries", "payroll", "headcount", "worker", "workers", "dept", "department", "departments",
             "product", "products", "item", "items", "pricing", "price", "stock", "catalog", "inventory",
             "lead", "leads", "business", "rating", "ratings", "review", "reviews", "phone", "address", "gmap", "google map"
@@ -2900,6 +3036,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         and not has_docs
         and not has_images
         and not is_greeting
+        and not _is_dataset_inventory_query(req.question)
         and (
             weather_city is not None
             or firecrawl_intent is not None
@@ -2910,16 +3047,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     )
 
     if should_reject_outside:
-        pol_msg = (
-            "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
-            "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
-            "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
-            "- **PRODUCTS** (Products, pricing, stock, categories)\n"
-            "- **Google Map Leads** (Business leads, contact information, ratings)\n"
-            "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
-            "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
-            "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
-        )
+        pol_msg = _build_security_policy_message(endpoints)
         emit("Question outside authorized database scope — General AI is OFF.")
         _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=total_tokens_used)
         return {

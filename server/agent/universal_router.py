@@ -82,7 +82,7 @@ def classify_query_route(
     file_export_pattern = r"\b(pdf|excel|xlsx?|word|docx?|ppt|powerpoint|presentation|spreadsheet)\b"
     has_export_kw = bool(re.search(file_export_pattern, q_lower))
     
-    from ui_app import _match_endpoint, _match_endpoint_with_history, _match_endpoints_multi
+    from ui_app import _match_endpoint, _match_endpoint_with_history, _match_endpoints_multi, _is_dataset_inventory_query
     matched_ep = _match_endpoint_with_history(q, endpoints, history)
     matched_multi = _match_endpoints_multi(q, endpoints)
 
@@ -96,8 +96,8 @@ def classify_query_route(
             }
 
     # 3. Enterprise Database Entity & Schema Match
-    # Detects explicit table references, column synonyms, or multi-table join intents
-    is_database_intent = bool(matched_ep or matched_multi)
+    # Detects explicit table references, column synonyms, dataset inventory inquiries, or multi-table join intents
+    is_database_intent = bool(matched_ep or matched_multi or _is_dataset_inventory_query(q))
     
     db_keywords = [
         "employee", "employees", "employess", "employes", "emplyees", "emloyee", "empolyee", "workforce", "personnel",
@@ -105,7 +105,7 @@ def classify_query_route(
         "department", "departments", "designation", "hire date", "job title",
         "product", "products", "prodcut", "prodcuts", "inventory", "stock level", "in stock", "out of stock", "unit price",
         "lead", "leads", "google map", "rating", "reviews", "phone number", "address",
-        "table", "database", "record", "records", "rows", "columns", "dataset", "cross table", "join",
+        "table", "tables", "database", "databases", "record", "records", "rows", "columns", "data", "dataset", "datasets", "data source", "data sources", "schema", "cross table", "join",
         "earner", "earners", "earning", "earnings", "top earner", "top earners",
         "highest earner", "highest earners", "highest paid", "top paid", "lowest paid",
         "highest salary", "lowest salary", "breakdown", "compensation", "wage", "wages", "bonus"
