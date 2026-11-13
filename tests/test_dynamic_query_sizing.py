@@ -25,12 +25,12 @@ def detect_query_scope(question: str):
     ])
 
     singular_superlative_patterns = [
-        r'\b(?:the|a|an|which|who|what)?\s*(?:most\s+)?(?:expensive|cheapest|costliest|priciest)\s+(?:product|item|offering|package|solution|catalog)\b',
-        r'\b(?:the|a|an|which|who|what)?\s*(?:highest|lowest|maximum|minimum|top|best)\s+(?:salary|paid|earner|income|wage|pay|compensation|price|rating|score|review)\b',
+        r'\b(?:the|a|an|which|who|what)?\s*(?:most\s+)?(?:expensive|cheapest|costliest|priciest)\s+\w+\b',
+        r'\b(?:the|a|an|which|who|what)?\s*(?:highest|lowest|maximum|minimum|top|best|max|min)\s+(?:salary|paid|earner|income|wage|pay|compensation|price|rating|score|review|revenue|cost|expense|profit|amount|balance|fee|margin)\b',
         r'\b(?:who|which)\s+(?:has|earns|gets|holds|is)\s+(?:the\s+)?(?:highest|lowest|max|maximum|min|minimum|most|cheapest|best|top|expensive)\b',
         r'\b(?:who|which)\s+is\s+(?:the\s+)?(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\b',
-        r'\b(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\s+(?:one|single|individual|employee|staff|worker|product|item|lead)\b',
-        r'\b(?:give|show|tell|get|find|display)\s+(?:me\s+)?(?:the\s+)?(?:most\s+)?(?:expensive|cheapest|costliest|priciest|highest|lowest|top|best)\s+(?:product|item|employee|staff|earner|lead)\b'
+        r'\b(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\s+(?:one|single|individual|employee|staff|worker|product|item|lead|customer|vendor|order|invoice|account|record)\b',
+        r'\b(?:give|show|tell|get|find|display)\s+(?:me\s+)?(?:the\s+)?(?:most\s+)?(?:expensive|cheapest|costliest|priciest|highest|lowest|top|best|max|min)\s+\w+\b'
     ]
     has_singular_pattern = any(bool(re.search(p, q_low_inq)) for p in singular_superlative_patterns)
 
@@ -87,13 +87,37 @@ class TestDynamicQuerySizing(unittest.TestCase):
             "priciest product",
             "top earner",
             "single product with highest price",
-            "who earns the most"
+            "who earns the most",
+            "what is the top lead by rating",
+            "highest invoice amount",
+            "cheapest shipping option",
+            "top customer by revenue"
         ]
         for q in cases:
             with self.subTest(q=q):
                 scope = detect_query_scope(q)
                 self.assertTrue(scope["is_singular_query"])
                 self.assertFalse(scope["is_table_form_request"])
+
+    def test_future_table_dynamic_execution(self):
+        # Hypothetical future table: Invoices or Customers
+        mock_invoices = [
+            {"INVOICE_ID": "INV-101", "CLIENT_NAME": "Acme Corp", "AMOUNT": 1500000, "STATUS": "Paid"},
+            {"INVOICE_ID": "INV-102", "CLIENT_NAME": "Beta Ltd", "AMOUNT": 4500000, "STATUS": "Pending"},
+            {"INVOICE_ID": "INV-103", "CLIENT_NAME": "Gamma Inc", "AMOUNT": 250000, "STATUS": "Paid"}
+        ]
+        plan = {
+            "mode": "raw",
+            "target_table": "INVOICES",
+            "order_by": [{"col": "AMOUNT", "desc": True}],
+            "limit": 1,
+            "chart": None
+        }
+        res = qe.execute_plan(mock_invoices, plan)
+        self.assertEqual(len(res["table_rows"]), 1)
+        self.assertEqual(res["table_rows"][0]["CLIENT_NAME"], "Beta Ltd")
+        self.assertEqual(res["table_rows"][0]["AMOUNT"], 4500000)
+        self.assertIsNone(res["chart"])
 
     def test_explicit_requested_limits(self):
         s3 = detect_query_scope("top 3 products")

@@ -2373,12 +2373,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     ])
 
     singular_superlative_patterns = [
-        r'\b(?:the|a|an|which|who|what)?\s*(?:most\s+)?(?:expensive|cheapest|costliest|priciest)\s+(?:product|item|offering|package|solution|catalog)\b',
-        r'\b(?:the|a|an|which|who|what)?\s*(?:highest|lowest|maximum|minimum|top|best)\s+(?:salary|paid|earner|income|wage|pay|compensation|price|rating|score|review)\b',
+        r'\b(?:the|a|an|which|who|what)?\s*(?:most\s+)?(?:expensive|cheapest|costliest|priciest)\s+\w+\b',
+        r'\b(?:the|a|an|which|who|what)?\s*(?:highest|lowest|maximum|minimum|top|best|max|min)\s+(?:salary|paid|earner|income|wage|pay|compensation|price|rating|score|review|revenue|cost|expense|profit|amount|balance|fee|margin)\b',
         r'\b(?:who|which)\s+(?:has|earns|gets|holds|is)\s+(?:the\s+)?(?:highest|lowest|max|maximum|min|minimum|most|cheapest|best|top|expensive)\b',
         r'\b(?:who|which)\s+is\s+(?:the\s+)?(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\b',
-        r'\b(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\s+(?:one|single|individual|employee|staff|worker|product|item|lead)\b',
-        r'\b(?:give|show|tell|get|find|display)\s+(?:me\s+)?(?:the\s+)?(?:most\s+)?(?:expensive|cheapest|costliest|priciest|highest|lowest|top|best)\s+(?:product|item|employee|staff|earner|lead)\b'
+        r'\b(?:top|highest|lowest|cheapest|most\s+expensive|expensive)\s+(?:one|single|individual|employee|staff|worker|product|item|lead|customer|vendor|order|invoice|account|record)\b',
+        r'\b(?:give|show|tell|get|find|display)\s+(?:me\s+)?(?:the\s+)?(?:most\s+)?(?:expensive|cheapest|costliest|priciest|highest|lowest|top|best|max|min)\s+\w+\b'
     ]
     has_singular_pattern = any(bool(re.search(p, q_low_inq)) for p in singular_superlative_patterns)
 
@@ -2803,16 +2803,17 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 plan["limit"] = 1
                 plan["chart"] = None
                 if not plan.get("order_by"):
-                    if any(k in q_low_inq for k in ["expensive", "priciest", "costliest", "highest price"]):
-                        plan["order_by"] = [{"col": "PRICE", "desc": True}]
-                    elif any(k in q_low_inq for k in ["cheapest", "lowest price"]):
-                        plan["order_by"] = [{"col": "PRICE", "desc": False}]
-                    elif any(k in q_low_inq for k in ["highest salary", "top earner", "highest paid", "max salary", "highest income"]):
-                        plan["order_by"] = [{"col": "SALARY", "desc": True}]
-                    elif any(k in q_low_inq for k in ["lowest salary", "minimum salary", "lowest paid", "min salary"]):
-                        plan["order_by"] = [{"col": "SALARY", "desc": False}]
-                    elif any(k in q_low_inq for k in ["rating", "best rated", "highest rating", "top lead", "best lead"]):
-                        plan["order_by"] = [{"col": "RATING", "desc": True}]
+                    is_desc = not any(k in q_low_inq for k in ["lowest", "cheapest", "min", "minimum", "bottom"])
+                    if any(k in q_low_inq for k in ["expensive", "priciest", "costliest", "price"]):
+                        plan["order_by"] = [{"col": "PRICE", "desc": is_desc}]
+                    elif any(k in q_low_inq for k in ["salary", "earner", "paid", "income", "wage", "pay"]):
+                        plan["order_by"] = [{"col": "SALARY", "desc": is_desc}]
+                    elif any(k in q_low_inq for k in ["rating", "rate", "score", "review"]):
+                        plan["order_by"] = [{"col": "RATING", "desc": is_desc}]
+                    elif any(k in q_low_inq for k in ["revenue", "sales", "turnover"]):
+                        plan["order_by"] = [{"col": "REVENUE", "desc": is_desc}]
+                    elif any(k in q_low_inq for k in ["amount", "total", "balance", "cost", "fee", "expense"]):
+                        plan["order_by"] = [{"col": "AMOUNT", "desc": is_desc}]
             elif explicit_requested_limit and plan:
                 plan["limit"] = explicit_requested_limit
                 if explicit_requested_limit == 1:
@@ -3118,17 +3119,46 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         # Pinpoint single entity KPIs instead of whole-catalog aggregates
         r0 = exec_result["table_rows"][0]
         pinpoint_kpis = []
-        name_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["name", "title", "product", "business", "employee"])]
-        metric_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["price", "salary", "rating", "amount", "cost"])]
-        sub_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["category", "department", "city", "status", "stock"])]
+        # 1. Primary entity identifier column (works for any domain: staff, products, leads, customers, orders, assets)
+        name_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["name", "title", "product", "business", "employee", "item", "customer", "vendor", "client", "asset", "service"])]
+        if not name_keys:
+            str_cols = [k for k, v in r0.items() if isinstance(v, str) and not k.lower().endswith(("_id", "id"))]
+            name_keys = [str_cols[0]] if str_cols else [list(r0.keys())[0]]
+
+        # 2. Key numeric metric column (salary, price, revenue, rating, score, count, quantity, amount)
+        metric_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["price", "salary", "rating", "amount", "cost", "revenue", "budget", "score", "total", "qty", "quantity", "stock", "balance", "rate"])]
+        if not metric_keys:
+            num_cols = [k for k, v in r0.items() if isinstance(v, (int, float))]
+            metric_keys = [num_cols[0]] if num_cols else []
+
+        # 3. Categorical/context attribute (category, department, city, status, role)
+        sub_keys = [k for k in r0.keys() if any(x in k.lower() for x in ["category", "department", "city", "status", "role", "designation", "type", "state", "group"])]
+
         if name_keys:
-            pinpoint_kpis.append({"label": name_keys[0].replace("_", " ").title(), "value": str(r0[name_keys[0]]), "sub": "Requested Entity"})
+            val = str(r0.get(name_keys[0]) or "N/A")
+            pinpoint_kpis.append({"label": name_keys[0].replace("_", " ").title(), "value": val, "sub": "Requested Entity"})
+
         if metric_keys:
-            val_raw = r0[metric_keys[0]]
-            val_str = f"Rs. {val_raw:,.0f}" if isinstance(val_raw, (int, float)) else str(val_raw)
-            pinpoint_kpis.append({"label": metric_keys[0].replace("_", " ").title(), "value": val_str, "sub": "Extremum Value"})
+            col_m = metric_keys[0]
+            val_raw = r0.get(col_m)
+            col_low = col_m.lower()
+            if isinstance(val_raw, (int, float)):
+                if any(curr in col_low for curr in ["price", "salary", "cost", "amount", "revenue", "budget", "payroll", "balance", "fee"]):
+                    val_str = f"Rs. {val_raw:,.0f}" if float(val_raw).is_integer() else f"Rs. {val_raw:,.2f}"
+                elif "rating" in col_low:
+                    val_str = f"{val_raw:.2f} ★"
+                elif any(pct in col_low for pct in ["percent", "pct", "share", "ratio"]):
+                    val_str = f"{val_raw:,.1f}%"
+                else:
+                    val_str = f"{val_raw:,.0f}" if float(val_raw).is_integer() else f"{val_raw:,.2f}"
+            else:
+                val_str = str(val_raw)
+            pinpoint_kpis.append({"label": col_m.replace("_", " ").title(), "value": val_str, "sub": "Target Metric"})
+
         if sub_keys:
-            pinpoint_kpis.append({"label": sub_keys[0].replace("_", " ").title(), "value": str(r0[sub_keys[0]]), "sub": "Classification"})
+            col_s = sub_keys[0]
+            pinpoint_kpis.append({"label": col_s.replace("_", " ").title(), "value": str(r0.get(col_s) or "N/A"), "sub": "Classification"})
+
         exec_result["kpis"] = pinpoint_kpis
     elif explicit_requested_limit and exec_result and exec_result.get("table_rows"):
         exec_result["table_rows"] = exec_result["table_rows"][:explicit_requested_limit]
