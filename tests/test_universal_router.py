@@ -51,6 +51,19 @@ class TestUniversalRouter(unittest.TestCase):
         res3 = classify_query_route("which products are in stock", self.mock_endpoints)
         self.assertEqual(res3["route"], QueryRoute.ENTERPRISE_DATA)
 
+        # Earner & breakdown query (top earners must route to enterprise database)
+        res4 = classify_query_route("List top 5 earners with breakdown", self.mock_endpoints, general_ai_enabled=True)
+        self.assertEqual(res4["route"], QueryRoute.ENTERPRISE_DATA)
+
+        res5 = classify_query_route("List top 5 earners with breakdown", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res5["route"], QueryRoute.ENTERPRISE_DATA)
+
+    def test_general_ai_off_strictly_locks_to_enterprise_data(self):
+        # When General AI is OFF, non-db questions must be strictly routed to ENTERPRISE_DATA for security guard rejection
+        res_off = classify_query_route("Who is the richest person in the world", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_off["route"], QueryRoute.ENTERPRISE_DATA)
+        self.assertIn("Strict internal database mode", res_off["reason"])
+
     def test_universal_conversational_routing(self):
         # Coding question
         res_code = classify_query_route("write a python script to parse JSON and sort by key", self.mock_endpoints)

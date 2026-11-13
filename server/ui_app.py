@@ -1013,7 +1013,10 @@ TABLE_SYNONYMS = {
         "salary", "salaries", "saalary", "pay", "payroll", "wage", "wages", "compensation",
         "employee", "employees", "employer", "employers", "staff", "worker", "workers", "hiring", "hired",
         "hire date", "job", "jobs", "job title", "designation", "department", "departments",
-        "director", "directors", "manager", "managers", "bonus"
+        "director", "directors", "manager", "managers", "bonus",
+        "earner", "earners", "earning", "earnings", "top earner", "top earners",
+        "highest earner", "highest earners", "highest paid", "top paid", "lowest paid",
+        "highest salary", "lowest salary", "breakdown"
     ],
     "PRODUCTS": [
         "product", "products", "item", "items", "catalog", "inventory",
@@ -2642,7 +2645,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     detected_route = route_info["route"]
 
     # Dedicated Universal Conversational Pipeline (ChatGPT-Style Direct Route)
-    if detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not (req_outside_enabled and any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"])):
+    if req_outside_enabled and detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"]):
         emit("Formulating comprehensive response…")
         universal_messages = [{"role": "system", "content": UNIVERSAL_ASSISTANT_SYSTEM_PROMPT + depth_prompt}]
         universal_messages.extend(history_msgs)

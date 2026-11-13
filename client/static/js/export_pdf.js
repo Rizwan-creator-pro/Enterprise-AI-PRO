@@ -39,21 +39,63 @@ function textImg(text, pt, bold) {
 
 function sanitizeForPdf(str) {
     if (str === null || str === undefined) return '';
-    let s = String(str)
-        .replace(/₹\s*/g, 'Rs. ')
-        .replace(/[\u2018\u2019]/g, "'")
-        .replace(/[\u201C\u201D]/g, '"')
-        .replace(/[\u2013\u2014]/g, '-')
-        .replace(/\u2026/g, '...')
-        .replace(/\u00A0/g, ' ')
-        .replace(/[▍▎▏▌]/g, '')
-        .replace(/\*\*/g, '')
-        .replace(/`/g, '');
+    let s = String(str);
+
+    // Normalize HTML tags and line breaks
+    s = s.replace(/<br\s*\/?>/gi, '\n')
+         .replace(/<\/p>/gi, '\n')
+         .replace(/<[^>]+>/g, '');
+
+    // Currencies
+    s = s.replace(/₹\s*/g, 'Rs. ')
+         .replace(/€\s*/g, 'EUR ')
+         .replace(/£\s*/g, 'GBP ')
+         .replace(/¥\s*/g, 'JPY ');
+
+    // Unicode quotes & primes
+    s = s.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+         .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB]/g, '"');
+
+    // Unicode dashes, hyphens, minuses
+    s = s.replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+
+    // Approximations and math symbols (e.g. ≈ which caused /"H corruption in WinAnsi)
+    s = s.replace(/[\u2248\u223C\u223D\u2245\u2249\u301C\uFF5E]/g, '~')
+         .replace(/≠/g, '!=')
+         .replace(/≤/g, '<=')
+         .replace(/≥/g, '>=')
+         .replace(/±/g, '+/-')
+         .replace(/×/g, 'x')
+         .replace(/÷/g, '/');
+
+    // Bullets - clean bullet with space
+    s = s.replace(/[\u2022\u25E6\u25AA\u25AB\u2219\u2023\u2043]/g, '• ');
+
+    // Ellipsis
+    s = s.replace(/\u2026/g, '...');
+
+    // ALL Unicode spaces (narrow no-break space \u202F, non-breaking space \u00A0, zero-width space \u200B, etc.)
+    // Note: \u202F (8239) % 256 = 47 ('/'), which caused "Bernard/Arnault" and "US/$233/B" in jsPDF WinAnsi!
+    s = s.replace(/[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ');
+
+    // Strip artifacts and markdown styling markers
+    s = s.replace(/[▍▎▏▌]/g, '')
+         .replace(/\*\*/g, '')
+         .replace(/`/g, '');
+
+    // Normalize spacing around bullets
+    s = s.replace(/•\s*•/g, '•')
+         .replace(/•\s+/g, '• ')
+         .replace(/\n\s*•\s*/g, '\n• ');
 
     // For extremely long unbroken URLs over 35 chars, allow natural break after delimiters
     if (/https?:\/\//i.test(s) && s.length > 35) {
         s = s.replace(/([\/?.&=])/g, '$1 ');
     }
+
+    // Collapse multi-spaces (preserve newlines)
+    s = s.replace(/[^\S\r\n]+/g, ' ');
+
     return s;
 }
 
@@ -221,6 +263,7 @@ async function buildPDF(data, title, summary = '', charts = []) {
             columnStyles,
             margin: { top: 15, left: marginSide, right: marginSide, bottom: 10 },
             styles: {
+                font: 'helvetica',
                 fontSize: tableFontSize,
                 cellPadding: pad,
                 lineWidth: 0.2,
@@ -230,6 +273,7 @@ async function buildPDF(data, title, summary = '', charts = []) {
                 valign: 'middle'
             },
             headStyles: {
+                font: 'helvetica',
                 fillColor: [223, 255, 255],
                 textColor: 0,
                 fontStyle: 'bold',
@@ -297,6 +341,7 @@ async function buildPDF(data, title, summary = '', charts = []) {
                 startY: nextY,
                 margin: { top: 15, left: marginSide, right: marginSide, bottom: 10 },
                 styles: {
+                    font: 'helvetica',
                     fontSize: tableFontSize,
                     cellPadding: pad,
                     lineWidth: 0.2,
@@ -306,6 +351,7 @@ async function buildPDF(data, title, summary = '', charts = []) {
                     valign: 'middle'
                 },
                 headStyles: {
+                    font: 'helvetica',
                     fillColor: [223, 255, 255],
                     textColor: 0,
                     fontStyle: 'bold',

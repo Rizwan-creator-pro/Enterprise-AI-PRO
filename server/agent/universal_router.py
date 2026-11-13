@@ -104,7 +104,10 @@ def classify_query_route(
         "department", "departments", "designation", "hire date", "job title",
         "product", "products", "inventory", "stock level", "in stock", "out of stock", "unit price",
         "lead", "leads", "google map", "rating", "reviews", "phone number", "address",
-        "table", "database", "record", "records", "rows", "columns", "dataset", "cross table", "join"
+        "table", "database", "record", "records", "rows", "columns", "dataset", "cross table", "join",
+        "earner", "earners", "earning", "earnings", "top earner", "top earners",
+        "highest earner", "highest earners", "highest paid", "top paid", "lowest paid",
+        "highest salary", "lowest salary", "breakdown", "compensation", "wage", "wages", "bonus"
     ]
     has_db_entity = any(re.search(r"\b" + re.escape(w) + r"\b", q_lower) for w in db_keywords)
 
@@ -147,7 +150,19 @@ def classify_query_route(
                 "reason": "Real-time web research, market feed, or external intelligence detected"
             }
 
-    # 5. Default: Universal Conversational Core
+    # 5. Strict Enterprise Mode Guard (when General AI is switched OFF)
+    # When General AI is OFF and no external documents/images are being queried,
+    # the query must route to the enterprise database engine so that it either queries
+    # the schema or triggers the Security Policy Guard rejection.
+    if not general_ai_enabled and not has_docs and not has_images:
+        return {
+            "route": QueryRoute.ENTERPRISE_DATA,
+            "target_endpoint": matched_ep,
+            "multi_endpoints": matched_multi,
+            "reason": "Strict internal database mode: General AI is switched off"
+        }
+
+    # 6. Default: Universal Conversational Core
     # General knowledge, coding, mathematics, education, creative writing, reasoning
     return {
         "route": QueryRoute.UNIVERSAL_CONVERSATIONAL,
