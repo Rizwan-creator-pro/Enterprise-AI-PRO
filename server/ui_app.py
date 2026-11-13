@@ -1011,7 +1011,8 @@ def _fetch_single_table_dataset(ep: dict, emit=None) -> List[dict]:
 TABLE_SYNONYMS = {
     "Employees Directory": [
         "salary", "salaries", "saalary", "pay", "payroll", "wage", "wages", "compensation",
-        "employee", "employees", "employer", "employers", "staff", "worker", "workers", "hiring", "hired",
+        "employee", "employees", "employess", "employes", "emplyees", "emloyee", "empolyee",
+        "employer", "employers", "staff", "worker", "workers", "workforce", "personnel", "hiring", "hired",
         "hire date", "job", "jobs", "job title", "designation", "department", "departments",
         "director", "directors", "manager", "managers", "bonus",
         "earner", "earners", "earning", "earnings", "top earner", "top earners",
@@ -1019,7 +1020,7 @@ TABLE_SYNONYMS = {
         "highest salary", "lowest salary", "breakdown"
     ],
     "PRODUCTS": [
-        "product", "products", "item", "items", "catalog", "inventory",
+        "product", "products", "prodcut", "prodcuts", "item", "items", "catalog", "inventory",
         "stock_qty", "stock quantity", "in stock", "out of stock", "sku",
         "unit price", "product price", "pricing", "product cost"
     ],
@@ -1061,11 +1062,13 @@ def _match_endpoint(text: str, endpoints: List[dict]) -> Optional[dict]:
             return ep
         for word in name.split():
             word = word.strip().rstrip("s")
-            if len(word) >= 4 and re.search(r"\b" + re.escape(word) + r"\b", t):
-                # Don't match 'google' alone without map or leads
-                if word == "google" and not any(k in t for k in ["map", "lead"]):
-                    continue
-                return ep
+            if len(word) >= 4:
+                stem = word[:6] if len(word) >= 6 else word
+                if re.search(r"\b" + re.escape(word) + r"\b", t) or re.search(r"\b" + re.escape(stem) + r"[a-z]*\b", t):
+                    # Don't match 'google' alone without map or leads
+                    if word == "google" and not any(k in t for k in ["map", "lead"]):
+                        continue
+                    return ep
 
     # Domain synonym matching
     for ep in endpoints:
@@ -2488,26 +2491,36 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
 
     # If General AI is strictly OFF, enforce internal database & whitelisted feed isolation
     if not req_outside_enabled and not has_images and not has_docs and not is_pure_math_expression(req.question):
-        chk_matched = _match_endpoint(req.question, endpoints)
+        chk_matched = _match_endpoint_with_history(req.question, endpoints, history_msgs)
         if not chk_matched and not has_whitelisted_feed:
-            pol_msg = (
-                "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
-                "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
-                "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
-                "- **PRODUCTS** (Products, pricing, stock, categories)\n"
-                "- **Google Map Leads** (Business leads, contact information, ratings)\n"
-                "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
-                "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
-                "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
-            )
-            emit("General AI is switched off — restricted to internal tables and verified business feeds.")
-            _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=0)
-            return {
-                "answer": pol_msg,
-                "provider_used": "Security Policy Guard",
-                "kpis": [],
-                "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
-            }
+            chk_weather = extract_weather_intent(req.question)
+            chk_urls = extract_urls_from_text(req.question)
+            has_ext_kw = any(k in req.question.lower() for k in [
+                "weather", "forecast", "temperature", "rain", "climate", "mausam",
+                "nasdaq", "nyse", "crypto", "bitcoin", "btc", "eth",
+                "president", "prime minister", "celebrity", "cricket", "who is", "what is the capital",
+                "gold price", "silver price", "search online", "browse web", "open web"
+            ])
+            is_explicit_outside = bool(chk_weather or chk_urls or has_ext_kw)
+            if is_explicit_outside:
+                pol_msg = (
+                    "### 🔒 Internal Database Mode Active (General AI is Switched Off)\n\n"
+                    "The **General AI** option is currently turned **OFF**. In this mode, the assistant is strictly locked to your authorized enterprise data & verified business feeds:\n"
+                    "- **Employees Directory** (Staff details, designations, salaries, departments)\n"
+                    "- **PRODUCTS** (Products, pricing, stock, categories)\n"
+                    "- **Google Map Leads** (Business leads, contact information, ratings)\n"
+                    "- **Verified Business Feeds** (Real-time Forex/Currency exchange, Pakistan Fuel prices, and PSX stock market data)\n\n"
+                    "Open-world internet search, live weather forecasts, and general non-business inquiries are disabled.\n\n"
+                    "👉 **To ask general questions, get live weather, or browse the open web, please turn General AI ON in the bottom toolbar.**"
+                )
+                emit("General AI is switched off — restricted to internal tables and verified business feeds.")
+                _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=0)
+                return {
+                    "answer": pol_msg,
+                    "provider_used": "Security Policy Guard",
+                    "kpis": [],
+                    "meta_stats": {"tokens": 0, "ms": int((time.time() - t_start) * 1000), "cost": 0}
+                }
 
     if not endpoints and not is_outside_db:
         return {

@@ -82,8 +82,8 @@ def classify_query_route(
     file_export_pattern = r"\b(pdf|excel|xlsx?|word|docx?|ppt|powerpoint|presentation|spreadsheet)\b"
     has_export_kw = bool(re.search(file_export_pattern, q_lower))
     
-    from ui_app import _match_endpoint, _match_endpoints_multi
-    matched_ep = _match_endpoint(q, endpoints)
+    from ui_app import _match_endpoint, _match_endpoint_with_history, _match_endpoints_multi
+    matched_ep = _match_endpoint_with_history(q, endpoints, history)
     matched_multi = _match_endpoints_multi(q, endpoints)
 
     if has_export_kw and not matched_ep and not matched_multi and not has_images and not has_docs:
@@ -100,9 +100,10 @@ def classify_query_route(
     is_database_intent = bool(matched_ep or matched_multi)
     
     db_keywords = [
-        "employee", "employees", "salary", "salaries", "payroll", "headcount", "staff",
+        "employee", "employees", "employess", "employes", "emplyees", "emloyee", "empolyee", "workforce", "personnel",
+        "salary", "salaries", "payroll", "headcount", "staff",
         "department", "departments", "designation", "hire date", "job title",
-        "product", "products", "inventory", "stock level", "in stock", "out of stock", "unit price",
+        "product", "products", "prodcut", "prodcuts", "inventory", "stock level", "in stock", "out of stock", "unit price",
         "lead", "leads", "google map", "rating", "reviews", "phone number", "address",
         "table", "database", "record", "records", "rows", "columns", "dataset", "cross table", "join",
         "earner", "earners", "earning", "earnings", "top earner", "top earners",

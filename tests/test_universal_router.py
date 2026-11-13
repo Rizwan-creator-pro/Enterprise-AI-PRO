@@ -58,6 +58,11 @@ class TestUniversalRouter(unittest.TestCase):
         res5 = classify_query_route("List top 5 earners with breakdown", self.mock_endpoints, general_ai_enabled=False)
         self.assertEqual(res5["route"], QueryRoute.ENTERPRISE_DATA)
 
+        # Typo tolerance: "employess" must match "Employees Directory"
+        res_typo = classify_query_route("give me employess data", self.mock_endpoints, general_ai_enabled=False)
+        self.assertEqual(res_typo["route"], QueryRoute.ENTERPRISE_DATA)
+        self.assertEqual(res_typo.get("target_endpoint", {}).get("endpoint_name"), "Employees Directory")
+
     def test_general_ai_off_strictly_locks_to_enterprise_data(self):
         # When General AI is OFF, non-db questions must be strictly routed to ENTERPRISE_DATA for security guard rejection
         res_off = classify_query_route("Who is the richest person in the world", self.mock_endpoints, general_ai_enabled=False)
