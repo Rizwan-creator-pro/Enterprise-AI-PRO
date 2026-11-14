@@ -10,6 +10,21 @@ console.log("Running Table Sorting & Page Sizing Validation Tests...");
 const indexPath = path.join(__dirname, '..', 'client', 'index.html');
 const indexHtml = fs.readFileSync(indexPath, 'utf-8');
 
+// Verify that all inline <script> tags in index.html are valid JS with 0 syntax errors
+const vm = require('vm');
+const scriptMatches = [...indexHtml.matchAll(/<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/gi)];
+scriptMatches.forEach((m, i) => {
+    const code = m[1].trim();
+    if (code) {
+        try {
+            new vm.Script(code, { filename: `index.html:script[${i+1}]` });
+        } catch (err) {
+            assert.fail(`Syntax error in index.html script tag #${i+1}: ${err.message}`);
+        }
+    }
+});
+console.log("✔ index.html full inline JavaScript syntax check passed (0 syntax errors).");
+
 assert(indexHtml.includes('tb-pagesize-wrap'), 'tb-pagesize-wrap must be present in index.html');
 assert(indexHtml.includes('tb-pagesize-pop'), 'tb-pagesize-pop must be present in index.html');
 assert(indexHtml.includes('tb-pagesize-options'), 'tb-pagesize-options must be present in index.html');
