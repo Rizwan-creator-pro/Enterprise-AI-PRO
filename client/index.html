@@ -2289,11 +2289,13 @@
             background: var(--surface, #ffffff);
             border: 1px solid var(--border-color, #dadce0);
             border-radius: 12px;
-            padding: 20px 24px;
+            padding: 18px 22px;
             box-shadow: 0 1px 6px rgba(32, 33, 36, 0.08);
             display: flex;
             flex-direction: column;
             gap: 16px;
+            max-width: 480px;
+            width: 100%;
         }
         html[data-theme="dark"] .gcc-card {
             background: #202124;
@@ -2302,10 +2304,8 @@
         }
         .gcc-head {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            flex-wrap: wrap;
-            gap: 12px;
+            flex-direction: column;
+            gap: 3px;
         }
         .gcc-head-left {
             display: flex;
@@ -2318,7 +2318,7 @@
             font-weight: 400;
         }
         .gcc-rate-title {
-            font-size: 32px;
+            font-size: 30px;
             font-weight: 400;
             color: var(--text-main, #202124);
             line-height: 1.2;
@@ -2332,62 +2332,15 @@
             color: var(--text-muted, #70757a);
             margin-top: 3px;
         }
-        .gcc-head-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .gcc-icon-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 1px solid var(--border-color, #dadce0);
-            background: transparent;
-            color: var(--text-muted, #70757a);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 13px;
-            transition: background 0.15s;
-        }
-        .gcc-icon-btn:hover {
-            background: var(--surface-2, #f1f3f4);
-        }
-        .gcc-follow-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            border-radius: 18px;
-            background: #1a73e8;
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .gcc-follow-btn:hover {
-            background: #1557b0;
-        }
         .gcc-main-row {
             display: flex;
-            gap: 24px;
-            align-items: stretch;
-        }
-        @media (max-width: 640px) {
-            .gcc-main-row {
-                flex-direction: column;
-            }
+            width: 100%;
         }
         .gcc-inputs-col {
-            flex: 1;
-            min-width: 250px;
+            width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            justify-content: center;
+            gap: 8px;
         }
         .gcc-input-group {
             display: flex;
@@ -2442,7 +2395,7 @@
             align-items: center;
             justify-content: flex-start;
             padding-left: 10px;
-            margin: -4px 0;
+            margin: -2px 0;
         }
         .gcc-swap-btn {
             width: 32px;
@@ -2466,74 +2419,6 @@
         .gcc-swap-btn:hover {
             background: #e8f0fe;
             transform: rotate(180deg);
-        }
-        .gcc-chart-col {
-            flex: 1.1;
-            min-width: 250px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .gcc-time-pills {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            justify-content: flex-end;
-        }
-        .gcc-time-pill {
-            background: transparent;
-            border: none;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-muted, #70757a);
-            padding: 4px 8px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .gcc-time-pill:hover {
-            background: var(--surface-2, #f1f3f4);
-            color: var(--text-main, #202124);
-        }
-        .gcc-time-pill.active {
-            background: #e8f0fe;
-            color: #1a73e8;
-            font-weight: 600;
-        }
-        html[data-theme="dark"] .gcc-time-pill.active {
-            background: #174ea6;
-            color: #d2e3fc;
-        }
-        .gcc-svg-wrap {
-            width: 100%;
-            height: 125px;
-            position: relative;
-        }
-        .gcc-svg-chart {
-            width: 100%;
-            height: 100%;
-            overflow: visible;
-        }
-        .gcc-tooltip-pill {
-            position: absolute;
-            background: var(--surface, #ffffff);
-            border: 1px solid var(--border-color, #dadce0);
-            border-radius: 6px;
-            padding: 3px 8px;
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--text-main, #202124);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            pointer-events: none;
-            transform: translate(-50%, -120%);
-            display: none;
-            white-space: nowrap;
-            z-index: 10;
-        }
-        html[data-theme="dark"] .gcc-tooltip-pill {
-            background: #303134;
-            border-color: #5f6368;
-            color: #e8eaed;
         }
 
         /* ================= Modern Elevative Theme: Stock Market & PSX Card ================= */
@@ -7337,7 +7222,6 @@ const skeletonHTML = () => `
             const getCurrName = c => CURRENCY_NAMES[c] || c;
             const formatNum = n => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            const chartId = 'gccChart_' + Math.random().toString(36).substring(2, 9);
             const tsStr = data.timestamp ? `${escapeHtml(data.timestamp)} · Disclaimer` : '14 Nov, 9:05 pm UTC · Disclaimer';
 
             card.innerHTML = `
@@ -7347,10 +7231,6 @@ const skeletonHTML = () => `
                             <div class="gcc-sub-title">1 <span class="gcc-sub-base">${getCurrName(curBase)}</span> equals</div>
                             <div class="gcc-rate-title"><span class="gcc-rate-num">${formatNum(currentRate)}</span> <span class="gcc-rate-target">${getCurrName(curTarget)}</span></div>
                             <div class="gcc-timestamp">${tsStr}</div>
-                        </div>
-                        <div class="gcc-head-right">
-                            <button type="button" class="gcc-icon-btn" title="Share"><i class="fa-solid fa-share-nodes"></i></button>
-                            <button type="button" class="gcc-follow-btn"><i class="fa-solid fa-plus"></i> Follow</button>
                         </div>
                     </div>
 
@@ -7378,106 +7258,9 @@ const skeletonHTML = () => `
                                 </div>
                             </div>
                         </div>
-
-                        <div class="gcc-chart-col">
-                            <div class="gcc-time-pills">
-                                <button type="button" class="gcc-time-pill" data-tf="1D">1D</button>
-                                <button type="button" class="gcc-time-pill" data-tf="5D">5D</button>
-                                <button type="button" class="gcc-time-pill active" data-tf="1M">1M</button>
-                                <button type="button" class="gcc-time-pill" data-tf="1Y">1Y</button>
-                                <button type="button" class="gcc-time-pill" data-tf="5Y">5Y</button>
-                                <button type="button" class="gcc-time-pill" data-tf="Max">Max</button>
-                            </div>
-                            <div class="gcc-svg-wrap" id="${chartId}"></div>
-                        </div>
                     </div>
                 </div>
             `;
-
-            const chartWrap = card.querySelector('.gcc-svg-wrap');
-            const renderGccChart = (timeframe) => {
-                if (!chartWrap) return;
-                const ptCount = 20;
-                const variance = currentRate * 0.012;
-                const points = [];
-                const seedVals = [0.2, -0.6, -0.4, 0.7, 0.5, -0.8, -0.9, 0.3, 0.6, 0.1, -0.5, 0.8, -0.2, 0.4, -0.6, -0.3, 0.5, 0.2, -0.1, 0.0];
-                for (let i = 0; i < ptCount; i++) {
-                    const factor = seedVals[i] || 0;
-                    points.push(Math.round((currentRate + factor * variance) * 100) / 100);
-                }
-                points[points.length - 1] = Math.round(currentRate * 100) / 100;
-
-                const minVal = Math.min(...points) - variance * 0.5;
-                const maxVal = Math.max(...points) + variance * 0.5;
-                const range = (maxVal - minVal) || 1;
-
-                const width = 240;
-                const height = 90;
-                const padLeft = 32;
-                const padBottom = 20;
-                const padTop = 10;
-                const padRight = 8;
-                const chartW = width - padLeft - padRight;
-                const chartH = height - padTop - padBottom;
-
-                const coords = points.map((p, idx) => {
-                    const x = padLeft + (idx / (ptCount - 1)) * chartW;
-                    const y = padTop + chartH - ((p - minVal) / range) * chartH;
-                    return { x, y, val: p };
-                });
-
-                const pathD = coords.reduce((acc, c, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`, '');
-
-                const yTicks = [
-                    { label: Math.round(maxVal), y: padTop },
-                    { label: Math.round((maxVal + minVal) / 2), y: padTop + chartH / 2 },
-                    { label: Math.round(minVal), y: padTop + chartH }
-                ];
-
-                chartWrap.innerHTML = `
-                    <svg class="gcc-svg-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                        ${yTicks.map(yt => `
-                            <text x="${padLeft - 4}" y="${yt.y + 3}" text-anchor="end" font-size="9" fill="var(--text-muted, #70757a)">${yt.label}</text>
-                            <line x1="${padLeft}" y1="${yt.y}" x2="${width - padRight}" y2="${yt.y}" stroke="var(--border-color, #dadce0)" stroke-width="0.7" stroke-dasharray="2,2" opacity="0.6" />
-                        `).join('')}
-                        <path d="${pathD}" fill="none" stroke="#ea4335" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        <text x="${padLeft + 15}" y="${height - 2}" font-size="9" fill="var(--text-muted, #70757a)">24 Oct</text>
-                        <text x="${width - padRight - 20}" y="${height - 2}" text-anchor="end" font-size="9" fill="var(--text-muted, #70757a)">14 Nov</text>
-                        <circle class="gcc-hover-dot" r="4" fill="#ea4335" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
-                    </svg>
-                    <div class="gcc-tooltip-pill"></div>
-                `;
-
-                const svg = chartWrap.querySelector('svg');
-                const dot = chartWrap.querySelector('.gcc-hover-dot');
-                const tip = chartWrap.querySelector('.gcc-tooltip-pill');
-
-                svg.addEventListener('mousemove', ev => {
-                    const rect = svg.getBoundingClientRect();
-                    const mouseX = ((ev.clientX - rect.left) / rect.width) * width;
-                    let closest = coords[0];
-                    let minD = Infinity;
-                    coords.forEach(c => {
-                        const d = Math.abs(c.x - mouseX);
-                        if (d < minD) { minD = d; closest = c; }
-                    });
-                    if (closest) {
-                        dot.setAttribute('cx', closest.x.toFixed(1));
-                        dot.setAttribute('cy', closest.y.toFixed(1));
-                        dot.style.display = 'block';
-                        tip.textContent = `${closest.val.toFixed(2)} ${curTarget}`;
-                        tip.style.left = `${(closest.x / width) * 100}%`;
-                        tip.style.top = `${(closest.y / height) * 100}%`;
-                        tip.style.display = 'block';
-                    }
-                });
-                svg.addEventListener('mouseleave', () => {
-                    dot.style.display = 'none';
-                    tip.style.display = 'none';
-                });
-            };
-
-            renderGccChart('1M');
 
             const srcInput = card.querySelector('.gcc-input-src');
             const tgtInput = card.querySelector('.gcc-input-tgt');
@@ -7502,15 +7285,6 @@ const skeletonHTML = () => `
                 card.querySelector('.gcc-src-name').textContent = getCurrName(curBase);
                 card.querySelector('.gcc-tgt-name').textContent = getCurrName(curTarget);
                 updateCalc();
-                renderGccChart('1M');
-            });
-
-            card.querySelectorAll('.gcc-time-pill').forEach(pill => {
-                pill.onclick = () => {
-                    card.querySelectorAll('.gcc-time-pill').forEach(p => p.classList.remove('active'));
-                    pill.classList.add('active');
-                    renderGccChart(pill.dataset.tf);
-                };
             });
 
             return card;
