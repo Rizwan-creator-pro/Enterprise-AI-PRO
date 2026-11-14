@@ -2816,7 +2816,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     detected_route = route_info["route"]
 
     # Dedicated Universal Conversational Pipeline (ChatGPT-Style Direct Route)
-    if req_outside_enabled and detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"]):
+    is_factual_inquiry = any(k in req.question.lower() for k in [
+        "president", "prime minister", "minister", "governor", "mayor", "ceo", "founder", "leader",
+        "who is", "who was", "who are", "current", "latest", "today", "now", "recent", "election", "winner"
+    ])
+    if req_outside_enabled and detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not is_factual_inquiry and not any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"]):
         emit("Formulating comprehensive response…")
         universal_messages = [{"role": "system", "content": UNIVERSAL_ASSISTANT_SYSTEM_PROMPT + depth_prompt}]
         universal_messages.extend(history_msgs)

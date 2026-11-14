@@ -217,13 +217,33 @@ def _extract_search_variants(question: str) -> List[str]:
                 variants.append("Elon Musk net worth")
                 variants.append("Elon Musk")
 
-    # Political / World leader extraction: e.g. "who is the president of the United States", "now the donald trump us the presedent of the USA"
-    if any(k in q_raw.lower() for k in ["president of the united states", "president of the us", "president of the usa", "us president", "u.s. president", "current president"]):
+    # Political / World leader extraction: e.g. "who is the prime minister of pakistan", "what is the current president of the USA"
+    ql = q_raw.lower()
+    if "prime minister" in ql and "pakistan" in ql:
+        if "Shehbaz Sharif" not in variants:
+            variants.insert(0, "Shehbaz Sharif")
+        variants.append("Prime Minister of Pakistan")
+    elif "president" in ql and "pakistan" in ql:
+        if "Asif Ali Zardari" not in variants:
+            variants.insert(0, "Asif Ali Zardari")
+        variants.append("President of Pakistan")
+    elif any(k in ql for k in ["president of the united states", "president of the us", "president of the usa", "us president", "u.s. president"]) or ("president" in ql and any(c in ql for c in ["usa", "us", "america", "united states"])):
         if "Donald Trump" not in variants:
             variants.insert(0, "Donald Trump")
-        if "President of the United States" not in variants:
-            variants.append("President of the United States")
-    if any(k in q_raw.lower() for k in ["trump", "donald trump", "dolen trump"]):
+        variants.append("President of the United States")
+    elif "president" in ql and "india" in ql:
+        if "Droupadi Murmu" not in variants:
+            variants.insert(0, "Droupadi Murmu")
+        variants.append("President of India")
+    elif "prime minister" in ql and "india" in ql:
+        if "Narendra Modi" not in variants:
+            variants.insert(0, "Narendra Modi")
+        variants.append("Prime Minister of India")
+    elif "prime minister" in ql and any(c in ql for c in ["uk", "britain", "united kingdom", "england"]):
+        if "Keir Starmer" not in variants:
+            variants.insert(0, "Keir Starmer")
+        variants.append("Prime Minister of the United Kingdom")
+    elif any(k in ql for k in ["trump", "donald trump", "dolen trump"]):
         if "Donald Trump" not in variants:
             variants.insert(0, "Donald Trump")
 
@@ -255,11 +275,24 @@ def _fetch_wikipedia_summary(variants: Any) -> Optional[Dict[str, Any]]:
         if "oracle apex" in vl:
             if "Oracle_APEX" not in wiki_terms:
                 wiki_terms.append("Oracle_APEX")
-        if any(k in vl for k in ["trump", "dolen trump", "president of the united states", "president of the us", "us president", "current president"]):
+        if "shehbaz sharif" in vl or ("prime minister" in vl and "pakistan" in vl):
+            if "Shehbaz_Sharif" not in wiki_terms:
+                wiki_terms.append("Shehbaz_Sharif")
+        elif "asif ali zardari" in vl or ("president" in vl and "pakistan" in vl):
+            if "Asif_Ali_Zardari" not in wiki_terms:
+                wiki_terms.append("Asif_Ali_Zardari")
+        elif any(k in vl for k in ["trump", "dolen trump"]) or ("president" in vl and any(c in vl for c in ["united states", "usa", "us", "america"])):
             if "Donald_Trump" not in wiki_terms:
                 wiki_terms.append("Donald_Trump")
-            if "President_of_the_United_States" not in wiki_terms:
-                wiki_terms.append("President_of_the_United_States")
+        elif "droupadi murmu" in vl or ("president" in vl and "india" in vl):
+            if "Droupadi_Murmu" not in wiki_terms:
+                wiki_terms.append("Droupadi_Murmu")
+        elif "narendra modi" in vl or ("prime minister" in vl and "india" in vl):
+            if "Narendra_Modi" not in wiki_terms:
+                wiki_terms.append("Narendra_Modi")
+        elif "keir starmer" in vl or ("prime minister" in vl and ("uk" in vl or "united kingdom" in vl)):
+            if "Keir_Starmer" not in wiki_terms:
+                wiki_terms.append("Keir_Starmer")
         cleaned_term = v.strip().replace(" ", "_")
         if cleaned_term and cleaned_term not in wiki_terms:
             wiki_terms.append(cleaned_term)
@@ -287,13 +320,79 @@ def _fetch_wikipedia_summary(variants: Any) -> Optional[Dict[str, Any]]:
 
 def search_web(query: str, limit: int = 5) -> Dict[str, Any]:
     """
-    Searches the live web using Firecrawl search (v2 API / SDK) with automatic
-    high-accuracy multi-query Google News and Wikipedia real-time intelligence fallbacks.
+    Searches the live web using Tavily AI Search, Serper, Firecrawl,
+    Wikipedia REST API, and Google News RSS in prioritized resilience order.
     """
     _ensure_env()
+
+    # 1. Try Tavily AI Search API (Agent-First Search Engine)
+    tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
+    if tavily_key:
+        try:
+            r = requests.post(
+                "https://api.tavily.com/search",
+                json={"api_key": tavily_key, "query": query, "search_depth": "basic", "max_results": limit},
+                timeout=8
+            )
+            if r.ok:
+                data = r.json()
+                t_items = []
+                for res in data.get("results", []):
+                    t_items.append({
+                        "title": res.get("title", ""),
+                        "url": res.get("url", ""),
+                        "description": res.get("content", ""),
+                        "markdown": f"[{res.get('title')}]({res.get('url')})\n\n{res.get('content')}"
+                    })
+                if t_items:
+                    return {
+                        "success": True,
+                        "query": query,
+                        "count": len(t_items),
+                        "results": t_items,
+                        "engine": "Tavily AI Search",
+                        "source": "tavily",
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                    }
+        except Exception as e:
+            print(f"[Tavily Search Notice] {e}")
+
+    # 2. Try Serper (Google Search API)
+    serper_key = os.environ.get("SERPER_API_KEY", "").strip()
+    if serper_key:
+        try:
+            r = requests.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                json={"q": query, "num": limit},
+                timeout=8
+            )
+            if r.ok:
+                data = r.json()
+                s_items = []
+                for res in data.get("organic", []):
+                    s_items.append({
+                        "title": res.get("title", ""),
+                        "url": res.get("link", ""),
+                        "description": res.get("snippet", ""),
+                        "markdown": f"[{res.get('title')}]({res.get('link')})\n\n{res.get('snippet')}"
+                    })
+                if s_items:
+                    return {
+                        "success": True,
+                        "query": query,
+                        "count": len(s_items),
+                        "results": s_items,
+                        "engine": "Serper Google Search",
+                        "source": "serper",
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                    }
+        except Exception as e:
+            print(f"[Serper Search Notice] {e}")
+
     api_key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
 
-    # 1. Try Firecrawl SDK
+    # 3. Try Firecrawl SDK
     client = get_firecrawl_client()
     if client:
         try:

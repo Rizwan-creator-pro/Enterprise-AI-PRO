@@ -387,14 +387,15 @@ async def universal_internet_agent_async(
             if n_res:
                 news_results.extend(n_res)
 
-    # 4. Concurrently read top search results if user didn't specify direct URLs
+    # 4. Concurrently read top search results if user didn't specify direct URLs and snippets lack substantive content
     read_search_pages = []
-    if search_results and len(direct_pages) < max_pages_to_read:
+    has_substantive_snippets = any(len(r.get("body", "")) > 120 for r in search_results)
+    if search_results and not has_substantive_snippets and len(direct_pages) < max_pages_to_read:
         candidate_urls = [r["href"] for r in search_results if r.get("href")][:max_pages_to_read]
         # Avoid re-reading already fetched direct URLs
         candidate_urls = [u for u in candidate_urls if u not in direct_urls]
         if candidate_urls:
-            page_tasks = [read_any_url(u, max_chars=3000) for u in candidate_urls]
+            page_tasks = [read_any_url(u, max_chars=3000, timeout_sec=2.5) for u in candidate_urls]
             read_search_pages = await asyncio.gather(*page_tasks, return_exceptions=True)
             read_search_pages = [p for p in read_search_pages if isinstance(p, dict) and p.get("success")]
 

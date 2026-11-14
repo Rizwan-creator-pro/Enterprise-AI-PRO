@@ -50,6 +50,15 @@ CORE OPERATIONAL PRINCIPLES:
 6. CITATIONS & FACTUAL INTEGRITY:
    - When provided with real-time web research or external evidence, cite sources cleanly and accurately.
    - Clearly distinguish between established facts, working estimates, and theoretical perspectives. Acknowledge uncertainty honestly where appropriate.
+
+7. TEMPORAL ANCHOR & 2026 GROUND TRUTH:
+   - Current Year: 2026 (November 2026).
+   - 47th President of the United States: Donald Trump (inaugurated January 2025).
+   - Prime Minister of Pakistan: Shehbaz Sharif (elected March 2024).
+   - President of Pakistan: Asif Ali Zardari (14th President, elected March 2024).
+   - President of India: Droupadi Murmu.
+   - Prime Minister of India: Narendra Modi.
+   - When answering questions about current world leaders, technology versions, or open-world facts, speak definitively in the current 2026 context. NEVER recite pre-training disclaimers such as "as of June 2024", "as of my latest knowledge cutoff", or claim that 2024/2026 election outcomes are unconfirmed.
 """
 
 
@@ -159,9 +168,16 @@ def classify_query_route(
             weather_intent = "auto"
         has_url = bool(re.search(r"https?://\S+", q))
 
-        has_web_kw = any(k in q_lower for k in [
+        has_web_kw = any(re.search(r"\b" + re.escape(k) + r"\b", q_lower) for k in [
             "search online", "search web", "browse", "latest news", "current price",
-            "weather", "forecast", "dollar rate", "stock price"
+            "weather", "forecast", "dollar rate", "stock price",
+            "president", "prime minister", "minister", "governor", "mayor", "ceo", "chief executive", "founder",
+            "leader", "head of state", "capital of", "population of", "net worth",
+            "latest version", "current version", "newest version", "release date",
+            "today", "now", "current", "latest", "recent", "election", "winner"
+        ]) or any(q_lower.startswith(p) for p in [
+            "who is", "who was", "who are", "what is the current", "what are the current",
+            "who is the current", "who is current", "current president", "current prime minister"
         ])
 
         if weather_intent or has_url or has_web_kw:
