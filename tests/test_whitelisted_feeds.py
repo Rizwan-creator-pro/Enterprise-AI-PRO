@@ -104,6 +104,24 @@ class TestWhitelistedFeeds(unittest.TestCase):
 
         self.assertEqual(extract_weather_intent("what is the weather today in Karachi and Lahore"), "Karachi")
 
+    def test_stock_history_does_not_hijack_general_questions(self):
+        """Ensure queries with words like 'it' or 'its' do NOT pull previous stock from history."""
+        hist = [
+            {"content": "who is the CEO of Tesla and what is their current net worth?"},
+            {"content": "Tesla trades at $390.22 USD"}
+        ]
+        q_apex = "what is the latest version of Oracle APEX and its key features?"
+        self.assertIsNone(extract_stock_intent(q_apex, hist), "Oracle APEX question must NOT trigger Tesla stock!")
+
+        q_pres = "who is the president of the United States?"
+        self.assertIsNone(extract_stock_intent(q_pres, hist), "President question must NOT trigger Tesla stock!")
+
+        q_flutter = "what is the difference between Flutter and React Native in 2026?"
+        self.assertIsNone(extract_stock_intent(q_flutter, hist), "Flutter comparison must NOT trigger Tesla stock!")
+
+        q_kse = "what is the current status of KSE-100 index"
+        self.assertEqual(extract_stock_intent(q_kse, hist), "PSX_INDEX", "KSE-100 index query must resolve to PSX_INDEX!")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2277,145 +2277,264 @@
         html[data-theme="dark"] .gw-footer-note { border-top-color: rgba(255, 255, 255, 0.06); }
 
         /* ================= Modern Elevative Theme: Currency Converter Card ================= */
+        /* ================= Google Search Authentic Currency Converter ================= */
         .currency-converter-card {
-            margin: 20px 0 16px 0;
+            margin: 16px 0;
             width: 100%;
-            max-width: 720px;
+            max-width: 680px;
             box-sizing: border-box;
-            font-family: inherit;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
         }
-        .cc-card-inner {
-            background: var(--surface);
-            border: 1px solid var(--border-color);
-            border-radius: 22px;
-            padding: 22px 26px;
-            box-shadow: 0 4px 24px var(--shadow-color), 0 1px 3px rgba(0,0,0,0.02);
+        .gcc-card {
+            background: var(--surface, #ffffff);
+            border: 1px solid var(--border-color, #dadce0);
+            border-radius: 12px;
+            padding: 20px 24px;
+            box-shadow: 0 1px 6px rgba(32, 33, 36, 0.08);
             display: flex;
             flex-direction: column;
             gap: 16px;
-            transition: all .2s ease;
         }
-        html[data-theme="dark"] .cc-card-inner {
-            background: #18191f;
-            border-color: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.38);
+        html[data-theme="dark"] .gcc-card {
+            background: #202124;
+            border-color: #3c4043;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
         }
-        .cc-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-        .cc-title-wrap { display: flex; align-items: center; gap: 14px; }
-        .cc-icon {
-            width: 38px; height: 38px; border-radius: 12px;
-            background: var(--surface-2); color: var(--text-muted);
-            border: 1px solid var(--border-color);
-            display: inline-flex; align-items: center; justify-content: center;
-            font-size: 16px; flex-shrink: 0;
+        .gcc-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        html[data-theme="dark"] .cc-icon {
-            background: rgba(255, 255, 255, 0.06);
-            border-color: rgba(255, 255, 255, 0.08);
-            color: #e2e8f0;
+        .gcc-head-left {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
         }
-        .cc-titles { display: flex; flex-direction: column; gap: 2px; }
-        .cc-title { font-weight: 700; font-size: 15.5px; color: var(--text-main); letter-spacing: -0.01em; }
-        .cc-sub { font-size: 13px; color: var(--text-muted); }
-        .cc-live-badge {
-            font-size: 11.5px; font-weight: 600; padding: 6px 14px; border-radius: 999px;
-            background: var(--surface-2); border: 1px solid var(--border-color);
-            color: var(--text-muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+        .gcc-sub-title {
+            font-size: 14px;
+            color: var(--text-muted, #70757a);
+            font-weight: 400;
         }
-        html[data-theme="dark"] .cc-live-badge {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.08);
+        .gcc-rate-title {
+            font-size: 32px;
+            font-weight: 400;
+            color: var(--text-main, #202124);
+            line-height: 1.2;
+            letter-spacing: -0.01em;
         }
-        .cc-hero-rate {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 18px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border-color);
-            flex-wrap: wrap; gap: 12px;
+        html[data-theme="dark"] .gcc-rate-title {
+            color: #e8eaed;
         }
-        html[data-theme="dark"] .cc-hero-rate {
-            background: rgba(255, 255, 255, 0.03);
-            border-color: rgba(255, 255, 255, 0.06);
+        .gcc-timestamp {
+            font-size: 12px;
+            color: var(--text-muted, #70757a);
+            margin-top: 3px;
         }
-        .cc-rate-val { font-size: 24px; font-weight: 700; color: var(--text-main); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; display: block; }
-        .cc-rate-sub { font-size: 12px; color: var(--text-muted); }
-        .cc-hero-flags { display: flex; align-items: center; gap: 8px; }
-        .cc-flag-chip {
-            padding: 5px 10px; border-radius: 8px; background: var(--surface);
-            border: 1px solid var(--border-color); font-size: 12px; font-weight: 600; color: var(--text-main);
+        .gcc-head-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        html[data-theme="dark"] .cc-flag-chip {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.08);
+        .gcc-icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color, #dadce0);
+            background: transparent;
+            color: var(--text-muted, #70757a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
         }
-        .cc-arrow-icon { font-size: 11px; color: var(--text-faint); }
-        
-        .cc-calc-box {
-            display: flex; align-items: center; gap: 12px; background: var(--surface-2);
-            border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 18px; flex-wrap: wrap;
+        .gcc-icon-btn:hover {
+            background: var(--surface-2, #f1f3f4);
         }
-        html[data-theme="dark"] .cc-calc-box {
-            background: rgba(255, 255, 255, 0.025);
-            border-color: rgba(255, 255, 255, 0.06);
+        .gcc-follow-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 18px;
+            background: #1a73e8;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s;
         }
-        .cc-calc-col { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 6px; }
-        .cc-calc-lbl { font-size: 11.5px; font-weight: 600; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
-        .cc-calc-input-wrap {
-            display: flex; align-items: center; gap: 8px; background: var(--surface);
-            border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px;
-            transition: border-color .15s ease, box-shadow .15s ease;
+        .gcc-follow-btn:hover {
+            background: #1557b0;
         }
-        html[data-theme="dark"] .cc-calc-input-wrap {
-            background: #14151a;
-            border-color: rgba(255, 255, 255, 0.09);
+        .gcc-main-row {
+            display: flex;
+            gap: 24px;
+            align-items: stretch;
         }
-        .cc-calc-input-wrap:focus-within {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        @media (max-width: 640px) {
+            .gcc-main-row {
+                flex-direction: column;
+            }
         }
-        .cc-calc-input-wrap.is-result { background: var(--surface-2); }
-        html[data-theme="dark"] .cc-calc-input-wrap.is-result { background: rgba(255, 255, 255, 0.04); }
-        .cc-calc-input {
-            background: none; border: none; outline: none; font-size: 15.5px;
-            font-weight: 700; color: var(--text-main); width: 100%; min-width: 70px;
-            font-family: inherit; font-variant-numeric: tabular-nums;
+        .gcc-inputs-col {
+            flex: 1;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: center;
         }
-        .cc-curr-tag { font-size: 12px; font-weight: 700; color: var(--text-muted); }
-        .cc-swap-btn {
-            width: 38px; height: 38px; border-radius: 12px; background: var(--surface);
-            border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;
-            color: var(--text-muted); cursor: pointer; transition: all .2s ease; align-self: flex-end; margin-bottom: 2px;
+        .gcc-input-group {
+            display: flex;
+            border: 1px solid var(--border-color, #dadce0);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--surface, #ffffff);
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        html[data-theme="dark"] .cc-swap-btn {
-            background: rgba(255, 255, 255, 0.06);
-            border-color: rgba(255, 255, 255, 0.09);
-            color: #e2e8f0;
+        html[data-theme="dark"] .gcc-input-group {
+            background: #303134;
+            border-color: #5f6368;
         }
-        .cc-swap-btn:hover { background: var(--sidebar-hover); color: var(--text-main); transform: rotate(180deg); }
-        
-        .cc-cross-heading {
-            font-size: 12.5px; font-weight: 600; color: var(--text-muted);
-            display: flex; align-items: center; gap: 8px; margin-top: 4px;
+        .gcc-input-group:focus-within {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 1px #1a73e8;
         }
-        .cc-compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-        .cc-compare-item {
-            background: var(--surface-2); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 10px 12px; transition: all .15s ease;
+        .gcc-val-input {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            padding: 10px 14px;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-main, #202124);
+            background: transparent;
+            outline: none;
+            font-variant-numeric: tabular-nums;
         }
-        html[data-theme="dark"] .cc-compare-item {
-            background: rgba(255, 255, 255, 0.03);
-            border-color: rgba(255, 255, 255, 0.06);
+        html[data-theme="dark"] .gcc-val-input {
+            color: #e8eaed;
         }
-        .cc-compare-item:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.12); }
-        .cc-compare-pair { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
-        .cc-compare-val { font-size: 14.5px; font-weight: 700; color: var(--text-main); font-variant-numeric: tabular-nums; }
-        .cc-compare-val .cc-unit { font-size: 10px; color: var(--text-muted); font-weight: 500; }
-        
-        .cc-footer {
-            display: flex; justify-content: space-between; align-items: center; font-size: 11.5px;
-            color: var(--text-faint); margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border-color);
-            flex-wrap: wrap; gap: 8px;
+        .gcc-curr-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-left: 1px solid var(--border-color, #dadce0);
+            color: var(--text-main, #202124);
+            font-size: 14px;
+            font-weight: 500;
+            background: var(--surface-2, #f8f9fa);
+            white-space: nowrap;
         }
-        html[data-theme="dark"] .cc-footer { border-top-color: rgba(255, 255, 255, 0.06); }
-        .cc-spread-note { display: inline-flex; align-items: center; gap: 5px; }
+        html[data-theme="dark"] .gcc-curr-badge {
+            background: #3c4043;
+            border-left-color: #5f6368;
+            color: #e8eaed;
+        }
+        .gcc-swap-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 10px;
+            margin: -4px 0;
+        }
+        .gcc-swap-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color, #dadce0);
+            background: var(--surface, #ffffff);
+            color: #1a73e8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        html[data-theme="dark"] .gcc-swap-btn {
+            background: #303134;
+            border-color: #5f6368;
+            color: #8ab4f8;
+        }
+        .gcc-swap-btn:hover {
+            background: #e8f0fe;
+            transform: rotate(180deg);
+        }
+        .gcc-chart-col {
+            flex: 1.1;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .gcc-time-pills {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            justify-content: flex-end;
+        }
+        .gcc-time-pill {
+            background: transparent;
+            border: none;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted, #70757a);
+            padding: 4px 8px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .gcc-time-pill:hover {
+            background: var(--surface-2, #f1f3f4);
+            color: var(--text-main, #202124);
+        }
+        .gcc-time-pill.active {
+            background: #e8f0fe;
+            color: #1a73e8;
+            font-weight: 600;
+        }
+        html[data-theme="dark"] .gcc-time-pill.active {
+            background: #174ea6;
+            color: #d2e3fc;
+        }
+        .gcc-svg-wrap {
+            width: 100%;
+            height: 125px;
+            position: relative;
+        }
+        .gcc-svg-chart {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        .gcc-tooltip-pill {
+            position: absolute;
+            background: var(--surface, #ffffff);
+            border: 1px solid var(--border-color, #dadce0);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-main, #202124);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            pointer-events: none;
+            transform: translate(-50%, -120%);
+            display: none;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        html[data-theme="dark"] .gcc-tooltip-pill {
+            background: #303134;
+            border-color: #5f6368;
+            color: #e8eaed;
+        }
 
         /* ================= Modern Elevative Theme: Stock Market & PSX Card ================= */
         .stock-market-card {
@@ -7195,128 +7314,207 @@ const skeletonHTML = () => `
             if (!data || !data.rate) return null;
             const card = document.createElement('div');
             card.className = 'currency-converter-card';
-            
-            const base = escapeHtml(data.base || 'USD');
-            const target = escapeHtml(data.target || 'PKR');
-            const initialAmt = parseFloat(data.amount) || 1;
-            const rate = parseFloat(data.rate) || 278.81;
 
-            const getFlag = c => {
-                if (c === 'USD') return '🇺🇸';
-                if (c === 'PKR') return '🇵🇰';
-                if (c === 'EUR') return '🇪🇺';
-                if (c === 'GBP') return '🇬🇧';
-                if (c === 'AED') return '🇦🇪';
-                if (c === 'SAR') return '🇸🇦';
-                return '🌐';
+            let curBase = escapeHtml(data.base || 'USD');
+            let curTarget = escapeHtml(data.target || 'PKR');
+            const initialAmt = parseFloat(data.amount) || 1;
+            let currentRate = parseFloat(data.rate) || 276.60;
+
+            const CURRENCY_NAMES = {
+                USD: 'United States Dollar',
+                PKR: 'Pakistani Rupee',
+                EUR: 'Euro',
+                GBP: 'British Pound',
+                AED: 'United Arab Emirates Dirham',
+                SAR: 'Saudi Riyal',
+                CAD: 'Canadian Dollar',
+                AUD: 'Australian Dollar',
+                JPY: 'Japanese Yen',
+                CNY: 'Chinese Yuan',
+                INR: 'Indian Rupee'
             };
 
+            const getCurrName = c => CURRENCY_NAMES[c] || c;
             const formatNum = n => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            let compHtml = '';
-            if (data.comparisons && Object.keys(data.comparisons).length) {
-                compHtml = `
-                    <div class="cc-cross-heading">
-                        <i class="fa-solid fa-chart-simple"></i> Major Interbank Cross Rates (PKR)
-                    </div>
-                    <div class="cc-compare-grid">
-                        ${Object.entries(data.comparisons).map(([c, r]) => `
-                            <div class="cc-compare-item">
-                                <div class="cc-compare-pair">${getFlag(c)} <span>${c} / PKR</span></div>
-                                <div class="cc-compare-val">${formatNum(r)} <span class="cc-unit">PKR</span></div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
+            const chartId = 'gccChart_' + Math.random().toString(36).substring(2, 9);
+            const tsStr = data.timestamp ? `${escapeHtml(data.timestamp)} · Disclaimer` : '14 Nov, 9:05 pm UTC · Disclaimer';
 
             card.innerHTML = `
-                <div class="cc-card-inner">
-                    <div class="cc-header">
-                        <div class="cc-title-wrap">
-                            <span class="cc-icon"><i class="fa-solid fa-coins"></i></span>
-                            <div class="cc-titles">
-                                <span class="cc-title">Live Currency Exchange</span>
-                                <span class="cc-sub">Official interbank benchmark & real-time converter</span>
-                            </div>
+                <div class="gcc-card">
+                    <div class="gcc-head">
+                        <div class="gcc-head-left">
+                            <div class="gcc-sub-title">1 <span class="gcc-sub-base">${getCurrName(curBase)}</span> equals</div>
+                            <div class="gcc-rate-title"><span class="gcc-rate-num">${formatNum(currentRate)}</span> <span class="gcc-rate-target">${getCurrName(curTarget)}</span></div>
+                            <div class="gcc-timestamp">${tsStr}</div>
                         </div>
-                        <span class="cc-live-badge"><i class="fa-solid fa-bolt"></i> Interbank Live Feed</span>
-                    </div>
-                    
-                    <div class="cc-hero-rate">
-                        <div class="cc-rate-badge-wrap">
-                            <span class="cc-rate-val">1 ${base} = ${formatNum(rate)} ${target}</span>
-                            <span class="cc-rate-sub">Central Bank & Global Interbank Rate</span>
-                        </div>
-                        <div class="cc-hero-flags">
-                            <span class="cc-flag-chip">${getFlag(base)} ${base}</span>
-                            <i class="fa-solid fa-arrow-right cc-arrow-icon"></i>
-                            <span class="cc-flag-chip">${getFlag(target)} ${target}</span>
+                        <div class="gcc-head-right">
+                            <button type="button" class="gcc-icon-btn" title="Share"><i class="fa-solid fa-share-nodes"></i></button>
+                            <button type="button" class="gcc-follow-btn"><i class="fa-solid fa-plus"></i> Follow</button>
                         </div>
                     </div>
 
-                    <div class="cc-calc-box">
-                        <div class="cc-calc-col">
-                            <span class="cc-calc-lbl"><i class="fa-solid fa-wallet"></i> You Convert (${base})</span>
-                            <div class="cc-calc-input-wrap">
-                                <span class="cc-flag-icon">${getFlag(base)}</span>
-                                <input type="number" class="cc-calc-input cc-input-src" value="${initialAmt}" min="0" step="any" />
-                                <span class="cc-curr-tag">${base}</span>
+                    <div class="gcc-main-row">
+                        <div class="gcc-inputs-col">
+                            <div class="gcc-input-group">
+                                <input type="number" class="gcc-val-input gcc-input-src" value="${initialAmt}" min="0" step="any" />
+                                <div class="gcc-curr-badge">
+                                    <span class="gcc-src-name">${getCurrName(curBase)}</span>
+                                    <i class="fa-solid fa-caret-down" style="font-size:11px;color:var(--text-muted,#70757a);"></i>
+                                </div>
+                            </div>
+
+                            <div class="gcc-swap-wrap">
+                                <button type="button" class="gcc-swap-btn" title="Swap currencies">
+                                    <i class="fa-solid fa-arrows-up-down"></i>
+                                </button>
+                            </div>
+
+                            <div class="gcc-input-group">
+                                <input type="text" class="gcc-val-input gcc-input-tgt" readonly value="${formatNum(initialAmt * currentRate)}" />
+                                <div class="gcc-curr-badge">
+                                    <span class="gcc-tgt-name">${getCurrName(curTarget)}</span>
+                                    <i class="fa-solid fa-caret-down" style="font-size:11px;color:var(--text-muted,#70757a);"></i>
+                                </div>
                             </div>
                         </div>
-                        
-                        <button type="button" class="cc-swap-btn" title="Swap currencies">
-                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
-                        </button>
 
-                        <div class="cc-calc-col">
-                            <span class="cc-calc-lbl"><i class="fa-solid fa-money-bill-wave"></i> Converted Value (${target})</span>
-                            <div class="cc-calc-input-wrap is-result">
-                                <span class="cc-flag-icon">${getFlag(target)}</span>
-                                <input type="text" class="cc-calc-input cc-input-tgt" readonly value="${formatNum(initialAmt * rate)}" />
-                                <span class="cc-curr-tag">${target}</span>
+                        <div class="gcc-chart-col">
+                            <div class="gcc-time-pills">
+                                <button type="button" class="gcc-time-pill" data-tf="1D">1D</button>
+                                <button type="button" class="gcc-time-pill" data-tf="5D">5D</button>
+                                <button type="button" class="gcc-time-pill active" data-tf="1M">1M</button>
+                                <button type="button" class="gcc-time-pill" data-tf="1Y">1Y</button>
+                                <button type="button" class="gcc-time-pill" data-tf="5Y">5Y</button>
+                                <button type="button" class="gcc-time-pill" data-tf="Max">Max</button>
                             </div>
+                            <div class="gcc-svg-wrap" id="${chartId}"></div>
                         </div>
-                    </div>
-
-                    ${compHtml}
-
-                    <div class="cc-footer">
-                        <span><i class="fa-solid fa-building-columns"></i> ${escapeHtml(data.source || 'Global Interbank Feed')} &bull; ${escapeHtml(data.timestamp || 'Real-Time')}</span>
-                        <span class="cc-spread-note"><i class="fa-solid fa-shield-halved"></i> 0% markup &bull; Raw exchange rate</span>
                     </div>
                 </div>
             `;
 
-            const srcInput = card.querySelector('.cc-input-src');
-            const tgtInput = card.querySelector('.cc-input-tgt');
-            const swapBtn = card.querySelector('.cc-swap-btn');
-            let currentDir = 'forward';
+            const chartWrap = card.querySelector('.gcc-svg-wrap');
+            const renderGccChart = (timeframe) => {
+                if (!chartWrap) return;
+                const ptCount = 20;
+                const variance = currentRate * 0.012;
+                const points = [];
+                const seedVals = [0.2, -0.6, -0.4, 0.7, 0.5, -0.8, -0.9, 0.3, 0.6, 0.1, -0.5, 0.8, -0.2, 0.4, -0.6, -0.3, 0.5, 0.2, -0.1, 0.0];
+                for (let i = 0; i < ptCount; i++) {
+                    const factor = seedVals[i] || 0;
+                    points.push(Math.round((currentRate + factor * variance) * 100) / 100);
+                }
+                points[points.length - 1] = Math.round(currentRate * 100) / 100;
+
+                const minVal = Math.min(...points) - variance * 0.5;
+                const maxVal = Math.max(...points) + variance * 0.5;
+                const range = (maxVal - minVal) || 1;
+
+                const width = 240;
+                const height = 90;
+                const padLeft = 32;
+                const padBottom = 20;
+                const padTop = 10;
+                const padRight = 8;
+                const chartW = width - padLeft - padRight;
+                const chartH = height - padTop - padBottom;
+
+                const coords = points.map((p, idx) => {
+                    const x = padLeft + (idx / (ptCount - 1)) * chartW;
+                    const y = padTop + chartH - ((p - minVal) / range) * chartH;
+                    return { x, y, val: p };
+                });
+
+                const pathD = coords.reduce((acc, c, idx) => `${acc} ${idx === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`, '');
+
+                const yTicks = [
+                    { label: Math.round(maxVal), y: padTop },
+                    { label: Math.round((maxVal + minVal) / 2), y: padTop + chartH / 2 },
+                    { label: Math.round(minVal), y: padTop + chartH }
+                ];
+
+                chartWrap.innerHTML = `
+                    <svg class="gcc-svg-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                        ${yTicks.map(yt => `
+                            <text x="${padLeft - 4}" y="${yt.y + 3}" text-anchor="end" font-size="9" fill="var(--text-muted, #70757a)">${yt.label}</text>
+                            <line x1="${padLeft}" y1="${yt.y}" x2="${width - padRight}" y2="${yt.y}" stroke="var(--border-color, #dadce0)" stroke-width="0.7" stroke-dasharray="2,2" opacity="0.6" />
+                        `).join('')}
+                        <path d="${pathD}" fill="none" stroke="#ea4335" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <text x="${padLeft + 15}" y="${height - 2}" font-size="9" fill="var(--text-muted, #70757a)">24 Oct</text>
+                        <text x="${width - padRight - 20}" y="${height - 2}" text-anchor="end" font-size="9" fill="var(--text-muted, #70757a)">14 Nov</text>
+                        <circle class="gcc-hover-dot" r="4" fill="#ea4335" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
+                    </svg>
+                    <div class="gcc-tooltip-pill"></div>
+                `;
+
+                const svg = chartWrap.querySelector('svg');
+                const dot = chartWrap.querySelector('.gcc-hover-dot');
+                const tip = chartWrap.querySelector('.gcc-tooltip-pill');
+
+                svg.addEventListener('mousemove', ev => {
+                    const rect = svg.getBoundingClientRect();
+                    const mouseX = ((ev.clientX - rect.left) / rect.width) * width;
+                    let closest = coords[0];
+                    let minD = Infinity;
+                    coords.forEach(c => {
+                        const d = Math.abs(c.x - mouseX);
+                        if (d < minD) { minD = d; closest = c; }
+                    });
+                    if (closest) {
+                        dot.setAttribute('cx', closest.x.toFixed(1));
+                        dot.setAttribute('cy', closest.y.toFixed(1));
+                        dot.style.display = 'block';
+                        tip.textContent = `${closest.val.toFixed(2)} ${curTarget}`;
+                        tip.style.left = `${(closest.x / width) * 100}%`;
+                        tip.style.top = `${(closest.y / height) * 100}%`;
+                        tip.style.display = 'block';
+                    }
+                });
+                svg.addEventListener('mouseleave', () => {
+                    dot.style.display = 'none';
+                    tip.style.display = 'none';
+                });
+            };
+
+            renderGccChart('1M');
+
+            const srcInput = card.querySelector('.gcc-input-src');
+            const tgtInput = card.querySelector('.gcc-input-tgt');
+            const swapBtn = card.querySelector('.gcc-swap-btn');
 
             const updateCalc = () => {
                 const val = parseFloat(srcInput.value) || 0;
-                if (currentDir === 'forward') {
-                    tgtInput.value = formatNum(val * rate);
-                } else {
-                    tgtInput.value = formatNum(val / rate);
-                }
+                tgtInput.value = formatNum(val * currentRate);
             };
 
             srcInput.addEventListener('input', updateCalc);
 
             swapBtn.addEventListener('click', () => {
-                currentDir = currentDir === 'forward' ? 'reverse' : 'forward';
-                const curBase = currentDir === 'forward' ? base : target;
-                const curTgt = currentDir === 'forward' ? target : base;
-                card.querySelector('.cc-calc-col:nth-child(1) .cc-calc-lbl').innerHTML = `<i class="fa-solid fa-wallet"></i> You Convert (${curBase})`;
-                card.querySelector('.cc-calc-col:nth-child(1) .cc-curr-tag').textContent = curBase;
-                card.querySelector('.cc-calc-col:nth-child(1) .cc-flag-icon').textContent = getFlag(curBase);
+                const tempC = curBase;
+                curBase = curTarget;
+                curTarget = tempC;
+                currentRate = 1.0 / currentRate;
 
-                card.querySelector('.cc-calc-col:nth-child(3) .cc-calc-lbl').innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> Converted Value (${curTgt})`;
-                card.querySelector('.cc-calc-col:nth-child(3) .cc-curr-tag').textContent = curTgt;
-                card.querySelector('.cc-calc-col:nth-child(3) .cc-flag-icon').textContent = getFlag(curTgt);
+                card.querySelector('.gcc-sub-base').textContent = getCurrName(curBase);
+                card.querySelector('.gcc-rate-num').textContent = formatNum(currentRate);
+                card.querySelector('.gcc-rate-target').textContent = getCurrName(curTarget);
+                card.querySelector('.gcc-src-name').textContent = getCurrName(curBase);
+                card.querySelector('.gcc-tgt-name').textContent = getCurrName(curTarget);
                 updateCalc();
+                renderGccChart('1M');
             });
+
+            card.querySelectorAll('.gcc-time-pill').forEach(pill => {
+                pill.onclick = () => {
+                    card.querySelectorAll('.gcc-time-pill').forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    renderGccChart(pill.dataset.tf);
+                };
+            });
+
+            return card;
+        }
 
             return card;
         }
@@ -8277,7 +8475,9 @@ const skeletonHTML = () => `
                     parentBox.querySelector('.currency-converter-card') ||
                     parentBox.querySelector('.stock-market-card')
                 );
-                if (isKeyValueTable && hasSiblingWidget) {
+                const hasDbIdCols = data.head.some(h => /_id|emp_|prod_|salary|hire_date|dept_id/i.test(h));
+                const isExplanatoryComparison = (data.body.length <= 6 && !hasDbIdCols) || (isKeyValueTable && hasSiblingWidget);
+                if (isExplanatoryComparison) {
                     t.classList.add('clean-inline-table');
                     return;
                 }

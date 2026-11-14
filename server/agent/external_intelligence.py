@@ -301,6 +301,12 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         if not any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["stock price", "share price", "equity price", "ticker", "shares of", "stock quote"]):
             return None
 
+    # 1. General PSX market index (KSE100, KSE-100, KSE30, KSE-30, PSX market)
+    if any(k in t for k in ["kse100", "kse 100", "kse-100", "kse30", "kse 30", "kse-30", "karachi stock exchange", "psx index", "market status", "psx status", "kse index"]):
+        return "PSX_INDEX"
+    if "psx" in t and any(w in t for w in ["index", "market", "summary", "status", "overview", "points"]):
+        return "PSX_INDEX"
+
     # Ambiguous names that collide with common words or table names
     ambiguous_names = {"google", "apple", "amazon", "systems", "luck", "waves", "meta", "target", "mari", "engro", "nishat", "shadab"}
     has_stock_indicator = any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in [
@@ -308,14 +314,14 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         "nasdaq", "nyse", "psx", "kse", "ticker", "dividend", "trading", "worth", "invest", "close", "points"
     ])
 
-    # 1. Check for mapped stock names in current query first (sorted by longest key first)
+    # 2. Check for mapped stock names in current query first (sorted by longest key first)
     for name in sorted(STOCK_SYMBOL_MAP.keys(), key=lambda x: len(x), reverse=True):
         if re.search(r'\b' + re.escape(name) + r'\b', t):
             if name in ambiguous_names and not has_stock_indicator:
                 continue
             return STOCK_SYMBOL_MAP[name]
 
-    # 2. Check for "stock price of X" / "share price of X" / "quote of X"
+    # 3. Check for "stock price of X" / "share price of X" / "quote of X"
     m_entity = re.search(r'(?:stock|share|shares|equity)\s*(?:price|quote|rate|worth)?\s*(?:of|for)\s+([a-zA-Z0-9\s\.\-]+?)(?:\s+today|\s+in\s+psx|\s+price|\?|$)', t)
     if m_entity:
         cand = m_entity.group(1).strip()
@@ -325,7 +331,7 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
                 return STOCK_SYMBOL_MAP[cand]
             return cand.upper()
 
-    # 3. Check for direct uppercase ticker pattern e.g. "AAPL", "LUCK.KA", "JKSM", "SHDT"
+    # 4. Check for direct uppercase ticker pattern e.g. "AAPL", "LUCK.KA", "JKSM", "SHDT"
     m = re.search(r'\b([A-Z]{2,6}(\.KA)?)\b', text)
     if m:
         sym = m.group(1).upper()
@@ -333,10 +339,13 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         if clean_sym in STOCK_SYMBOL_MAP.values() or any(w in t for w in ["stock", "share", "shares", "ticker", "quote"]):
             return sym
 
-    # 4. Contextual memory: ONLY trigger if current turn is an explicit follow-up referring to the stock
+    # 5. Contextual memory: ONLY trigger if current turn is an explicit follow-up asking specifically about a stock
     is_explicit_stock_followup = (
-        any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["it", "its", "this company", "this stock", "that company", "that stock", "same stock", "volume", "chart", "dividend", "pe ratio", "eps", "target", "fair value"])
-        or any(w in t for w in ["check again", "is it live", "what about volume", "show chart", "refresh rate", "live portal"])
+        any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in [
+            "this stock", "that stock", "same stock", "its stock", "its shares", "its ticker",
+            "stock chart", "share volume", "pe ratio", "fair value", "refresh rate", "live portal"
+        ])
+        or (has_stock_indicator and any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["it", "its", "this company", "that company", "check again", "volume", "chart"]))
     )
     # If the user introduces a new subject/question, NEVER pull previous stock from history
     if is_explicit_stock_followup and history:
@@ -354,12 +363,6 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
                     return STOCK_SYMBOL_MAP[c]
                 elif c and len(c) > 2 and c not in ["dollar", "usd", "weather", "fuel", "petrol"]:
                     return c.upper()
-
-    # 5. General PSX market index (KSE100, KSE30) only if not referring to an individual company
-    if any(k in t for k in ["kse100", "kse 100", "kse30", "kse 30", "karachi stock exchange", "psx index", "market status"]):
-        return "PSX_INDEX"
-    if "psx" in t and any(w in t for w in ["index", "market", "summary", "status", "overview", "points"]):
-        return "PSX_INDEX"
 
     return None
 

@@ -3126,7 +3126,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         try:
             def _local_db_worker(p, eps, em):
                 tt = p.get("target_table")
-                ep = _match_endpoint(str(tt), eps) if tt else (_match_endpoint(req.question, eps) or (eps[0] if eps else None))
+                ep = _match_endpoint(str(tt), eps) if tt else _match_endpoint(req.question, eps)
                 if ep:
                     d = _fetch_single_table_dataset(ep, em)
                     return qe.execute_plan(d, p)
@@ -3180,8 +3180,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             matched_target_ep = _match_endpoint(str(target_table), endpoints)
         if not matched_target_ep:
             matched_target_ep = _match_endpoint(req.question, endpoints)
-        if not matched_target_ep and endpoints:
-            matched_target_ep = endpoints[0]
+        if not matched_target_ep and not is_outside_db:
+            matched_target_ep = _match_endpoint_with_history(req.question, endpoints, history_msgs)
 
         if matched_target_ep:
             target_data = _fetch_single_table_dataset(matched_target_ep, emit)
