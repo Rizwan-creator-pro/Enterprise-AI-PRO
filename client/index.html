@@ -7576,8 +7576,9 @@ const skeletonHTML = () => `
                 box.querySelectorAll('.table-block, table').forEach(tbl => tbl.remove());
             }
 
-            // Render KPI cards deck if present (from live meta or persisted in message content)
-            const actualKpis = (meta && meta.kpis && meta.kpis.length) ? meta.kpis : (kpisData || []);
+            // Only render KPI cards deck if explicitly requested by user (e.g. "kpi", "cards", "bento", "dashboard")
+            const userWantsDeck = meta && (meta.user_wants_deck || meta.wants_kpis);
+            const actualKpis = (meta && meta.kpis && meta.kpis.length && userWantsDeck) ? meta.kpis : null;
             if (actualKpis && actualKpis.length) {
                 const deck = document.createElement('div');
                 deck.className = 'kpi-deck';

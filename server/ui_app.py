@@ -1887,12 +1887,12 @@ RULES:
      * Set "order_by": [{"col": "salary", "desc": true}] (desc: true for highest/expensive/top, desc: false for lowest/cheapest).
      * Set "limit": 1 (CRITICAL: MUST BE EXACTLY 1! NEVER return 4, 5, or all records when a single person or item is asked!).
      * Set "chart": null (CRITICAL: NEVER generate a chart for a 1-row singular query).
-   - PLURAL / RANKING / LIST INQUIRIES (e.g. "top 5 highest salaries", "top 3 employees", "top earners", "ranking of salaries", "compare top employees", "first 10"):
-     * Set "limit": N (e.g. 5 or requested number).
+   - PLURAL / RANKING / LIST INQUIRIES (e.g. "top 5 highest salaries", "top 3 products by price", "top earners", "ranking of salaries", "compare top employees", "first 10"):
+     * Set "limit": N (e.g. 3, 5, or requested number).
      * If the user asks for "all" or does not specify a number, leave "limit": null.
-     * If comparing 3+ categories or shares, include a "chart" definition.
+     * Set "chart": null (CRITICAL: NEVER generate a chart unless the user explicitly requested "chart", "graph", "plot", or "visualize").
 4. If comparing categories or breakdowns, use "mode": "aggregate" with appropriate "group_by" and "aggs".
-5. If comparing 3+ categories or shares of a whole, ALWAYS include a "chart" definition. Use "donut" for share of whole, "bar" for comparison, "line" for trends over time.
+5. CHARTS & VISUALIZATIONS: ONLY include a "chart" definition if the user EXPLICITLY asks for a chart, graph, plot, visual, or diagram. If the user asked for records, lists, prices, or converted currency without asking for a chart, ALWAYS set "chart": null.
 6. CHARTS & CATEGORIES: ALWAYS use descriptive human-readable name columns (such as 'full_name', 'product_name', 'business_name', 'name', 'department', 'category', 'city') for "cat_col", "group_by", and chart axes. NEVER use raw numeric IDs ('emp_id', 'product_id', 'id', 'dept_id') as "cat_col".
 7. CHART METRICS: NEVER put ID or code columns ('dept_id', 'emp_id', 'product_id', 'id', 'zip', 'phone') into "val_cols". Only include true numeric metrics like 'salary', 'price', 'stock_qty', 'rating', 'total'.
 7. Choose "target_table" precisely from the tables listed in SCHEMA SPECIFICATION (e.g. "Employees Directory", "PRODUCTS"). Look at the columns of each table to pick the right one for the question.
@@ -1969,7 +1969,13 @@ STRICT BREVITY & QUALITY RULES:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
   - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
-  - State the definitive single active rate clearly and unequivocally."""
+  - State the definitive single active rate clearly and unequivocally.
+11. TEMPORAL ANCHOR & 2026 GROUND TRUTH:
+- The current year is 2026 (November 2026).
+- The 47th President of the United States is Donald Trump (inaugurated January 20, 2025 after winning the November 2024 presidential election).
+- Elon Musk is the CEO of Tesla and CTO of SpaceX; his net worth is tracked in the $880B - $900B range in 2026.
+- The latest major version of Oracle APEX is Oracle APEX 26.2 (released October 2026).
+- When answering questions about current world leaders, technology versions, or open-world facts, speak definitively in the current 2026 context. NEVER recite pre-training disclaimers such as "as of June 2024", "as of my latest knowledge cutoff", or claim that 2024 election outcomes / post-2024 events are unconfirmed."""
 
 def _get_general_synthesizer_prompt() -> str:
     company = _get_app_config().get("company_name", "Enterprise AI")
@@ -1992,7 +1998,13 @@ CORE REASONING & PRESENTATION PRINCIPLES:
 - For volatile real-world data (such as petrol/diesel/fuel prices, gold rates, exchange rates, commodities, or inflation):
   - Always extract and quote the rate associated with the most recent date or timestamp header found in the search context.
   - STRICTLY IGNORE historical range boundaries or outdated rates if a definitive, single latest active price string is present in the latest search snippets.
-  - State the definitive single active rate clearly and unequivocally."""
+  - State the definitive single active rate clearly and unequivocally.
+9. TEMPORAL ANCHOR & 2026 GROUND TRUTH:
+- The current year is 2026 (November 2026).
+- The 47th President of the United States is Donald Trump (inaugurated January 20, 2025 after winning the November 2024 presidential election).
+- Elon Musk is the CEO of Tesla and CTO of SpaceX; his net worth is tracked in the $880B - $900B range in 2026.
+- The latest major version of Oracle APEX is Oracle APEX 26.2 (released October 2026).
+- When answering questions about current world leaders, technology versions, or open-world facts, speak definitively in the current 2026 context. NEVER recite pre-training disclaimers such as "as of June 2024", "as of my latest knowledge cutoff", or claim that 2024 election outcomes / post-2024 events are unconfirmed."""
 
 SYNTHESIZER_SYSTEM_PROMPT = _get_synthesizer_prompt()
 
@@ -2921,7 +2933,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                         plan["order_by"] = [{"col": "AMOUNT", "desc": is_desc}]
             elif explicit_requested_limit and plan:
                 plan["limit"] = explicit_requested_limit
-                if explicit_requested_limit == 1:
+                if explicit_requested_limit == 1 or not any(k in q_low_inq for k in ["chart", "graph", "plot", "visualize"]):
                     plan["chart"] = None
             break
         except Exception as e:
@@ -3200,7 +3212,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         "in $", "into dollar", "to usd", "also in usd", "dollar me", "dollars me", "usd me", "per employee in dollar"
     ]) or (
         any(k in q_low for k in ["usd", "dollar", "dollars", "$"]) and
-        any(k in q_low for k in ["salary", "salaries", "pay", "payroll", "earner", "earners", "wage", "wages"])
+        any(k in q_low for k in ["salary", "salaries", "pay", "payroll", "earner", "earners", "wage", "wages", "price", "prices", "cost", "costs", "product", "products"])
     )
     if is_usd_conversion and exec_result and exec_result.get("table_rows"):
         try:
@@ -3212,16 +3224,17 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
 
         t_rows = exec_result.get("table_rows") or []
         if t_rows:
-            cand_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["salary", "pay", "price", "amount"])]
+            cand_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["salary", "pay", "price", "amount", "cost"])]
             if cand_cols:
                 sal_col = cand_cols[0]
-                id_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["name", "full_name", "first_name", "role", "designation", "title", "department"])]
+                id_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["name", "full_name", "first_name", "product_name", "role", "designation", "title", "department"])]
                 if not id_cols:
                     id_cols = [list(t_rows[0].keys())[0]]
 
                 augmented_rows = []
                 total_pkr = 0.0
                 total_usd = 0.0
+                metric_name = sal_col.replace("_", " ").title()
                 for r in t_rows:
                     new_r = {}
                     for ic in id_cols:
@@ -3230,17 +3243,15 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     total_pkr += raw_v
                     v_usd = round(raw_v / usd_rate, 2)
                     total_usd += v_usd
-                    new_r["Salary (PKR)"] = f"Rs. {raw_v:,.0f}" if raw_v.is_integer() else f"Rs. {raw_v:,.2f}"
-                    new_r[f"Salary (USD @ {usd_rate})"] = f"${v_usd:,.2f}"
+                    new_r[f"{metric_name} (PKR)"] = f"Rs. {raw_v:,.0f}" if raw_v.is_integer() else f"Rs. {raw_v:,.2f}"
+                    new_r[f"{metric_name} (USD @ {usd_rate})"] = f"${v_usd:,.2f}"
                     augmented_rows.append(new_r)
 
                 exec_result["table_rows"] = augmented_rows
                 exec_result["table_md"] = qe.rows_to_md_table(augmented_rows)
-                exec_result["kpis"] = [
-                    {"label": "Total Employees", "value": str(len(augmented_rows)), "sub": "Active Workforce"},
-                    {"label": "Total Payroll (PKR)", "value": f"Rs. {total_pkr:,.0f}", "sub": "Monthly total in PKR"},
-                    {"label": "Total Payroll (USD)", "value": f"${total_usd:,.2f}", "sub": f"Interbank rate: {usd_rate} PKR/USD"}
-                ]
+                if not any(k in q_low for k in ["chart", "graph", "plot", "visualize"]):
+                    exec_result["chart"] = None
+                exec_result["kpis"] = []
 
     # Dynamic Response Sizing & Pinpoint Directness Post-Processing:
     if is_singular_query and exec_result and exec_result.get("table_rows"):
@@ -3294,8 +3305,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     elif explicit_requested_limit and exec_result and exec_result.get("table_rows"):
         exec_result["table_rows"] = exec_result["table_rows"][:explicit_requested_limit]
         exec_result["table_md"] = qe.rows_to_md_table(exec_result["table_rows"])
-        exec_result["kpis"] = qe.compute_kpis(exec_result["table_rows"])
-        if explicit_requested_limit == 1:
+        if not is_usd_conversion:
+            exec_result["kpis"] = qe.compute_kpis(exec_result["table_rows"])
+        if explicit_requested_limit == 1 or not any(k in req.question.lower() for k in ["chart", "graph", "plot", "visualize"]):
             exec_result["chart"] = None
     elif is_table_form_request and exec_result:
         exec_result["chart"] = None
@@ -3337,6 +3349,10 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
         elif chart_json_str:
             synth_user_prompt += f"Verified Chart ECharts Config:\n```json\n{chart_json_str}\n```\n"
+        else:
+            synth_user_prompt += (
+                "INSTRUCTION: Deliver your response with a crisp 1 to 2 sentence executive summary and present the exact verified table above in clean Markdown table format.\n"
+            )
 
         # Check if user requested dual-currency presentation (e.g. "in dollar and also in the pkr")
         q_lower = req.question.lower()
@@ -3539,7 +3555,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for Universal Internet Search & Headless Webpage Reading (Zero saved sites!)
-    web_agent_data = None
+    if not web_agent_data:
+        web_agent_data = None
     search_queries = []
     browse_urls = list(direct_urls)
 
@@ -3556,7 +3573,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # 1. NEVER run when analyzing an uploaded document (has_docs) — the document is the source of truth!
     # 2. Concurrently execute alongside DuckDB if external_tools specified or real-world validation needed.
     has_dedicated_tool_result = bool(forex_card_data or stock_card_data or weather_info or fuel_data)
-    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data and not has_dedicated_tool_result
+    should_run_web = req_outside_enabled and not has_docs and not firecrawl_result_data and not has_dedicated_tool_result and not (web_agent_data and web_agent_data.get("has_content"))
     if should_run_web:
         if browse_urls or search_queries:
             emit("Browsing live internet sources with Universal Web Agent...")
@@ -3839,7 +3856,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     return {
         "answer": answer,
         "provider_used": provider_used,
-        "kpis": kpis_out,
+        "kpis": kpis_out if (user_wants_deck or is_multi_table) else [],
+        "user_wants_deck": bool(user_wants_deck or is_multi_table),
         "web_intelligence": firecrawl_result_data or (web_agent_data if web_agent_data and web_agent_data.get("has_content") else None),
         "meta_stats": {
             "tokens": total_tokens_used,

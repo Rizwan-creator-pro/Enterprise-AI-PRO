@@ -870,9 +870,29 @@ def build_echarts(
 # Markdown Table Formatter
 # ---------------------------------------------------------------------------
 
-def _clean_cell(val: Any) -> str:
+def _clean_cell(val: Any, col_name: str = "") -> str:
     if val is None:
         return ""
+    col_low = str(col_name).lower()
+    # Currency formatting: if column represents salary, price, cost, revenue, budget
+    if any(k in col_low for k in ["salary", "price", "cost", "revenue", "budget", "payroll", "amount"]) and not col_low.endswith(("_id", "id")):
+        if isinstance(val, (int, float)):
+            f_val = float(val)
+            return f"Rs. {int(f_val):,}" if f_val.is_integer() else f"Rs. {f_val:,.2f}"
+        val_str = str(val).strip()
+        if not val_str.startswith(("Rs.", "Rs", "$", "€", "£")) and val_str.replace(",", "").replace(".", "").isdigit():
+            try:
+                f_val = float(val_str.replace(",", ""))
+                return f"Rs. {int(f_val):,}" if f_val.is_integer() else f"Rs. {f_val:,.2f}"
+            except Exception:
+                pass
+    # Percentage formatting
+    if any(k in col_low for k in ["percent", "pct", "share", "margin", "ratio"]):
+        if isinstance(val, (int, float)):
+            return f"{float(val):,.1f}%"
+    # Integer ID formatting
+    if col_low.endswith(("_id", "id", "code", "zip", "phone", "year")) and isinstance(val, float) and val.is_integer():
+        return str(int(val))
     formatted = format_number(val)
     # Sanitize markdown table breaking characters: newlines, carriage returns, and pipes
     return str(formatted).replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "&#124;").strip()
@@ -885,7 +905,7 @@ def rows_to_md_table(rows: List[dict], max_rows: int = 50) -> str:
     sep = "|" + "|".join("---" for _ in cols) + "|"
     lines = [head, sep]
     for r in rows[:max_rows]:
-        line = "| " + " | ".join(_clean_cell(r.get(c)) for c in cols) + " |"
+        line = "| " + " | ".join(_clean_cell(r.get(c), c) for c in cols) + " |"
         lines.append(line)
     if len(rows) > max_rows:
         lines.append(f"\n_Showing first {max_rows} of {len(rows):,} records in chat preview. Use Table Explorer or Export to Excel for the complete dataset._")

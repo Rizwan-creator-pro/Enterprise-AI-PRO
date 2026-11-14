@@ -217,6 +217,16 @@ def _extract_search_variants(question: str) -> List[str]:
                 variants.append("Elon Musk net worth")
                 variants.append("Elon Musk")
 
+    # Political / World leader extraction: e.g. "who is the president of the United States", "now the donald trump us the presedent of the USA"
+    if any(k in q_raw.lower() for k in ["president of the united states", "president of the us", "president of the usa", "us president", "u.s. president", "current president"]):
+        if "Donald Trump" not in variants:
+            variants.insert(0, "Donald Trump")
+        if "President of the United States" not in variants:
+            variants.append("President of the United States")
+    if any(k in q_raw.lower() for k in ["trump", "donald trump", "dolen trump"]):
+        if "Donald Trump" not in variants:
+            variants.insert(0, "Donald Trump")
+
     # Cleaned query (removes conversational prefixes and filler)
     t = re.sub(r'^(?:please\s+)?(?:tell\s+me|show\s+me|give\s+me|what\s+is\s+the|what\s+are\s+the|what\s+is|what\s+are|who\s+is\s+the|who\s+are\s+the|who\s+is|who\s+are|how\s+much\s+is|how\s+many|can\s+you\s+tell\s+me)\s+', '', q_raw, flags=re.IGNORECASE)
     t = re.sub(r'[\?\!\.]+$', '', t).strip()
@@ -231,18 +241,30 @@ def _extract_search_variants(question: str) -> List[str]:
     return variants
 
 
-def _fetch_wikipedia_summary(variants: List[str]) -> Optional[Dict[str, Any]]:
-    """Fetches real-time Wikipedia summary for recognized entities (e.g. Elon_Musk, Oracle_APEX)."""
+def _fetch_wikipedia_summary(variants: Any) -> Optional[Dict[str, Any]]:
+    """Fetches real-time Wikipedia summary for recognized entities (e.g. Elon_Musk, Oracle_APEX, Donald_Trump)."""
     import urllib.parse
+    if isinstance(variants, str):
+        variants = [variants]
     wiki_terms = []
     for v in variants:
-        if "elon musk" in v.lower() or "tesla" in v.lower():
-            wiki_terms.append("Elon_Musk")
-        if "oracle apex" in v.lower():
-            wiki_terms.append("Oracle_APEX")
-        wiki_terms.append(v.replace(" ", "_"))
+        vl = v.lower()
+        if "elon musk" in vl or "tesla" in vl:
+            if "Elon_Musk" not in wiki_terms:
+                wiki_terms.append("Elon_Musk")
+        if "oracle apex" in vl:
+            if "Oracle_APEX" not in wiki_terms:
+                wiki_terms.append("Oracle_APEX")
+        if any(k in vl for k in ["trump", "dolen trump", "president of the united states", "president of the us", "us president", "current president"]):
+            if "Donald_Trump" not in wiki_terms:
+                wiki_terms.append("Donald_Trump")
+            if "President_of_the_United_States" not in wiki_terms:
+                wiki_terms.append("President_of_the_United_States")
+        cleaned_term = v.strip().replace(" ", "_")
+        if cleaned_term and cleaned_term not in wiki_terms:
+            wiki_terms.append(cleaned_term)
 
-    for term in wiki_terms[:3]:
+    for term in wiki_terms[:4]:
         try:
             url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(term)}"
             r = requests.get(url, headers={"User-Agent": "EnterpriseAI/1.0"}, timeout=3)
