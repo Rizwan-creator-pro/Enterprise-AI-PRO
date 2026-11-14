@@ -7479,9 +7479,13 @@ const skeletonHTML = () => `
 
         function appendAIMessage(text, provider, meta, ts, isLive = false) {
             const live = isLive || (ts === undefined && meta !== null);
-            let weatherData = null;
+            let weatherDataList = [];
             text = text.replace(/:::google-weather\s*([\s\S]*?)\s*:::/g, (m, jsonStr) => {
-                try { weatherData = JSON.parse(jsonStr.trim()); } catch(e) {}
+                try {
+                    const parsed = JSON.parse(jsonStr.trim());
+                    if (Array.isArray(parsed)) weatherDataList.push(...parsed);
+                    else if (parsed) weatherDataList.push(parsed);
+                } catch(e) {}
                 return '';
             }).trim();
 
@@ -7588,12 +7592,14 @@ const skeletonHTML = () => `
                 if (cCard) box.prepend(cCard);
             }
 
-            if (weatherData) {
-                const wCard = buildGoogleWeatherCard(weatherData);
-                if (wCard) box.prepend(wCard);
+            if (weatherDataList.length) {
+                for (let i = weatherDataList.length - 1; i >= 0; i--) {
+                    const wCard = buildGoogleWeatherCard(weatherDataList[i]);
+                    if (wCard) box.prepend(wCard);
+                }
             }
 
-            if (stockData || forexData || weatherData) {
+            if (stockData || forexData || weatherDataList.length) {
                 // Eliminate duplicate card box overload: remove any duplicate KPI decks that repeat the widget
                 const redundantKpi = box.querySelector('.kpi-deck');
                 if (redundantKpi) redundantKpi.remove();
@@ -8303,7 +8309,7 @@ const skeletonHTML = () => `
                 const n = data.body.length;
                 block.querySelector('.tb-count').textContent = `${n} ${n === 1 ? 'row' : 'rows'} · ${data.head.length} columns`;
                 const title = titleFor(block);
-                const menu = block.querySelector('.pop'), more = block.querySelector('.tb-more');
+                const menu = block.querySelector('.tb-tools .pop'), more = block.querySelector('.tb-more');
                 const exp = menu.querySelector('[data-a=expand]'), sep = menu.querySelector('.pop-sep');
                 const hideEl = menu.querySelector('[data-a=hide]');
                 const hiddenPill = block.querySelector('.tb-hidden-pill');

@@ -1,7 +1,7 @@
 import requests
 import datetime
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 WMO_CODES = {
     0: ("Clear", "sun", "moon"),
@@ -32,16 +32,22 @@ KNOWN_CITIES = [
     "dubai", "new york", "tokyo", "paris", "beijing", "toronto"
 ]
 
-def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Optional[str]:
-    """Detects if the query asks about weather and extracts the target location."""
+def extract_weather_cities(text: str, default_city: Optional[str] = None) -> List[str]:
+    """Detects if the query asks about weather and extracts all target locations in prompt order."""
     t = text.lower().strip()
     if not any(k in t for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain today", "is it raining"]):
-        return None
+        return []
 
-    # Check known cities first
+    # Find all matching known cities preserving word boundaries and prompt occurrence order
+    city_matches = []
     for city in KNOWN_CITIES:
-        if re.search(r"\b" + re.escape(city) + r"\b", t):
-            return city.title()
+        m = re.search(r"\b" + re.escape(city) + r"\b", t)
+        if m:
+            city_matches.append((m.start(), city.title()))
+
+    if city_matches:
+        city_matches.sort(key=lambda x: x[0])
+        return [c for _, c in city_matches]
 
     # Preposition pattern with word boundaries: 'weather in <city>', 'temperature for <city>'
     m = re.search(r"\b(?:in|for|of|at)\s+([a-zA-Z\s]{3,25})", t)
@@ -49,19 +55,24 @@ def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Opt
         c = m.group(1).strip()
         c = re.sub(r"\b(today|tomorrow|now|please|right now|currently|this week|the|update|forecast)\b", "", c).strip()
         if len(c) >= 3 and c not in ["the", "this", "here", "update", "my city", "our city"]:
-            return c.title()
+            return [c.title()]
 
     # Prefix pattern: '<city> weather', '<city> temperature'
     m2 = re.search(r"^\s*([a-zA-Z\s]{3,20})\s+(?:weather|forecast|temperature|climate)", t)
     if m2:
         c = m2.group(1).strip()
         if c not in ["current", "today", "todays", "today's", "live", "local", "the", "what is the", "how is the", "check"]:
-            return c.title()
+            return [c.title()]
 
     if default_city and str(default_city).strip():
-        return str(default_city).strip().title()
+        return [str(default_city).strip().title()]
 
-    return None
+    return []
+
+def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Optional[str]:
+    """Detects if the query asks about weather and extracts the primary target location."""
+    cities = extract_weather_cities(text, default_city=default_city)
+    return cities[0] if cities else None
 
 def fetch_wttr_in(city_name: str) -> Optional[Dict[str, Any]]:
     """Resilient fallback meteorological provider querying wttr.in JSON API."""

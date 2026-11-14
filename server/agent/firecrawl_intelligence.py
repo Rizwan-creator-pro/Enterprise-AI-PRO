@@ -413,6 +413,16 @@ def detect_firecrawl_intent(text: str) -> Optional[Dict[str, Any]]:
     if any(w in t for w in ["scrape website", "crawl website", "scrape page"]):
         return {"type": "search", "query": text.strip()}
 
+    # 4. Open-world research inquiries (market benchmarks, executive net worth, company leadership, online rates)
+    research_triggers = [
+        r"\bmarket\s+rates?\b", r"\bagency\s+rates?\b", r"\bcompetitor\s+rates?\b",
+        r"\bnet\s*worth\b", r"\bwho\s+is\s+the\s+ceo\b", r"\bwho\s+is\s+the\s+founder\b",
+        r"\bwho\s+is\s+the\s+president\b", r"\blatest\s+version\s+of\b", r"\blatest\s+news\b",
+        r"\bonline\b"
+    ]
+    if any(re.search(pat, t) for pat in research_triggers):
+        return {"type": "search", "query": text.strip()}
+
     return None
 
 

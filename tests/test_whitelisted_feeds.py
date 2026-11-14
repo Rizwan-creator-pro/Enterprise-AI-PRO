@@ -12,6 +12,7 @@ from agent.external_intelligence import (
     extract_stock_intent,
     is_psx_stock
 )
+from agent.weather_helper import extract_weather_cities, extract_weather_intent
 from agent.universal_router import classify_query_route, QueryRoute
 
 
@@ -76,6 +77,32 @@ class TestWhitelistedFeeds(unittest.TestCase):
         # Strictly BLOCKED when General AI is OFF: General Chit-Chat / Trivia
         r_trivia = classify_query_route("who won the 1992 cricket world cup", self.mock_endpoints, general_ai_enabled=False)
         self.assertEqual(r_trivia["route"], QueryRoute.ENTERPRISE_DATA)
+
+    def test_forex_disambiguation_avoids_agency_and_market_rates(self):
+        """Ensure market rate comparison or product service queries do NOT trigger forex converter."""
+        q_agency = "compare our Mobile App Development price (800,000 PKR) against market rates for app agencies in Pakistan online"
+        self.assertIsNone(extract_forex_intent(q_agency), "Agency market rate comparison must NOT trigger forex intent!")
+
+        q_prod = "list all products with price in PKR"
+        self.assertIsNone(extract_forex_intent(q_prod), "Product database query must NOT trigger forex intent!")
+
+    def test_stock_disambiguation_avoids_ceo_and_net_worth(self):
+        """Ensure questions about CEOs, executive leadership, or net worth do NOT trigger stock quote cards."""
+        q_ceo = "who is the CEO of Tesla and what is their current net worth?"
+        self.assertIsNone(extract_stock_intent(q_ceo), "CEO and net worth queries must NOT hijack stock ticker intent!")
+
+        q_stock = "what is the share price of Tesla today"
+        self.assertEqual(extract_stock_intent(q_stock), "TSLA")
+
+        q_psx = "give me the share price of PSO"
+        self.assertEqual(extract_stock_intent(q_psx), "PSO")
+
+    def test_multi_city_weather_extraction(self):
+        """Ensure queries mentioning multiple cities extract all cities in prompt order."""
+        cities = extract_weather_cities("what is the weather today in Karachi and Lahore")
+        self.assertEqual(cities, ["Karachi", "Lahore"])
+
+        self.assertEqual(extract_weather_intent("what is the weather today in Karachi and Lahore"), "Karachi")
 
 
 if __name__ == "__main__":

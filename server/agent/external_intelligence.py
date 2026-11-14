@@ -142,24 +142,33 @@ def extract_forex_intent(text: str) -> Optional[Dict[str, Any]]:
         r"\b(?:department|departments|designation|designations|hire\s*date|job\s*title)\b",
         r"\b(?:product|products|inventory|unit\s*price|stock\s*quantity|stock\s*level|category|categories)\b",
         r"\b(?:lead|leads|google\s*map|rating|reviews|phone\s*number|address)\b",
-        r"\b(?:table|database|records?|rows?|dataset|columns?)\b"
+        r"\b(?:table|database|records?|rows?|dataset|columns?)\b",
+        r"\b(?:mobile\s*app|app\s*development|web\s*development|website|software|license|hosting|analytics|training|setup|hardware|server)\b",
+        r"\b(?:compare|comparison|against|versus\s+market|market\s+rates?|agency|agencies|competitor|competitors|industry\s+average|benchmark|freelance|hourly\s+rate|project\s+rate)\b"
     ]
-    if any(re.search(p, t) for p in db_entity_patterns):
+    # Check if this is an explicit currency conversion/exchange rate request
+    has_explicit_forex_kw = any(re.search(r'\b' + re.escape(k) + r'\b', t) for k in [
+        "exchange rate", "exchange rates", "forex", "currency exchange", "dollar rate", "dollar price",
+        "interbank rate", "interbank forex", "usd to pkr", "pkr to usd", "aed to pkr", "sar to pkr",
+        "eur to pkr", "gbp to pkr", "currency converter", "convert to pkr", "convert to usd"
+    ])
+    if any(re.search(p, t) for p in db_entity_patterns) and not has_explicit_forex_kw:
         return None
 
     currency_keywords = [
         "dollar", "usd", "pkr", "rupee", "rupees", "currency", "exchange rate", "forex",
         "dirham", "aed", "riyal", "sar", "euro", "eur", "pound", "gbp", "dinar", "exchange"
     ]
-    if not any(k in t for k in currency_keywords):
+    if not any(re.search(r'\b' + re.escape(k) + r'\b', t) for k in currency_keywords):
         return None
     
     intent_triggers = [
-        "rate", "price", "convert", "conversion", "how much", "worth", "today", "now", "currently",
-        "vs", "to", "in", "kitna", "kitne", "aaj", "bhav", "chal raha", "kya hai", "equal",
-        "trend", "trends", "weekly", "daily", "monthly", "chart", "history", "forecast"
+        r"\brate\b", r"\brates\b", r"\bprice\b", r"\bconvert\b", r"\bconversion\b", r"\bhow\s+much\b", r"\bworth\b",
+        r"\btoday\b", r"\bnow\b", r"\bcurrently\b", r"\bvs\b", r"\bto\s+pkr\b", r"\bto\s+usd\b", r"\bin\s+pkr\b",
+        r"\bin\s+usd\b", r"\bkitna\b", r"\bkitne\b", r"\baaj\b", r"\bbhav\b", r"\bchal\s+raha\b", r"\bkya\s+hai\b",
+        r"\bequal\b", r"\btrend\b", r"\btrends\b", r"\bweekly\b", r"\bdaily\b", r"\bmonthly\b", r"\bchart\b", r"\bhistory\b", r"\bforecast\b"
     ]
-    if not any(k in t for k in intent_triggers):
+    if not any(re.search(p, t) for p in intent_triggers):
         return None
 
     # Detect base and target
@@ -279,6 +288,17 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     # Negative override: queries about product inventory / warehouse stock or employee payroll are NOT equity stock queries
     if any(k in t for k in ["product", "products", "item", "items", "catalog", "inventory", "stock_qty", "in stock", "out of stock", "stock level", "unit price", "employee", "salary", "payroll", "department"]):
         if not any(w in t for w in ["psx", "kse", "ticker", "shares", "equity", "nasdaq", "nyse", "dividend", "close", "open"]):
+            return None
+
+    # Negative override: inquiries about leadership, executives, founders, biographies, net worth, or people
+    leadership_or_bio_keywords = [
+        "ceo", "cfo", "cto", "coo", "founder", "co-founder", "president", "chairman", "director", "owner",
+        "who is", "who are", "biography", "net worth", "networth", "wealth", "richest", "billionaire",
+        "salary of", "career", "born", "wife", "husband", "family"
+    ]
+    if any(re.search(r'\b' + re.escape(k) + r'\b', t) for k in leadership_or_bio_keywords):
+        # Only allow if explicitly asking for stock quotes / ticker / equity price
+        if not any(re.search(r'\b' + re.escape(w) + r'\b', t) for w in ["stock price", "share price", "equity price", "ticker", "shares of", "stock quote"]):
             return None
 
     # Ambiguous names that collide with common words or table names

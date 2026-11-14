@@ -1089,82 +1089,46 @@ def _build_security_policy_message(endpoints: List[dict]) -> str:
     )
 
 def _handle_dataset_inventory_query(endpoints: List[dict], req_outside_enabled: bool) -> str:
-    """Generate an authoritative, dynamic overview of the user's authorized tables."""
+    """Generate a clean, concise, guiding overview of the user's authorized tables."""
     TABLE_DESCRIPTIONS = {
-        "Employees Directory": "Staff directory, employee designations, salaries, hiring dates, and departments",
-        "PRODUCTS": "Product catalog, unit pricing, inventory stock quantities, and categories",
-        "Google Map Leads": "B2B local business leads, ratings, review counts, and contact details"
-    }
-    SAMPLE_QUERIES = {
-        "Employees Directory": [
-            "\"What is the highest salary in our database?\"",
-            "\"Compare average salary across departments\"",
-            "\"Show all employees in the IT department\""
-        ],
-        "PRODUCTS": [
-            "\"Show all products in stock with their unit prices\"",
-            "\"Which product has the highest price?\"",
-            "\"List products by category\""
-        ],
-        "Google Map Leads": [
-            "\"Top rated leads in Lahore\"",
-            "\"List leads with highest review count\""
-        ]
+        "Employees Directory": "Staff directory, employee designations, salaries, and departments.",
+        "PRODUCTS": "Product catalog, unit pricing, inventory stock quantities, and categories.",
+        "Google Map Leads": "B2B local business leads, contact information, review counts, and ratings."
     }
 
-    table_blocks = []
-    sample_queries = []
+    table_lines = []
     seen = set()
     for ep in (endpoints or []):
         name = ep.get("endpoint_name") or ep.get("ENDPOINT_NAME") or ep.get("name")
         if not name or name in seen:
             continue
         seen.add(name)
-        desc = TABLE_DESCRIPTIONS.get(name) or ep.get("description") or "Authorized enterprise dataset"
-        cols = KNOWN_COLUMNS.get(name, "")
-        if cols:
-            col_list = [c.split()[0] for c in cols.split(",")[:8]]
-            col_str = ", ".join(f"`{c}`" for c in col_list)
-            if len(cols.split(",")) > 8:
-                col_str += f", and {len(cols.split(',')) - 8} more columns"
-            col_line = f"  * **Available Fields:** {col_str}\n"
-        else:
-            col_line = ""
-        table_blocks.append(f"• **{name}**\n  * **Overview:** {desc}\n{col_line}")
-        if name in SAMPLE_QUERIES:
-            sample_queries.extend(SAMPLE_QUERIES[name][:2])
+        desc = TABLE_DESCRIPTIONS.get(name) or ep.get("description") or "Live enterprise dataset."
+        table_lines.append(f"- **{name}**: {desc}")
 
-    if not table_blocks:
-        tables_text = "*(No enterprise database tables are currently assigned to your account. Please check user permissions in Oracle APEX.)*\n"
+    count = len(table_lines)
+    if not table_lines:
+        tables_text = "- *(No enterprise database tables are currently assigned to your account. Please check user permissions in Oracle APEX.)*\n"
+        count_str = "0 authorized datasets"
     else:
-        tables_text = "\n".join(table_blocks)
-
-    if not sample_queries:
-        sample_queries = [
-            "\"What is the highest salary in our database?\"",
-            "\"Show all products in stock with their unit prices\""
-        ]
-
-    samples_rendered = "\n".join(f"- *{sq}*" for sq in sample_queries[:4])
+        tables_text = "\n".join(table_lines)
+        count_str = f"**{count} authorized live dataset{'s' if count != 1 else ''}**"
 
     ext_text = ""
     if req_outside_enabled:
         ext_text = (
-            "\n🌐 **General AI is Active:** You can also ask open-web research questions, fetch live global weather, "
-            "or explore market benchmarks."
+            "\n🌐 **General AI is Active:** Open-web research, live weather forecasts, and market benchmarks are also enabled."
         )
     else:
         ext_text = (
-            "\n📈 **Verified Business Feeds:** You can also query real-time **Forex exchange rates** (State Bank / Interbank), "
-            "**Pakistan Fuel rates** (OGRA / PSO), and **PSX stock quotes** (Pakistan Stock Exchange)."
+            "\n📈 **Verified Business Feeds:** Real-time **Forex exchange rates**, **Pakistan Fuel rates**, and **PSX stock quotes** are also available."
         )
 
     return (
-        f"### 🗄️ Available Enterprise Datasets\n\n"
-        f"You have authorized access to the following live enterprise data sources:\n\n"
-        f"{tables_text}\n"
-        f"**Sample queries you can try:**\n"
-        f"{samples_rendered}\n"
+        f"### 🗄️ Authorized Enterprise Datasets\n\n"
+        f"You have access to {count_str}:\n\n"
+        f"{tables_text}\n\n"
+        f"💡 *Ask any question about the datasets above to view records, run aggregations, filter columns, or export reports.*"
         f"{ext_text}"
     )
 
@@ -2637,22 +2601,24 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     if req_outside_enabled:
         can_search_ext = True
         is_outside_db = True
-        weather_city = extract_weather_intent(orch_question, default_city=c_city)
-        if not weather_city and any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
-            weather_city = c_city.title() if c_city else "Lahore"
+        from agent.weather_helper import extract_weather_cities
+        weather_cities = extract_weather_cities(orch_question, default_city=c_city)
+        if not weather_cities and any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
+            weather_cities = [c_city.title() if c_city else "Lahore"]
+        weather_city = weather_cities[0] if weather_cities else None
         firecrawl_intent = detect_firecrawl_intent(orch_question)
         direct_urls = extract_urls_from_text(orch_question)
     else:
         can_search_ext = False
         is_outside_db = has_whitelisted_feed
+        weather_cities = []
         weather_city = None
         firecrawl_intent = None
         direct_urls = []
 
     # If General AI is strictly OFF, enforce internal database & whitelisted feed isolation
     if not req_outside_enabled and not has_images and not has_docs and not is_pure_math_expression(req.question):
-        chk_matched = _match_endpoint_with_history(req.question, endpoints, history_msgs)
-        if not chk_matched and not has_whitelisted_feed and not _is_dataset_inventory_query(req.question):
+        if not has_whitelisted_feed and not _is_dataset_inventory_query(req.question):
             chk_weather = extract_weather_intent(req.question)
             chk_urls = extract_urls_from_text(req.question)
             has_ext_kw = any(k in req.question.lower() for k in [
@@ -2661,8 +2627,13 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 "president", "prime minister", "celebrity", "cricket", "who is", "what is the capital",
                 "gold price", "silver price", "search online", "browse web", "open web"
             ])
-            is_explicit_outside = bool(chk_weather or chk_urls or has_ext_kw)
-            if is_explicit_outside:
+            # Current inquiry explicit outside check (must not be overridden by previous history)
+            matched_cur_ep = _match_endpoint(req.question, endpoints) or _match_endpoints_multi(req.question, endpoints)
+            is_explicit_outside = bool((chk_weather or chk_urls or has_ext_kw) and not matched_cur_ep)
+
+            chk_matched = matched_cur_ep or _match_endpoint_with_history(req.question, endpoints, history_msgs)
+
+            if is_explicit_outside or (not chk_matched and not has_whitelisted_feed):
                 pol_msg = _build_security_policy_message(endpoints)
                 emit("General AI is switched off — restricted to internal tables and verified business feeds.")
                 _save_and_record(req, pol_msg, t_start, provider_used="Security Policy Guard", total_tokens=0)
@@ -3483,25 +3454,40 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             )
 
     # Check for live weather request (only when General AI is enabled)
-    if req_outside_enabled and weather_city:
-        if weather_city.lower() == "lahore" and "lahore" not in req.question.lower() and c_city:
-            weather_city = c_city.title()
-        if not weather_info:
-            from agent.weather_helper import fetch_live_weather
-            weather_info = fetch_live_weather(weather_city)
-        if weather_info:
-            w_curr = weather_info["current"]
-            synth_user_prompt += (
-                f"\n\n[LIVE VERIFIED METEOROLOGICAL DATA FOR {weather_info['location']}]:\n"
-                f"- Current Temperature: {w_curr['temp']}°C ({round(w_curr['temp'] * 9/5 + 32)}°F)\n"
-                f"- Condition: {w_curr['condition']}\n"
-                f"- Humidity: {w_curr['humidity']}%\n"
-                f"- Wind Speed: {w_curr['wind_kph']} km/h\n"
-                f"- Precipitation: {w_curr['precipitation_pct']}%\n\n"
-                f"STRICT WEATHER INSTRUCTION:\n"
-                f"1. Provide a crisp 1 to 2 sentence summary of current weather conditions in {weather_info['location']}.\n"
-                f"2. DO NOT output hourly timelines or lists of hours/days in your text. The interactive graphical weather card will be attached automatically below your response."
-            )
+    weather_infos = []
+    if req_outside_enabled and weather_cities:
+        from agent.weather_helper import fetch_live_weather
+        for w_city in weather_cities[:3]:
+            if w_city.lower() == "lahore" and "lahore" not in req.question.lower() and c_city:
+                w_city = c_city.title()
+            w_res = fetch_live_weather(w_city)
+            if w_res:
+                weather_infos.append(w_res)
+        if weather_infos:
+            weather_info = weather_infos[0]
+            for w_res in weather_infos:
+                w_curr = w_res["current"]
+                synth_user_prompt += (
+                    f"\n\n[LIVE VERIFIED METEOROLOGICAL DATA FOR {w_res['location']}]:\n"
+                    f"- Current Temperature: {w_curr['temp']}°C ({round(w_curr['temp'] * 9/5 + 32)}°F)\n"
+                    f"- Condition: {w_curr['condition']}\n"
+                    f"- Humidity: {w_curr['humidity']}%\n"
+                    f"- Wind Speed: {w_curr['wind_kph']} km/h\n"
+                    f"- Precipitation: {w_curr['precipitation_pct']}%\n"
+                )
+            if len(weather_infos) > 1:
+                loc_names = " and ".join(w["location"] for w in weather_infos)
+                synth_user_prompt += (
+                    f"\nSTRICT WEATHER INSTRUCTION:\n"
+                    f"1. Provide a crisp comparative summary addressing current weather conditions in both {loc_names}.\n"
+                    f"2. DO NOT output hourly timelines or lists of hours/days in your text. The interactive graphical weather cards will be attached automatically below your response."
+                )
+            else:
+                synth_user_prompt += (
+                    f"\nSTRICT WEATHER INSTRUCTION:\n"
+                    f"1. Provide a crisp 1 to 2 sentence summary of current weather conditions in {weather_infos[0]['location']}.\n"
+                    f"2. DO NOT output hourly timelines or lists of hours/days in your text. The interactive graphical weather card will be attached automatically below your response."
+                )
 
     # Check for live fuel / petroleum prices request
     if fuel_intent:
@@ -3765,7 +3751,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             answer = re.sub(r"```(?:json|echarts|chart)[\s\S]*?```", "", answer).strip()
             answer = f"{answer.strip()}\n\n```json\n{chart_str}\n```"
 
-    if req_outside_enabled and weather_info:
+    if req_outside_enabled and weather_infos:
+        answer = re.sub(r":::google-weather[\s\S]*?(?:::|$)", "", answer).strip()
+        cards_str = "\n\n".join(f":::google-weather\n{json.dumps(w)}\n:::" for w in weather_infos)
+        answer = f"{answer.strip()}\n\n{cards_str}"
+    elif req_outside_enabled and weather_info:
         answer = re.sub(r":::google-weather[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::google-weather\n{json.dumps(weather_info)}\n:::"
     if forex_card_data:
@@ -3775,7 +3765,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         answer = re.sub(r":::stock-market-card[\s\S]*?(?:::|$)", "", answer).strip()
         answer = f"{answer.strip()}\n\n:::stock-market-card\n{json.dumps(stock_card_data)}\n:::"
 
-    if forex_card_data or stock_card_data or (req_outside_enabled and weather_info):
+    if forex_card_data or stock_card_data or (req_outside_enabled and (weather_info or weather_infos)):
         # Eliminate card box overload: Strip all manual markdown tables, multi-row conversion metrics,
         # and enforce ONLY a clean 1-2 sentence executive market commentary alongside the specialized widget.
         widget_blocks = re.findall(r":::(?:currency-converter|stock-market-card|google-weather)[\s\S]*?:::", answer)

@@ -98,15 +98,14 @@ class TestDatasetInventoryAndDynamicSecurity(unittest.TestCase):
         ]
         inventory_msg = _handle_dataset_inventory_query(user_endpoints, req_outside_enabled=False)
 
-        self.assertIn("### 🗄️ Available Enterprise Datasets", inventory_msg)
+        self.assertIn("### 🗄️ Authorized Enterprise Datasets", inventory_msg)
         self.assertIn("Employees Directory", inventory_msg)
         self.assertIn("PRODUCTS", inventory_msg)
         self.assertNotIn("Google Map Leads", inventory_msg)
-        self.assertIn("Available Fields:", inventory_msg)
-        self.assertIn("emp_id", inventory_msg)
-        self.assertIn("product_id", inventory_msg)
-        self.assertIn("Sample queries you can try:", inventory_msg)
+        self.assertNotIn("Available Fields:", inventory_msg)
+        self.assertNotIn("emp_id", inventory_msg)
         self.assertIn("Verified Business Feeds", inventory_msg)
+        self.assertIn("Ask any question about the datasets above", inventory_msg)
 
     def test_universal_router_routes_inventory_query_to_enterprise_data(self):
         """Verify that 'what data you have' routes directly to ENTERPRISE_DATA, not general chat or rejection."""
