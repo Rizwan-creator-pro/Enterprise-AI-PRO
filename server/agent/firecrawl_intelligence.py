@@ -325,8 +325,24 @@ def search_web(query: str, limit: int = 5) -> Dict[str, Any]:
     """
     _ensure_env()
 
-    # 1. Try Tavily AI Search API (Agent-First Search Engine)
     tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
+    serper_key = os.environ.get("SERPER_API_KEY", "").strip()
+
+    # Dynamic key retrieval from Oracle APEX AI_EXTERNAL_APIS table
+    try:
+        from agent.external_apis_manager import get_active_keys_for_type
+        search_keys = get_active_keys_for_type("SEARCH")
+        for k_obj in search_keys:
+            s_name = str(k_obj.get("service_name") or "").upper()
+            k_val = str(k_obj.get("api_key") or "").strip()
+            if not tavily_key and "TAVILY" in s_name and k_val:
+                tavily_key = k_val
+            if not serper_key and "SERPER" in s_name and k_val:
+                serper_key = k_val
+    except Exception:
+        pass
+
+    # 1. Try Tavily AI Search API (Agent-First Search Engine)
     if tavily_key:
         try:
             r = requests.post(
