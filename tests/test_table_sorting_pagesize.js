@@ -120,4 +120,31 @@ assert.deepStrictEqual(getAvailableSizes(60), [10, 25, 50, 'all']);
 assert.deepStrictEqual(getAvailableSizes(120), [10, 25, 50, 100, 'all']);
 console.log("✔ Dynamic page size threshold generation verified.");
 
+// 4. Test Table Classification & Anti-Overflow Protection
+const classifyTableForDecoration = (head, bodyLength, hasSiblingWidget = false) => {
+    const isKeyValueTable = head.length <= 2 && bodyLength <= 7;
+    const hasDbCols = head.some(h => /(^|_)id$|emp|prod|salary|hire|dept|lead|price|amount|rate|score|phone|email|status|niche|business|company|cust|order|user|address|date|created|updated|review|rating/i.test(h.trim()));
+    const isWideDataTable = head.length > 3 || hasDbCols;
+    const isExplanatoryComparison = !isWideDataTable && ((isKeyValueTable && hasSiblingWidget) || (head.length <= 3 && bodyLength <= 4));
+    return { isWideDataTable, isExplanatoryComparison };
+};
+
+// Google Map Leads (12 columns, 1 row or 3 rows) must NEVER be inline comparison
+const leadsHead = ["id", "business_name", "niche", "location", "phone", "email", "website", "rating", "reviews_count", "lead_score", "priority", "maps_url"];
+assert.strictEqual(classifyTableForDecoration(leadsHead, 1).isWideDataTable, true);
+assert.strictEqual(classifyTableForDecoration(leadsHead, 1).isExplanatoryComparison, false);
+assert.strictEqual(classifyTableForDecoration(leadsHead, 3).isExplanatoryComparison, false);
+
+// Database queries with <= 3 cols but DB columns (e.g. id, salary) must be wide data table
+assert.strictEqual(classifyTableForDecoration(["id", "first_name", "salary"], 1).isWideDataTable, true);
+assert.strictEqual(classifyTableForDecoration(["id", "first_name", "salary"], 1).isExplanatoryComparison, false);
+
+// Tiny markdown comparison table (3 cols, 2 rows, no DB columns)
+assert.strictEqual(classifyTableForDecoration(["Feature", "Version 1", "Version 2"], 2).isExplanatoryComparison, true);
+
+// Verify defensive CSS in index.html
+assert(indexHtml.includes('overflow-x: auto'), 'clean-inline-table must have overflow-x: auto');
+assert(indexHtml.includes('word-break: break-word'), 'index.html must have word-break: break-word');
+console.log("✔ Table classification & anti-overflow protection verified.");
+
 console.log("\nALL TABLE SORTING & PAGE SIZING TESTS PASSED SUCCESSFULLY! 🚀");

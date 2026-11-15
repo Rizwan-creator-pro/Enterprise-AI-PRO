@@ -275,16 +275,24 @@
         }
         .clean-inline-table {
             width: 100%;
-            max-width: 650px;
+            max-width: 100%;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
             margin: 14px 0 16px;
             border-collapse: collapse;
             font-size: 13.5px;
             line-height: 1.6;
+            box-sizing: border-box;
         }
         .clean-inline-table th, .clean-inline-table td {
             padding: 8px 12px;
             border-bottom: 1px solid var(--border-color);
             text-align: left;
+            max-width: 320px;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
         }
         .clean-inline-table th {
             font-weight: 600;
@@ -292,6 +300,10 @@
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+        .ai-text table:not(.clean-inline-table) {
+            max-width: 100%;
         }
         html[data-theme="dark"] .es-logo {
             background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%) !important;
@@ -2817,7 +2829,7 @@
         @keyframes textShimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 
         /* ================= Answer Typography (Hallmark Anti-Slop Rules) ================= */
-        .ai-text { font-size: 15px; line-height: 1.7; color: var(--text-main); font-family: var(--font-body); }
+        .ai-text { font-size: 15px; line-height: 1.7; color: var(--text-main); font-family: var(--font-body); min-width: 0; max-width: 100%; word-break: break-word; }
         .ai-text p { margin: 0 0 12px; }
         .ai-text strong { font-weight: 600; color: var(--text-main); }
         .ai-text ul, .ai-text ol { padding-inline-start: 22px; margin: 8px 0 14px; }
@@ -8247,8 +8259,10 @@ const skeletonHTML = () => `
                     parentBox.querySelector('.currency-converter-card') ||
                     parentBox.querySelector('.stock-market-card')
                 );
-                const hasDbIdCols = data.head.some(h => /_id|emp_|prod_|salary|hire_date|dept_id/i.test(h));
-                const isExplanatoryComparison = (data.body.length <= 6 && !hasDbIdCols) || (isKeyValueTable && hasSiblingWidget);
+                const hasDbCols = data.head.some(h => /(^|_)id$|emp|prod|salary|hire|dept|lead|price|amount|rate|score|phone|email|status|niche|business|company|cust|order|user|address|date|created|updated|review|rating/i.test(h.trim()));
+                // Any table with > 3 columns or database attributes is a wide/enterprise data table and MUST be wrapped in .table-block
+                const isWideDataTable = data.head.length > 3 || hasDbCols;
+                const isExplanatoryComparison = !isWideDataTable && ((isKeyValueTable && hasSiblingWidget) || (data.head.length <= 3 && data.body.length <= 4));
                 if (isExplanatoryComparison) {
                     t.classList.add('clean-inline-table');
                     return;
@@ -8548,8 +8562,8 @@ const skeletonHTML = () => `
                     };
                 }
 
-                // If table has 10 or more columns and more than 1 row, attach Claude-style Column Questionnaire Card
-                if (data.head && data.head.length >= 10 && data.body && data.body.length > 1) {
+                // If table has 10 or more columns and at least 1 row, attach Claude-style Column Questionnaire Card
+                if (data.head && data.head.length >= 10 && data.body && data.body.length >= 1) {
                     const prevEl = block.previousElementSibling;
                     if (!prevEl || !prevEl.classList.contains('claude-col-questionnaire')) {
                         const qCard = buildTableColumnQuestionnaire(block, t, data, title);
