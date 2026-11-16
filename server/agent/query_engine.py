@@ -874,6 +874,19 @@ def _clean_cell(val: Any, col_name: str = "") -> str:
     if val is None:
         return ""
     col_low = str(col_name).lower()
+    # USD Currency formatting
+    if any(k in col_low for k in ["usd", "dollar"]) or col_low.startswith("$"):
+        if isinstance(val, (int, float)):
+            f_val = float(val)
+            return f"${f_val:,.2f}"
+        val_str = str(val).strip()
+        if not val_str.startswith("$") and val_str.replace(",", "").replace(".", "").isdigit():
+            try:
+                f_val = float(val_str.replace(",", ""))
+                return f"${f_val:,.2f}"
+            except Exception:
+                pass
+
     # Currency formatting: if column represents salary, price, cost, revenue, budget
     if any(k in col_low for k in ["salary", "price", "cost", "revenue", "budget", "payroll", "amount"]) and not col_low.endswith(("_id", "id")):
         if isinstance(val, (int, float)):
@@ -886,11 +899,19 @@ def _clean_cell(val: Any, col_name: str = "") -> str:
                 return f"Rs. {int(f_val):,}" if f_val.is_integer() else f"Rs. {f_val:,.2f}"
             except Exception:
                 pass
+
     # Percentage formatting
     if any(k in col_low for k in ["percent", "pct", "share", "margin", "ratio"]):
         if isinstance(val, (int, float)):
             return f"{float(val):,.1f}%"
-    # Integer ID formatting
+
+    # Date formatting (e.g. 2026-09-15T10:43:43Z -> 2026-09-15)
+    if any(k in col_low for k in ["date", "time", "created_at", "hire_date"]):
+        val_s = str(val).strip()
+        if "T" in val_s and (val_s.endswith("Z") or ":" in val_s):
+            return val_s.split("T")[0]
+
+    # Integer ID / code formatting
     if col_low.endswith(("_id", "id", "code", "zip", "phone", "year")) and isinstance(val, float) and val.is_integer():
         return str(int(val))
     formatted = format_number(val)

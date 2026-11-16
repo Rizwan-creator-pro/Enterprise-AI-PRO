@@ -833,29 +833,9 @@ def log_usage(
 # ---------------- User Endpoints & Schema Extraction (Cache 60s) ----------------
 _dataset_cache: Dict[str, Tuple[float, dict]] = {}  # ep_url -> (cached_at, items)
 
-DEPT_NAMES = {
-    1: "Human Resources",
-    2: "Information Technology",
-    3: "Finance",
-    4: "Marketing",
-    5: "Sales",
-    6: "Operations",
-    7: "Customer Support",
-    8: "Research & Development"
-}
-
 def _enrich_row(r: dict) -> dict:
     row = dict(r)
-    # 1. Department name enrichment
-    if "dept_id" in row:
-        d_val = row.get("dept_id")
-        try:
-            d_int = int(d_val) if d_val is not None else None
-        except (ValueError, TypeError):
-            d_int = None
-        if "department" not in row:
-            row["department"] = DEPT_NAMES.get(d_int, f"Department {d_val}" if d_val is not None else "Unknown")
-    # 2. Full name enrichment
+    # Full name enrichment if first_name and last_name exist
     if "first_name" in row and "last_name" in row and "name" not in row and "full_name" not in row:
         fn = str(row.get("first_name") or "").strip()
         ln = str(row.get("last_name") or "").strip()
@@ -1008,34 +988,27 @@ def _fetch_single_table_dataset(ep: dict, emit=None) -> List[dict]:
     _dataset_cache[rest_url] = (now, all_rows)
     return all_rows
 
-TABLE_SYNONYMS = {
-    "Employees Directory": [
-        "salary", "salaries", "saalary", "pay", "payroll", "wage", "wages", "compensation",
-        "employee", "employees", "employess", "employes", "emplyees", "emloyee", "empolyee",
-        "employer", "employers", "staff", "worker", "workers", "workforce", "personnel", "hiring", "hired",
-        "hire date", "job", "jobs", "job title", "designation", "department", "departments",
-        "director", "directors", "manager", "managers", "bonus",
-        "earner", "earners", "earning", "earnings", "top earner", "top earners",
-        "highest earner", "highest earners", "highest paid", "top paid", "lowest paid",
-        "highest salary", "lowest salary", "breakdown"
-    ],
-    "PRODUCTS": [
-        "product", "products", "prodcut", "prodcuts", "item", "items", "catalog", "inventory",
-        "stock_qty", "stock quantity", "in stock", "out of stock", "sku",
-        "unit price", "product price", "pricing", "product cost"
-    ],
-    "Google Map Leads": [
-        "lead", "leads", "g map", "gmap", "google map", "google maps", "rating", "ratings",
-        "review", "reviews", "business", "businesses", "niche", "phone number",
-        "contact", "whatsapp", "website status", "lead score", "place_id", "opportunity"
-    ]
-}
+def _get_table_synonyms(endpoints: List[dict]) -> Dict[str, List[str]]:
+    """Builds table synonym mappings dynamically from authorized endpoints metadata, filtering out common stopwords."""
+    COMMON_STOPWORDS = {
+        "and", "the", "for", "all", "contain", "contains", "record", "records", "data", "table", "tables",
+        "list", "show", "view", "information", "info", "details", "detail", "item", "items", "entry", "entries",
+        "system", "database", "endpoint", "user", "users", "with", "from", "into", "that", "this", "these", "those"
+    }
+    syn_map: Dict[str, List[str]] = {}
+    for ep in (endpoints or []):
+        name = str(ep.get("endpoint_name") or ep.get("ENDPOINT_NAME") or "").strip()
+        if not name:
+            continue
+        words = [w.lower().rstrip("s") for w in re.findall(r'[a-zA-Z0-9]+', name) if len(w) >= 3 and w.lower() not in COMMON_STOPWORDS]
+        desc = str(ep.get("description") or "").lower()
+        desc_words = [w.rstrip("s") for w in re.findall(r'[a-zA-Z0-9]+', desc) if len(w) >= 3 and w.lower() not in COMMON_STOPWORDS]
+        all_terms = [t for t in set(words + desc_words + [name.lower()]) if t not in COMMON_STOPWORDS]
+        syn_map[name] = all_terms
+    return syn_map
 
-KNOWN_COLUMNS = {
-    "Employees Directory": "emp_id (int), full_name (text), first_name (text), last_name (text), email (text), phone (text), hire_date (date), job_title (text), salary (number), department (text), city (text), status (text)",
-    "PRODUCTS": "product_id (int), product_name (text), category (text), price (number), stock_qty (number), status (text), created_date (date)",
-    "Google Map Leads": "id (int), business_name (text), niche (text), location (text), phone (text), email (text), website (text), rating (number), reviews_count (int), lead_score (int), priority (text), maps_url (text)"
-}
+TABLE_SYNONYMS: Dict[str, List[str]] = {}
+KNOWN_COLUMNS: Dict[str, str] = {}
 
 def _is_dataset_inventory_query(text: str) -> bool:
     """Detect if the user is asking what data/tables/datasets exist or can be queried."""
@@ -1052,11 +1025,6 @@ def _is_dataset_inventory_query(text: str) -> bool:
 
 def _build_security_policy_message(endpoints: List[dict]) -> str:
     """Build a 100% dynamic Security Policy message listing only the tables authorized for the current user."""
-    TABLE_DESCRIPTIONS = {
-        "Employees Directory": "Staff details, designations, salaries, departments",
-        "PRODUCTS": "Products, pricing, stock, categories",
-        "Google Map Leads": "Business leads, contact information, ratings"
-    }
     table_lines = []
     seen = set()
     for ep in (endpoints or []):
@@ -1064,14 +1032,7 @@ def _build_security_policy_message(endpoints: List[dict]) -> str:
         if not name or name in seen:
             continue
         seen.add(name)
-        desc = TABLE_DESCRIPTIONS.get(name)
-        if not desc:
-            cols = KNOWN_COLUMNS.get(name, "")
-            if cols:
-                first_few = [c.split()[0] for c in cols.split(",")[:4]]
-                desc = ", ".join(first_few)
-            else:
-                desc = ep.get("description") or "Authorized enterprise dataset"
+        desc = ep.get("description") or "Live enterprise data"
         table_lines.append(f"- **{name}** ({desc})")
 
     if not table_lines:
@@ -1089,13 +1050,7 @@ def _build_security_policy_message(endpoints: List[dict]) -> str:
     )
 
 def _handle_dataset_inventory_query(endpoints: List[dict], req_outside_enabled: bool) -> str:
-    """Generate a clean, concise, guiding overview of the user's authorized tables."""
-    TABLE_DESCRIPTIONS = {
-        "Employees Directory": "Staff directory, employee designations, salaries, and departments.",
-        "PRODUCTS": "Product catalog, unit pricing, inventory stock quantities, and categories.",
-        "Google Map Leads": "B2B local business leads, contact information, review counts, and ratings."
-    }
-
+    """Generate a clean, concise, guiding overview of the user's authorized tables dynamically."""
     table_lines = []
     seen = set()
     for ep in (endpoints or []):
@@ -1103,16 +1058,16 @@ def _handle_dataset_inventory_query(endpoints: List[dict], req_outside_enabled: 
         if not name or name in seen:
             continue
         seen.add(name)
-        desc = TABLE_DESCRIPTIONS.get(name) or ep.get("description") or "Live enterprise dataset."
+        desc = ep.get("description") or "Enterprise dataset"
         table_lines.append(f"- **{name}**: {desc}")
 
-    count = len(table_lines)
     if not table_lines:
-        tables_text = "- *(No enterprise database tables are currently assigned to your account. Please check user permissions in Oracle APEX.)*\n"
+        table_lines.append("- *(No enterprise database tables are currently assigned to your account. Please check user permissions in Oracle APEX.)*")
         count_str = "0 authorized datasets"
     else:
-        tables_text = "\n".join(table_lines)
-        count_str = f"**{count} authorized live dataset{'s' if count != 1 else ''}**"
+        count_str = f"**{len(seen)} authorized live dataset{'s' if len(seen) != 1 else ''}**"
+
+    tables_text = "\n".join(table_lines)
 
     ext_text = ""
     if req_outside_enabled:
@@ -1165,10 +1120,11 @@ def _match_endpoint(text: str, endpoints: List[dict]) -> Optional[dict]:
                         continue
                     return ep
 
-    # Domain synonym matching
+    # Domain synonym matching dynamically built from active endpoints
+    dyn_syns = _get_table_synonyms(endpoints)
     for ep in endpoints:
         name = str(ep.get("endpoint_name", ""))
-        syns = TABLE_SYNONYMS.get(name, [])
+        syns = dyn_syns.get(name, [])
         for s in syns:
             if re.search(r"\b" + re.escape(s) + r"\b", t) or s in t:
                 return ep
@@ -1182,6 +1138,7 @@ def _match_endpoints_multi(text: str, endpoints: List[dict]) -> List[dict]:
         return []
     matched = []
     seen = set()
+    dyn_syns = _get_table_synonyms(endpoints)
     for ep in endpoints:
         ep_key = str(ep.get("endpoint_id") or ep.get("endpoint_name") or ep.get("rest_url"))
         name = str(ep.get("endpoint_name", ""))
@@ -1201,9 +1158,9 @@ def _match_endpoints_multi(text: str, endpoints: List[dict]) -> List[dict]:
                     hit = True
                     break
 
-        # Check domain synonyms if not matched yet
+        # Check domain synonyms dynamically
         if not hit:
-            for s in TABLE_SYNONYMS.get(name, []):
+            for s in dyn_syns.get(name, []):
                 if re.search(r"\b" + re.escape(s) + r"\b", t):
                     hit = True
                     break
@@ -1705,6 +1662,56 @@ def usage_top(request: Request):
         except Exception:
             pass
     return {"items": []}
+
+@app.get("/api/admin/system-config")
+def get_admin_system_config(request: Request):
+    """
+    Returns master system connection configuration.
+    Strictly protected: ONLY accessible by users with is_admin == 'Y'.
+    The master link is displayed as READ-ONLY in the Admin Console.
+    """
+    u = current_user(request)
+    if u.get("a") != "Y":
+        raise HTTPException(status_code=403, detail="Access denied. Admin privileges required.")
+    
+    ords_healthy = False
+    providers_count = 0
+    external_apis_count = 0
+    endpoints_count = 0
+    
+    try:
+        r_p = ords_get(URL_PROVIDERS, timeout=5)
+        if r_p.ok:
+            ords_healthy = True
+            providers_count = len(r_p.json().get("items", []))
+    except Exception:
+        pass
+        
+    try:
+        from agent.external_apis_manager import fetch_external_apis_from_ords
+        ext_apis = fetch_external_apis_from_ords(force=True)
+        external_apis_count = len(ext_apis)
+    except Exception:
+        pass
+        
+    try:
+        r_ep = ords_get(f"{URL_USER_ENDPOINTS}/{u['u']}", timeout=5)
+        if r_ep.ok:
+            endpoints_count = len(r_ep.json().get("items", []))
+    except Exception:
+        pass
+
+    return {
+        "master_ords_url": BASE_URL,
+        "is_editable_in_ui": False,
+        "mode": "Single Master Link (Oracle APEX / ORDS)",
+        "security_policy": "Strictly Read-Only in UI. Edited only from code/server environment.",
+        "connection_status": "Connected & Operational" if ords_healthy else "Checking / Unreachable",
+        "active_providers_count": providers_count,
+        "active_external_apis_count": external_apis_count,
+        "active_endpoints_count": endpoints_count,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
 
 # ---------------- File Request Markers & Plain Dumps ----------------
 _KIND_PATTERNS = [
@@ -2380,30 +2387,29 @@ async def run_hybrid_orchestrator(
 
 
 def generate_followup_suggestions(q: str, endpoints: Optional[List[dict]] = None) -> List[str]:
-    """Generates 3 contextual, high-intent follow-up question suggestions (Claude/ChatGPT style)."""
+    """Generates 3 contextual, high-intent follow-up question suggestions dynamically."""
     q_low = q.lower().strip()
-    if any(k in q_low for k in ["stock", "share price", "psx", "ilp", "jksm", "aapl", "equity"]):
+    matched = _match_endpoint(q, endpoints or [])
+    tbl_name = matched.get("endpoint_name") if matched else ((endpoints[0].get("endpoint_name") if endpoints else "database"))
+    clean_tbl = str(tbl_name).replace('_', ' ').title()
+
+    if any(k in q_low for k in ["stock", "share price", "psx", "equity"]):
         return ["Show fair value & price targets", "Compare with PSX sector index", "Latest market announcements"]
-    elif any(k in q_low for k in ["highest salary", "top earner", "highest paid"]):
-        return ["Show lowest salary in our database", "Average salary by department", "List top 5 earners with breakdown"]
-    elif any(k in q_low for k in ["lowest salary", "cheapest salary"]):
+    elif any(k in q_low for k in ["salary", "payroll", "earner", "paid", "compensation", "income"]):
         return ["Who has the highest salary?", "Average salary by department", "Show salary range by city"]
-    elif any(k in q_low for k in ["salary", "payroll", "employee", "staff"]):
-        return ["Who has the highest salary?", "Average salary by department", "Show employee headcount by city"]
-    elif any(k in q_low for k in ["product", "item", "inventory"]):
+    elif any(k in q_low for k in ["product", "item", "inventory", "stock level"]):
         return ["Show low stock products alert", "Most expensive product in stock", "Category-wise product count"]
     elif any(k in q_low for k in ["fuel", "petrol", "diesel", "cng", "lpg"]):
-        return ["Hi-Octane and LPG prices today", "Weekly fuel price trend", "Petrol price in Lahore"]
+        return ["Check recent fuel price notifications", "Fuel price trend", "Compare petrol and diesel rates"]
     elif any(k in q_low for k in ["weather", "temperature", "forecast", "climate"]):
         return ["7-day weather forecast", "Humidity and wind speed", "Hourly rain probability"]
     elif any(k in q_low for k in ["dollar", "usd", "forex", "exchange rate", "currency"]):
-        return ["Open market cash exchange rate", "USD to PKR weekly trend", "Convert 1,000 USD to PKR"]
+        return ["Open market cash exchange rate", "Currency weekly trend", "Convert to another currency"]
 
-    first_tbl = endpoints[0].get("endpoint_name") if endpoints else "database"
     return [
-        f"Show key metrics and averages for {first_tbl}",
-        "Analyze trends and highlight anomalies",
-        "Export complete executive summary as PDF"
+        f"Show key metrics and averages for {clean_tbl}",
+        f"Analyze trends and highlight anomalies in {clean_tbl}",
+        f"Export {clean_tbl} summary as PDF"
     ]
 
 
@@ -3222,12 +3228,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         try:
             from agent.external_intelligence import fetch_live_forex
             fx_raw = fetch_live_forex("USD")
-            usd_rate = fx_raw.get("rate") if (fx_raw and fx_raw.get("rate")) else 276.63
+            usd_rate = fx_raw.get("rates", {}).get("PKR") if fx_raw else None
         except Exception:
-            usd_rate = 276.63
+            usd_rate = None
 
         t_rows = exec_result.get("table_rows") or []
-        if t_rows:
+        if t_rows and usd_rate and usd_rate > 0:
             cand_cols = [c for c in t_rows[0].keys() if any(k in c.lower() for k in ["salary", "pay", "price", "amount", "cost"])]
             if cand_cols:
                 sal_col = cand_cols[0]
@@ -3256,6 +3262,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 if not any(k in q_low for k in ["chart", "graph", "plot", "visualize"]):
                     exec_result["chart"] = None
                 exec_result["kpis"] = []
+                forex_card_data = None
 
     # Dynamic Response Sizing & Pinpoint Directness Post-Processing:
     if is_singular_query and exec_result and exec_result.get("table_rows"):
@@ -3315,6 +3322,11 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             exec_result["chart"] = None
     elif is_table_form_request and exec_result:
         exec_result["chart"] = None
+
+    # Text-First Quality Gate: Suppress KPI card blocks unless the user explicitly asks for cards or KPI decks
+    user_wants_cards = any(k in req.question.lower() for k in ["kpi", "cards", "card", "deck", "bento", "dashboard"])
+    if not user_wants_cards and exec_result:
+        exec_result["kpis"] = []
 
     # STAGE 4: Synthesis LLM (Writes crisp summary from small result table)
     emit("Synthesizing concise summary & visualization…")
@@ -3393,8 +3405,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 f"Authorized Schema Overview:\n{schema_overview}"
             )
 
-    # Check for live forex / currency exchange request
-    if forex_intent:
+    # Check for live forex / currency exchange request (only when not performing internal DB row conversion)
+    if forex_intent and not exec_result:
         if not forex_card_data:
             emit(f"Retrieving verified real-time interbank forex rates ({forex_intent.get('base','USD')} to {forex_intent.get('target','PKR')})...")
             forex_raw = fetch_live_forex(forex_intent.get("base", "USD"))
@@ -3760,8 +3772,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
             if not clean_intro or len(clean_intro) < 6:
                 clean_intro = f"**Summary of results** ({exec_result['row_count']} records matching):"
             answer = f"{clean_intro}\n\n{exec_result['table_md']}"
-        elif exec_result.get("mode") in ("raw", "aggregate", "pivot") and not exec_result.get("chart"):
-            answer = f"{answer.strip()}\n\n{exec_result['table_md']}"
+        elif not exec_result.get("chart"):
+            if not (exec_result['table_md'] in answer):
+                answer = f"{answer.strip()}\n\n{exec_result['table_md']}"
 
 
     if exec_result and exec_result.get("chart"):

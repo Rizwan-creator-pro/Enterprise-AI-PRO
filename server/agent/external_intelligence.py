@@ -214,13 +214,15 @@ def extract_forex_intent(text: str) -> Optional[Dict[str, Any]]:
 
     return {"base": base, "target": target, "amount": amount}
 
-def format_forex_payload(intent: Dict[str, Any], forex_data: Dict[str, Any]) -> Dict[str, Any]:
+def format_forex_payload(intent: Dict[str, Any], forex_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Formats verified forex rates for interactive UI cards."""
     base = intent.get("base", "USD")
     target = intent.get("target", "PKR")
     amount = float(intent.get("amount", 1.0))
     rates = forex_data.get("rates", {})
-    rate = rates.get(target, 276.88 if target == "PKR" else 1.0)
+    rate = rates.get(target)
+    if not rate or rate <= 0:
+        return None
     converted_amount = round(amount * rate, 2)
     rev_rate = round(1.0 / rate, 6) if rate else 0.0
 
@@ -229,10 +231,9 @@ def format_forex_payload(intent: Dict[str, Any], forex_data: Dict[str, Any]) -> 
         pkr_per_usd = rates["PKR"]
         if base == "USD":
             comparisons["USD"] = pkr_per_usd
-            if rates.get("EUR"): comparisons["EUR"] = round(pkr_per_usd * (1.0 / rates["EUR"]), 2)
-            if rates.get("GBP"): comparisons["GBP"] = round(pkr_per_usd * (1.0 / rates["GBP"]), 2)
-            if rates.get("AED"): comparisons["AED"] = round(pkr_per_usd / rates["AED"], 2)
-            if rates.get("SAR"): comparisons["SAR"] = round(pkr_per_usd / rates["SAR"], 2)
+            for c_cand in ["EUR", "GBP", "AED", "SAR", "CAD", "AUD", "JPY", "CNY", "INR"]:
+                if rates.get(c_cand):
+                    comparisons[c_cand] = round(pkr_per_usd * (1.0 / rates[c_cand]), 2) if rates[c_cand] > 1.5 else round(pkr_per_usd / rates[c_cand], 2)
 
     return {
         "type": "forex",
@@ -249,7 +250,7 @@ def format_forex_payload(intent: Dict[str, Any], forex_data: Dict[str, Any]) -> 
 
 
 def fetch_live_forex(base: str = "USD") -> Optional[Dict[str, Any]]:
-    """Fetches verified live interbank and central bank exchange rates."""
+    """Fetches verified live interbank and central bank exchange rates dynamically for any currency."""
     urls = [
         f"https://open.er-api.com/v6/latest/{base}",
         f"https://api.exchangerate-api.com/v4/latest/{base}",
@@ -258,25 +259,23 @@ def fetch_live_forex(base: str = "USD") -> Optional[Dict[str, Any]]:
     for url in urls:
         try:
             r = requests.get(url, timeout=4).json()
-            rates = r.get("rates") or r.get(base.lower(), {})
-            if rates and ("PKR" in rates or "pkr" in rates):
-                pkr_rate = float(rates.get("PKR") or rates.get("pkr", 0))
-                eur_rate = float(rates.get("EUR") or rates.get("eur", 0))
-                gbp_rate = float(rates.get("GBP") or rates.get("gbp", 0))
-                aed_rate = float(rates.get("AED") or rates.get("aed", 0))
-                sar_rate = float(rates.get("SAR") or rates.get("sar", 0))
-                return {
-                    "base": base,
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
-                    "rates": {
-                        "PKR": round(pkr_rate, 2),
-                        "EUR": round(eur_rate, 4),
-                        "GBP": round(gbp_rate, 4),
-                        "AED": round(aed_rate, 4),
-                        "SAR": round(sar_rate, 4),
-                    },
-                    "source": "Interbank Global Forex Feed"
-                }
+            rates_raw = r.get("rates") or r.get(base.lower(), {})
+            if rates_raw:
+                clean_rates = {}
+                for k, v in rates_raw.items():
+                    try:
+                        fv = float(v)
+                        if fv > 0:
+                            clean_rates[k.upper()] = round(fv, 4)
+                    except (ValueError, TypeError):
+                        pass
+                if clean_rates:
+                    return {
+                        "base": base.upper(),
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+                        "rates": clean_rates,
+                        "source": "Interbank Global Forex Feed"
+                    }
         except Exception:
             continue
     return None
@@ -444,6 +443,8 @@ def is_psx_stock(symbol_or_query: str) -> bool:
     if re.match(r'^[A-Z0-9]{2,6}$', clean_s):
         try:
             psx_res = fetch_psx_company(clean_s)
+            if not psx_res or psx_res.get("price") is None:
+                psx_res = fetch_investify_stock(clean_s)
             if psx_res and psx_res.get("price") is not None:
                 STOCK_SYMBOL_MAP[clean_s.lower()] = clean_s
                 if psx_res.get("company_name"):
@@ -451,6 +452,8 @@ def is_psx_stock(symbol_or_query: str) -> bool:
                 return True
         except Exception:
             pass
+        # Any uppercase non-global 2-6 letter symbol queried as a stock is treated as PSX equity
+        return True
     # If full company name, try resolving to PSX ticker
     resolved = resolve_psx_symbol_from_name(s)
     if resolved:
@@ -972,10 +975,10 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
 
                 # Pattern D: "High Speed Diesel is Rs. 378/Ltr"
                 if not diesel_price:
-                    m_d_solo = re.search(r'(?:high\s*speed\s*diesel|hsd)\s*(?:is\s*)?(?:Rs\.?|PKR)?\s*(\d{3}(?:\.\d{1,2})?)', desc, re.IGNORECASE)
+                    m_d_solo = re.search(r'(?:high\s*speed\s*diesel|hsd)\s*(?:is\s*)?(?:Rs\.?|PKR)?\s*(\d{2,3}(?:\.\d{1,2})?)', desc, re.IGNORECASE)
                     if m_d_solo:
                         val = float(m_d_solo.group(1))
-                        if 280 <= val <= 500:
+                        if val > 50:
                             diesel_price = f"Rs. {val:.2f}"
     except Exception as fc_err:
         logger.debug(f"[Fuel Intelligence] Firecrawl fast query notice: {fc_err}")
@@ -994,16 +997,16 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
                     snippets.append(f"- **{t}**: {b}")
 
             petrol_patterns = [
-                r'(?:petrol|super|motor gasoline)[^\d]{1,40}?(?:is\s+)?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)',
-                r'(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)[^\d]{1,25}?(?:per\s+litre|/litre)[^\d]{1,30}?(?:for\s+)?(?:petrol|super)',
-                r'(?:petrol|super)\s+(?:price|rate)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)',
-                r'(?:petrol|super)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)'
+                r'(?:petrol|super|motor gasoline)[^\d]{1,40}?(?:is\s+)?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)',
+                r'(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)[^\d]{1,25}?(?:per\s+litre|/litre)[^\d]{1,30}?(?:for\s+)?(?:petrol|super)',
+                r'(?:petrol|super)\s+(?:price|rate)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)',
+                r'(?:petrol|super)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)'
             ]
             diesel_patterns = [
-                r'(?:diesel|hsd|high speed)[^\d]{1,40}?(?:is\s+)?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)',
-                r'(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)[^\d]{1,25}?(?:per\s+litre|/litre)[^\d]{1,30}?(?:for\s+)?(?:diesel|hsd)',
-                r'(?:diesel|hsd)\s+(?:price|rate)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)',
-                r'(?:diesel|hsd)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{3}(?:\.\d{1,2})?)'
+                r'(?:diesel|hsd|high speed)[^\d]{1,40}?(?:is\s+)?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)',
+                r'(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)[^\d]{1,25}?(?:per\s+litre|/litre)[^\d]{1,30}?(?:for\s+)?(?:diesel|hsd)',
+                r'(?:diesel|hsd)\s+(?:price|rate)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)',
+                r'(?:diesel|hsd)[^\d]{1,25}?(?:Rs\.?|PKR)\s*(\d{2,3}(?:\.\d{1,2})?)'
             ]
 
             for item in web_res:
@@ -1013,7 +1016,7 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
                         m = re.search(pat, text, re.IGNORECASE)
                         if m:
                             val = float(m.group(1))
-                            if 280 <= val <= 500:
+                            if val > 50:
                                 petrol_price = f"Rs. {val:.2f}"
                                 break
                 if not diesel_price:
@@ -1021,33 +1024,35 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
                         m = re.search(pat, text, re.IGNORECASE)
                         if m:
                             val = float(m.group(1))
-                            if 280 <= val <= 500:
+                            if val > 50:
                                 diesel_price = f"Rs. {val:.2f}"
                                 break
         except Exception as web_err:
             logger.debug(f"[Fuel Intelligence] Web search fallback notice: {web_err}")
 
-    # Verified nationwide official ceiling rates (OGRA / PSO current active notification)
-    petrol_price = petrol_price or "Rs. 346.00"
-    diesel_price = diesel_price or "Rs. 378.00"
-    hioctane_price = "Rs. 415.00"
-    kerosene_price = "Rs. 308.52"
-    ldo_price = "Rs. 251.37"
-    lpg_price = "Rs. 254.86 / kg"
-
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    result = {
-        "country": country,
-        "petrol": petrol_price,
-        "diesel": diesel_price,
-        "hi_octane": hioctane_price,
-        "kerosene": kerosene_price,
-        "ldo": ldo_price,
-        "lpg": lpg_price,
-        "timestamp": timestamp,
-        "source": "Official OGRA & PSO Benchmark Feeds",
-        "snippets": snippets[:6]
-    }
+
+    # If neither petrol nor diesel was found in live feeds, return an authentic status message with snippets
+    if not petrol_price and not diesel_price:
+        result = {
+            "country": country,
+            "petrol": None,
+            "diesel": None,
+            "status": "unavailable",
+            "message": "Official live petroleum rates could not be retrieved from real-time feeds at this moment.",
+            "timestamp": timestamp,
+            "source": "Official OGRA & PSO Feeds",
+            "snippets": snippets[:6]
+        }
+    else:
+        result = {
+            "country": country,
+            "petrol": petrol_price or "Updating",
+            "diesel": diesel_price or "Updating",
+            "timestamp": timestamp,
+            "source": "Official OGRA & PSO Benchmark Feeds",
+            "snippets": snippets[:6]
+        }
 
     _FUEL_PRICE_CACHE[cache_key] = result
     _FUEL_PRICE_CACHE_TIME = now

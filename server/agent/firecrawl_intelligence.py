@@ -325,10 +325,10 @@ def search_web(query: str, limit: int = 5) -> Dict[str, Any]:
     """
     _ensure_env()
 
-    tavily_key = os.environ.get("TAVILY_API_KEY", "").strip() or "tvly-1JQEg8-muIXmIFo3DrY7vR0Fqe5BbGBKO3hZVm1ZfOV5AjI1G"
+    tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
     serper_key = os.environ.get("SERPER_API_KEY", "").strip()
 
-    # Dynamic key retrieval from Oracle APEX AI_EXTERNAL_APIS table
+    # Dynamic key retrieval from Oracle APEX AI_EXTERNAL_APIS table via single master link
     try:
         from agent.external_apis_manager import get_active_keys_for_type
         search_keys = get_active_keys_for_type("SEARCH")

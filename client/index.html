@@ -5061,6 +5061,12 @@
                         <span class="pop-badge">DOCS</span>
                     </div>
 
+                    <div class="pop-item" id="menuAdminConsoleItem" style="display:none;" onclick="closeMenus(); openAdminConsole()">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div class="pi-text"><span class="pi-name">Admin Console</span><span class="pi-sub">Master DB link & system health</span></div>
+                        <span class="pop-badge" style="background:#e8f0fe; color:#1a73e8; font-weight:700;">ADMIN</span>
+                    </div>
+
                     <!-- Theme Accordion (clean inline expansion, works on all screens) -->
                     <div class="pop-has-flyout" id="themeFlyoutRow">
                         <div class="pop-flyout-trigger" onclick="toggleSubFlyout('themeSubFlyout', event)">
@@ -5594,6 +5600,13 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
             if (!perms.can_view_tables) {
                 const expView = document.getElementById('tableExplorerView');
                 if (expView && expView.style.display !== 'none') closeTableExplorer();
+            }
+
+            // 5. Admin Console visibility (strictly Admin only)
+            const menuAdminItem = document.getElementById('menuAdminConsoleItem');
+            if (menuAdminItem) {
+                const isAdm = (user.is_admin === true || user.is_admin === 'Y' || (user.role && user.role.toLowerCase() === 'admin'));
+                menuAdminItem.style.display = isAdm ? 'flex' : 'none';
             }
         }
 
@@ -7584,8 +7597,6 @@ const skeletonHTML = () => `
                 // Eliminate duplicate card box overload: remove any duplicate KPI decks that repeat the widget
                 const redundantKpi = box.querySelector('.kpi-deck');
                 if (redundantKpi) redundantKpi.remove();
-                // Strictly remove duplicate manual markdown table containers under live widgets
-                box.querySelectorAll('.table-block, table').forEach(tbl => tbl.remove());
             }
 
             // Only render KPI cards deck if explicitly requested by user (e.g. "kpi", "cards", "bento", "dashboard")
@@ -11138,6 +11149,105 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                 });
             } else {
                 alert('Usage dashboard loaded.');
+            }
+        }
+
+        async function openAdminConsole() {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '<i class="fa-solid fa-shield-halved" style="color:#1a73e8;"></i> Enterprise Admin Console',
+                    html: '<div style="padding:20px; text-align:center;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px; color:#1a73e8;"></i><p style="margin-top:10px; font-size:13px; color:var(--text-muted);">Connecting to Oracle Autonomous Engine...</p></div>',
+                    width: 720,
+                    showConfirmButton: false,
+                    showCloseButton: true
+                });
+            }
+
+            try {
+                const res = await fetch('/api/admin/system-config');
+                if (res.status === 403) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Access Restricted',
+                            text: 'Admin Console is strictly reserved for administrative accounts.',
+                            confirmButtonColor: '#1a73e8'
+                        });
+                    } else {
+                        alert('Access restricted to administrators.');
+                    }
+                    return;
+                }
+                if (!res.ok) throw new Error('Failed to retrieve system configuration');
+                const cfg = await res.json();
+
+                const html = `
+                <div style="text-align:left; font-size:13px; color:var(--text-primary); padding:4px 8px;">
+                    <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:10px; padding:16px; margin-bottom:16px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                            <span style="font-weight:700; font-size:12px; text-transform:uppercase; color:var(--accent-blue); letter-spacing:0.5px;">
+                                <i class="fa-solid fa-database"></i> Master Connection Link (Single Unified Engine)
+                            </span>
+                            <span style="background:#e6f4ea; color:#137333; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">
+                                <i class="fa-solid fa-circle-check"></i> ${escapeHtml(cfg.connection_status || 'Operational')}
+                            </span>
+                        </div>
+                        <div style="display:flex; align-items:center; background:var(--surface-1); border:1px solid var(--border-color); border-radius:8px; padding:10px 12px; margin-top:6px;">
+                            <i class="fa-solid fa-lock" style="color:#1a73e8; margin-right:10px; font-size:14px;" title="Read-Only Security Lock"></i>
+                            <input type="text" value="${escapeHtml(cfg.master_ords_url || '')}" readonly disabled style="width:100%; border:none; background:transparent; font-family:monospace; font-size:12px; color:var(--text-primary); cursor:not-allowed;" />
+                        </div>
+                        <div style="display:flex; align-items:center; margin-top:8px; font-size:11px; color:var(--text-muted, #70757a);">
+                            <i class="fa-solid fa-shield-halved" style="margin-right:6px; color:#1a73e8;"></i>
+                            <span><b>Read-Only Master Link:</b> Configured strictly in server code / .env. Cannot be edited from UI to ensure perimeter security.</span>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
+                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Active AI Providers</div>
+                            <div style="font-size:22px; font-weight:800; color:#1a73e8; margin-top:4px;">${cfg.active_providers_count || 0}</div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Dynamic from Oracle DB</div>
+                        </div>
+                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">External API Keys</div>
+                            <div style="font-size:22px; font-weight:800; color:#188038; margin-top:4px;">${cfg.active_external_apis_count || 0}</div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Dynamic from Oracle DB</div>
+                        </div>
+                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Enterprise Tables</div>
+                            <div style="font-size:22px; font-weight:800; color:#f2994a; margin-top:4px;">${cfg.active_endpoints_count || 0}</div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">User-Assigned via APEX</div>
+                        </div>
+                    </div>
+
+                    <div style="background:rgba(26,115,232,0.06); border:1px solid rgba(26,115,232,0.2); border-radius:8px; padding:12px; font-size:11.5px; line-height:1.5;">
+                        <div style="font-weight:700; color:#1a73e8; margin-bottom:4px;">
+                            <i class="fa-solid fa-certificate"></i> Zero-Hardcoding Architecture Verified
+                        </div>
+                        <div>All external keys, AI models, and endpoint schemas are dynamically loaded from your Oracle APEX tables (<code>PROVIDERS</code>, <code>AI_EXTERNAL_APIS</code>, <code>USER_ENDPOINTS</code>) through the single master link above. No API keys or mock fallback data are hardcoded in application code.</div>
+                    </div>
+                </div>`;
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: '<i class="fa-solid fa-shield-halved" style="color:#1a73e8;"></i> Enterprise Admin Console',
+                        html: html,
+                        width: 720,
+                        confirmButtonText: 'Done',
+                        confirmButtonColor: '#1a73e8',
+                        scrollbarPadding: false,
+                        showCloseButton: true
+                    });
+                }
+            } catch (err) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Admin Console Error',
+                        text: err.message || 'Could not load admin system configuration.',
+                        confirmButtonColor: '#1a73e8'
+                    });
+                }
             }
         }
 

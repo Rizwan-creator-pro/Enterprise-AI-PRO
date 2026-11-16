@@ -114,11 +114,11 @@ def get_active_keys_for_type(api_type: str) -> List[Dict[str, Any]]:
     service_name = "Default Env Service"
 
     if target_type == "FINANCE":
-        fallback_key = os.environ.get("EULERPOOL_API_KEY", "eu_prod_1794002761034_8gcodzj7yue").strip()
-        service_name = "Eulerpool Fallback (.env)"
+        fallback_key = os.environ.get("EULERPOOL_API_KEY", "").strip()
+        service_name = "Eulerpool (.env)"
     elif target_type in ("SEARCH", "SCRAPING"):
-        fallback_key = os.environ.get("FIRECRAWL_API_KEY", "fc-6bcc8f9252e54fc5861ee5ae421c42c7").strip()
-        service_name = "Firecrawl Fallback (.env)"
+        fallback_key = os.environ.get("FIRECRAWL_API_KEY", "").strip() or os.environ.get("TAVILY_API_KEY", "").strip()
+        service_name = "Search/Scraping (.env)"
 
     if fallback_key:
         return [{
