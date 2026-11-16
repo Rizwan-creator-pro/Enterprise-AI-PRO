@@ -112,6 +112,20 @@ STOCK_SYMBOL_MAP = {
     "fauji cement": "FCCL",
     "fccl": "FCCL",
     "pakola": "PKL",
+    "bilf": "BILF",
+    "bilal fibres": "BILF",
+    "bilal fibres limited": "BILF",
+    "bilal fibers": "BILF",
+    "ctm": "CTM",
+    "colony textile": "CTM",
+    "colony textile mills": "CTM",
+    "cwsm": "CWSM",
+    "chakwal spinning": "CWSM",
+    "chakwal spinning mills": "CWSM",
+    "pglc": "PGLC",
+    "pak-gulf leasing": "PGLC",
+    "ffbl": "FFBL",
+    "fauji fertilizer bin qasim": "FFBL",
 
     # Global Stocks
     "apple": "AAPL",
@@ -329,6 +343,10 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
         if cand and len(cand) > 1 and cand not in ["dollar", "usd", "gold", "bitcoin", "weather", "kse", "psx", "fuel", "petrol", "diesel", "oil"]:
             if cand in STOCK_SYMBOL_MAP:
                 return STOCK_SYMBOL_MAP[cand]
+            # Try dynamic name-to-ticker resolution
+            resolved = resolve_psx_symbol_from_name(cand)
+            if resolved:
+                return resolved
             return cand.upper()
 
     # 4. Check for direct uppercase ticker pattern e.g. "AAPL", "LUCK.KA", "JKSM", "SHDT"
@@ -367,24 +385,76 @@ def extract_stock_intent(text: str, history: Optional[List[Dict[str, Any]]] = No
     return None
 
 
+def resolve_psx_symbol_from_name(name: str) -> Optional[str]:
+    """Resolves a company name (e.g. 'Bilal Fibres', 'Colony Textile') to its official PSX ticker symbol."""
+    if not name:
+        return None
+    name_clean = name.strip().lower()
+    if name_clean in STOCK_SYMBOL_MAP:
+        return STOCK_SYMBOL_MAP[name_clean]
+    for k, v in sorted(STOCK_SYMBOL_MAP.items(), key=lambda x: len(x[0]), reverse=True):
+        if k in name_clean or (len(name_clean) > 4 and name_clean in k):
+            return v
+    # Try dynamic web search resolution
+    try:
+        from agent.firecrawl_intelligence import search_web
+        q = f"{name} Pakistan stock exchange PSX ticker symbol"
+        res = search_web(q, limit=2)
+        if res and res.get("results"):
+            text = " ".join([r.get("title", "") + " " + r.get("description", "") for r in res["results"]])
+            cands = re.findall(r'\b([A-Z]{2,6})\b', text)
+            stop = {"PSX", "KSE", "PKR", "THE", "AND", "FOR", "LTD", "INC", "CORP", "STOCK", "SHARE", "INDEX", "DPS", "COMP", "PRICE", "TODAY", "USA", "SEC", "CEO"}
+            for cand in cands:
+                if cand in stop or cand in GLOBAL_STOCK_SYMBOLS:
+                    continue
+                psx = fetch_psx_company(cand)
+                if psx and psx.get("price") is not None:
+                    STOCK_SYMBOL_MAP[name_clean] = cand
+                    STOCK_SYMBOL_MAP[cand.lower()] = cand
+                    if psx.get("company_name"):
+                        STOCK_SYMBOL_MAP[psx["company_name"].lower()] = cand
+                    return cand
+    except Exception as e:
+        logger.debug(f"Dynamic PSX symbol resolution notice: {e}")
+    return None
+
+
 def is_psx_stock(symbol_or_query: str) -> bool:
     """Checks if a stock symbol or company name refers to the Pakistan Stock Exchange (PSX)."""
     if not symbol_or_query:
         return False
     s = str(symbol_or_query).strip()
-    if s.upper() in ["PSX", "KSE", "PSX_INDEX", "KSE-100", "KSE100"]:
-        return True
     clean_s = s.upper().replace(".KA", "")
+    if clean_s in ["PSX", "KSE", "PSX_INDEX", "KSE-100", "KSE100"]:
+        return True
     if clean_s in GLOBAL_STOCK_SYMBOLS:
         return False
     if clean_s in STOCK_SYMBOL_MAP.values():
         return True
     s_low = s.lower()
-    if any(k in s_low for k in ["psx", "kse", "karachi stock", "pakistan stock"]):
+    if any(k in s_low for k in ["psx", "kse", "karachi stock", "pakistan stock", "dps.psx"]):
         return True
     for name in STOCK_SYMBOL_MAP.keys():
         if name in s_low:
             return True
+    # Common Pakistani industrial sectors / company terms
+    if any(k in s_low for k in ["spinning", "fibres", "textile", "mills", "sugar", "cement", "fertilizer", "refinery", "chemical", "modaraba"]):
+        return True
+    # Dynamic ticker check: Any 2-6 character uppercase alphanumeric symbol that isn't global
+    if re.match(r'^[A-Z0-9]{2,6}$', clean_s):
+        try:
+            psx_res = fetch_psx_company(clean_s)
+            if psx_res and psx_res.get("price") is not None:
+                STOCK_SYMBOL_MAP[clean_s.lower()] = clean_s
+                if psx_res.get("company_name"):
+                    STOCK_SYMBOL_MAP[psx_res["company_name"].lower()] = clean_s
+                return True
+        except Exception:
+            pass
+    # If full company name, try resolving to PSX ticker
+    resolved = resolve_psx_symbol_from_name(s)
+    if resolved:
+        return True
     return False
 
 def fetch_psx_indices() -> Optional[Dict[str, Any]]:
@@ -678,29 +748,43 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
     """
     q_norm = symbol_or_query.strip().lower()
     clean_sym = STOCK_SYMBOL_MAP.get(q_norm) or symbol_or_query.strip().upper().replace(".KA", "")
+    
+    # If clean_sym looks like a company name (spaces or length > 6), attempt PSX resolution
+    if (len(clean_sym) > 6 or " " in clean_sym) and clean_sym not in GLOBAL_STOCK_SYMBOLS:
+        res_sym = resolve_psx_symbol_from_name(symbol_or_query)
+        if res_sym:
+            clean_sym = res_sym
     sym = clean_sym
 
-    # 1. Check if it's a known PSX symbol or mapped Pakistani company
+    # 1. Check if it's a known PSX symbol or Pakistani company
     is_global = clean_sym in GLOBAL_STOCK_SYMBOLS or any(clean_sym == sym_alias for sym_alias in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"])
     is_psx = (
         not is_global
         and (
             symbol_or_query.strip().upper().endswith(".KA")
-            or any(k in symbol_or_query.lower() for k in ["spinning", "mills", "cement", "fertilizer", "sugar", "pakistan", "textile", "psx", "kse", "interloop"])
+            or bool(re.match(r'^[A-Z0-9]{2,6}$', clean_sym))
+            or any(k in symbol_or_query.lower() for k in ["spinning", "fibres", "textile", "mills", "cement", "fertilizer", "sugar", "pakistan", "psx", "kse", "interloop", "modaraba", "refinery", "chemical"])
             or (clean_sym in STOCK_SYMBOL_MAP.values() and clean_sym not in GLOBAL_STOCK_SYMBOLS)
         )
     )
 
     if is_psx:
-        # Tier 1A: Investify.pk (Primary resilient scraper for Render cloud hosting)
+        # Tier 1A: Direct PSX Data Portal (Authoritative official live quotes for all 500+ listed companies)
+        psx_data = fetch_psx_company(clean_sym)
+        if psx_data and psx_data.get("price") is not None and psx_data["price"] > 0:
+            STOCK_SYMBOL_MAP[clean_sym.lower()] = clean_sym
+            if psx_data.get("company_name"):
+                c_name = psx_data["company_name"].strip()
+                STOCK_SYMBOL_MAP[c_name.lower()] = clean_sym
+                s_name = c_name.lower().replace("limited", "").replace("ltd", "").strip()
+                if s_name:
+                    STOCK_SYMBOL_MAP[s_name] = clean_sym
+            return psx_data
+
+        # Tier 1B: Investify.pk (Resilient scraper for cloud hosting environments)
         inv_data = fetch_investify_stock(clean_sym)
         if inv_data and inv_data.get("price") is not None and inv_data["price"] > 0:
             return inv_data
-
-        # Tier 1B: PSX Data Portal
-        psx_data = fetch_psx_company(clean_sym)
-        if psx_data and psx_data.get("price") is not None and psx_data["price"] > 0:
-            return psx_data
 
     # 2. Try Yahoo Finance API
     quote_res = None
