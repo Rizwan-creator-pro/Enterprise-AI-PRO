@@ -4961,6 +4961,334 @@
             }
         }
 
+        /* ================= Enterprise Admin Console (Full Page Site Settings) ================= */
+        .admin-console-view {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            inset: 0;
+            background: var(--bg-color, #f8fafc);
+            z-index: 56;
+            overflow: hidden;
+            animation: fadeIn .2s ease;
+        }
+        .admin-view-body {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            position: relative;
+        }
+        .admin-sidebar {
+            width: 250px;
+            min-width: 220px;
+            max-width: 270px;
+            background: var(--surface, #ffffff);
+            border-right: 1px solid var(--border-color, #e5e7eb);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+            padding: 20px 14px;
+            gap: 20px;
+        }
+        .admin-sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 6px 12px;
+            border-bottom: 1px solid var(--border-color, #e5e7eb);
+        }
+        .admin-brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: #0ea5e9;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+        .admin-brand-text {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .admin-brand-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-main, #0f172a);
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .admin-brand-sub {
+            font-size: 11px;
+            color: var(--text-muted, #64748b);
+        }
+        .admin-nav-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .admin-nav-header {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--text-muted, #94a3b8);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 8px 4px;
+        }
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-muted, #475569);
+            cursor: pointer;
+            transition: 0.15s ease;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .admin-nav-item:hover {
+            background: var(--sidebar-hover, #f1f5f9);
+            color: var(--text-main, #0f172a);
+        }
+        .admin-nav-item.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            font-weight: 600;
+        }
+        .admin-nav-item i {
+            font-size: 13.5px;
+            width: 18px;
+            text-align: center;
+        }
+        .admin-main-pane {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 28px 36px 80px;
+            background: var(--bg-color, #f8fafc);
+        }
+        .admin-container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        .admin-page-header {
+            margin-bottom: 24px;
+        }
+        .admin-page-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-main, #0f172a);
+            letter-spacing: -0.02em;
+            margin: 0 0 6px;
+        }
+        .admin-page-sub {
+            font-size: 13.5px;
+            color: var(--text-muted, #64748b);
+            margin: 0;
+        }
+        .admin-card {
+            background: var(--surface, #ffffff);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 12px;
+            padding: 22px 24px;
+            margin-bottom: 22px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            position: relative;
+        }
+        .admin-card.accent-green { border-left: 4px solid #10b981; }
+        .admin-card.accent-blue { border-left: 4px solid #3b82f6; }
+        .admin-card.accent-amber { border-left: 4px solid #f59e0b; }
+        .admin-card.accent-purple { border-left: 4px solid #8b5cf6; }
+        .admin-card.accent-indigo { border-left: 4px solid #6366f1; }
+        .admin-card.accent-cyan { border-left: 4px solid #06b6d4; }
+        .admin-card.accent-emerald { border-left: 4px solid #059669; }
+
+        .admin-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .admin-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main, #0f172a);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .admin-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px 20px;
+        }
+        @media (max-width: 768px) {
+            .admin-form-grid {
+                grid-template-columns: 1fr;
+            }
+            .admin-sidebar {
+                display: none;
+            }
+            .admin-main-pane {
+                padding: 16px 14px 60px;
+            }
+        }
+        .admin-form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .admin-form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        .admin-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted, #64748b);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .admin-label .tip {
+            color: #94a3b8;
+            cursor: help;
+            font-size: 11px;
+        }
+        .admin-input, .admin-textarea {
+            width: 100%;
+            background: var(--surface-2, #f8fafc);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 13.5px;
+            color: var(--text-main, #0f172a);
+            outline: none;
+            transition: border-color .15s ease, box-shadow .15s ease;
+            box-sizing: border-box;
+        }
+        .admin-input:focus, .admin-textarea:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            background: var(--surface, #ffffff);
+        }
+        .admin-textarea {
+            resize: vertical;
+            min-height: 70px;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        .admin-locked-input {
+            display: flex;
+            align-items: center;
+            background: var(--surface-2, #f1f5f9);
+            border: 1px solid var(--border-color, #cbd5e1);
+            border-radius: 8px;
+            padding: 8px 12px;
+            gap: 10px;
+        }
+        .admin-locked-input i {
+            color: #3b82f6;
+            font-size: 13px;
+        }
+        .admin-locked-input input {
+            border: none;
+            background: transparent;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12.5px;
+            color: var(--text-main, #334155);
+            flex: 1;
+            outline: none;
+            cursor: not-allowed;
+        }
+        .admin-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 8px;
+            background: var(--surface, #ffffff);
+            margin-top: 8px;
+        }
+        .admin-data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            text-align: left;
+        }
+        .admin-data-table th {
+            background: var(--surface-2, #f8fafc);
+            color: var(--text-muted, #475569);
+            font-weight: 600;
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .admin-data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color, #f1f5f9);
+            color: var(--text-main, #1e293b);
+        }
+        .admin-data-table tr:last-child td {
+            border-bottom: none;
+        }
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .admin-badge.success {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .admin-badge.info {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .admin-badge.warning {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        .admin-save-btn {
+            background: #0f172a;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 11px 26px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all .15s ease;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        }
+        .admin-save-btn:hover {
+            background: #1e293b;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+        }
+        .admin-save-btn:active {
+            transform: translateY(0);
+        }
+
     </style>
 </head>
 <body>
@@ -5238,6 +5566,221 @@
                         <ul class="doc-toc-nav" id="docTocNav"></ul>
                     </aside>
                     <main class="doc-content-pane" id="docContentPane"></main>
+                </div>
+            </div>
+
+            <!-- Enterprise Admin Console / Site Settings & Agent Control View (Full Page) -->
+            <div class="table-explorer-view admin-console-view" id="adminConsoleView" style="display:none;">
+                <div class="et-topbar">
+                    <div class="et-title-wrap">
+                        <button type="button" class="et-back-btn" onclick="closeAdminConsole()" title="Back to Chat"><i class="fa-solid fa-arrow-left"></i> <span>Back to Chat</span></button>
+                        <div class="et-title">
+                            <span class="et-title-desktop"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Enterprise Admin Center</span>
+                            <span class="admin-badge success et-title-desktop"><i class="fa-solid fa-circle-check"></i> ADMIN VERIFIED</span>
+                            <span class="et-title-mobile">Site Settings</span>
+                        </div>
+                    </div>
+                    <div class="et-top-actions">
+                        <button type="button" class="admin-save-btn" onclick="saveAdminSettings()" style="padding:7px 18px; font-size:12.5px;">
+                            <i class="fa-solid fa-floppy-disk"></i> <span>Save Settings</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-view-body">
+                    <!-- Left Sidebar (APEX Store Admin Center style) -->
+                    <aside class="admin-sidebar" id="adminSidebar">
+                        <div class="admin-sidebar-brand">
+                            <div class="admin-brand-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                            <div class="admin-brand-text">
+                                <span class="admin-brand-title">Admin Center</span>
+                                <span class="admin-brand-sub">Oracle Autonomous V2.4</span>
+                            </div>
+                        </div>
+
+                        <div class="admin-nav-group">
+                            <div class="admin-nav-header">Navigation</div>
+                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole()"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
+                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole(); openTableExplorer();"><i class="fa-solid fa-database"></i> <span>Products & Datasets</span></a>
+                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole(); openDocExplorer();"><i class="fa-solid fa-book-open"></i> <span>Guides & Architecture</span></a>
+                            <a class="admin-nav-item active" href="javascript:void(0)"><i class="fa-solid fa-sliders"></i> <span>Site Settings</span></a>
+                            <a class="admin-nav-item" href="javascript:void(0)" onclick="openUsageDashboard();"><i class="fa-solid fa-chart-line"></i> <span>Analytics & Usage</span></a>
+                        </div>
+
+                        <div class="admin-nav-group">
+                            <div class="admin-nav-header">System</div>
+                            <a class="admin-nav-item" href="#secMasterLink"><i class="fa-solid fa-link"></i> <span>Autonomous Master Link</span></a>
+                            <a class="admin-nav-item" href="#secProviders"><i class="fa-solid fa-microchip"></i> <span>AI Providers</span></a>
+                            <a class="admin-nav-item" href="#secExternalApis"><i class="fa-solid fa-network-wired"></i> <span>External APIs</span></a>
+                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole()"><i class="fa-solid fa-right-from-bracket"></i> <span>Return to Chat</span></a>
+                        </div>
+                    </aside>
+
+                    <!-- Main Content Pane -->
+                    <main class="admin-main-pane" id="adminMainPane">
+                        <div class="admin-container">
+                            <div class="admin-page-header">
+                                <h1 class="admin-page-title">Site Settings</h1>
+                                <p class="admin-page-sub">Configure enterprise branding, file export watermarks, single read-only autonomous master link, AI models, and external APIs.</p>
+                            </div>
+
+                            <!-- Card 1: Identity & Enterprise Branding -->
+                            <div class="admin-card accent-green" id="secIdentity">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-id-badge" style="color:#10b981;"></i> Identity & Enterprise Branding</div>
+                                    <span class="admin-badge success">Live Synchronized</span>
+                                </div>
+                                <div class="admin-form-grid">
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Owner / Developer Name <span class="tip" title="Primary owner or system architect name">?</span></label>
+                                        <input type="text" class="admin-input" id="adminOwnerName" placeholder="e.g. M. Rizwan" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Site Name / App Name <span class="tip" title="Application display name shown in header and browser title">?</span></label>
+                                        <input type="text" class="admin-input" id="adminAppName" placeholder="e.g. Enterprise AI Hub" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Top-Bar Mark <span class="tip" title="Short domain or corporate mark shown in the header">?</span></label>
+                                        <input type="text" class="admin-input" id="adminTopbarMark" placeholder="e.g. digitalcreator.tech" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">CV / Resume Link <span class="tip" title="External URL or document link for resume/portfolio">?</span></label>
+                                        <input type="text" class="admin-input" id="adminResumeLink" placeholder="cv.pdf or https://..." />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Company Name (For Export Files) <span class="tip" title="Company name applied on all PDF, Word, Excel, and PowerPoint headers and creators">?</span></label>
+                                        <input type="text" class="admin-input" id="adminCompanyName" placeholder="e.g. Enterprise AI" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Document Watermark Text <span class="tip" title="Confidentiality watermark stamp embedded on document exports">?</span></label>
+                                        <input type="text" class="admin-input" id="adminWatermarkText" placeholder="e.g. Enterprise AI Hub • Confidential" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Footer & Navigation -->
+                            <div class="admin-card accent-blue" id="secFooter">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-window-maximize" style="color:#3b82f6;"></i> Footer & Navigation</div>
+                                </div>
+                                <div class="admin-form-group full-width">
+                                    <label class="admin-label">Footer Tagline & Copyright <span class="tip" title="Tagline and copyright statement rendered at footer of reports and interface">?</span></label>
+                                    <textarea class="admin-textarea" id="adminFooterTagline" placeholder="Oracle APEX developer — building production utilities for classic report reporting, exports, and formatting."></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Contact Details -->
+                            <div class="admin-card accent-amber" id="secContact">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-address-book" style="color:#f59e0b;"></i> Contact Details</div>
+                                </div>
+                                <div class="admin-form-grid">
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Email <span class="tip" title="Support email address">?</span></label>
+                                        <input type="email" class="admin-input" id="adminContactEmail" placeholder="you@example.com" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Phone (Display Format) <span class="tip" title="Human-readable phone format">?</span></label>
+                                        <input type="text" class="admin-input" id="adminContactPhone" placeholder="+92 323 700 4270" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Phone (Digits Only, For Tel: Links) <span class="tip" title="Digits only with country code for phone links">?</span></label>
+                                        <input type="text" class="admin-input" id="adminContactPhoneDigits" placeholder="923237004270" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">WhatsApp Number (Digits Only) <span class="tip" title="WhatsApp phone number with country code">?</span></label>
+                                        <input type="text" class="admin-input" id="adminWhatsappNumber" placeholder="923237004270" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Master Connection Link (Single Unified Engine) -->
+                            <div class="admin-card accent-indigo" id="secMasterLink">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-lock" style="color:#6366f1;"></i> Master Connection Link (Single Unified Engine)</div>
+                                    <span class="admin-badge success" id="adminConnectionStatusBadge"><i class="fa-solid fa-circle-check"></i> Connected & Operational</span>
+                                </div>
+                                <div class="admin-form-group full-width">
+                                    <label class="admin-label">Master Autonomous ORDS REST Endpoint (Strictly Read-Only in UI) <span class="tip" title="Single master link to Autonomous Database engine">?</span></label>
+                                    <div class="admin-locked-input">
+                                        <i class="fa-solid fa-lock" title="Read-Only Security Lock"></i>
+                                        <input type="text" id="adminMasterOrdsUrl" readonly disabled value="https://g086cd062cdff6a-services.adb.ap-singapore-1.oraclecloudapps.com/ords/aiagent/engine" />
+                                    </div>
+                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:6px; display:flex; align-items:center; gap:6px;">
+                                        <i class="fa-solid fa-shield-halved" style="color:#6366f1;"></i>
+                                        <span><b>Perimeter Security Policy:</b> Configured strictly in server environment / <code>.env</code>. UI editing is permanently locked to prevent database redirection attacks.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 5: AI Model Providers (AI_PROVIDERS) -->
+                            <div class="admin-card accent-cyan" id="secProviders">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-microchip" style="color:#06b6d4;"></i> AI Model Providers (Oracle Table: <code>AI_PROVIDERS</code>)</div>
+                                    <span class="admin-badge info" id="adminProvidersCountBadge">0 Providers</span>
+                                </div>
+                                <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 10px;">
+                                    Dynamically fetched from Oracle APEX autonomous database via ORDS endpoint <code>/engine/providers</code>. Automatic model routing and latency-based failover are enabled.
+                                </p>
+                                <div class="admin-table-wrap">
+                                    <table class="admin-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Provider Name</th>
+                                                <th>Model Name</th>
+                                                <th>Priority Order</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="adminProvidersTableBody">
+                                            <tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading AI Providers from Oracle DB...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Card 6: External API Integrations (AI_EXTERNAL_APIS) -->
+                            <div class="admin-card accent-emerald" id="secExternalApis">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-network-wired" style="color:#059669;"></i> External API Integrations (Oracle Table: <code>AI_EXTERNAL_APIS</code>)</div>
+                                    <span class="admin-badge success" id="adminExternalApisCountBadge">3 Active APIs</span>
+                                </div>
+                                <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 10px;">
+                                    Configured in Oracle APEX schema <code>AIAGENT</code> table <code>AI_EXTERNAL_APIS</code> (Image 2). Supports multi-key rotation and automatic failover for live web search and institutional equity data.
+                                </p>
+                                <div class="admin-table-wrap">
+                                    <table class="admin-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>API ID</th>
+                                                <th>Service Name</th>
+                                                <th>API Type</th>
+                                                <th>Endpoint URL</th>
+                                                <th>API Key (Masked)</th>
+                                                <th>Priority</th>
+                                                <th>Daily Limit</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="adminExternalApisTableBody">
+                                            <tr><td colspan="8" style="text-align:center; padding:18px; color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading External APIs...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Action -->
+                            <div style="margin-top:28px; margin-bottom:40px; display:flex; align-items:center; gap:16px;">
+                                <button type="button" class="admin-save-btn" onclick="saveAdminSettings()">
+                                    <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                                </button>
+                                <button type="button" class="et-back-btn" onclick="closeAdminConsole()" style="padding:10px 20px; font-size:13.5px;">
+                                    <i class="fa-solid fa-arrow-left"></i> Back to Chat
+                                </button>
+                            </div>
+                        </div>
+                    </main>
                 </div>
             </div>
 
@@ -11153,100 +11696,218 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         }
 
         async function openAdminConsole() {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    title: '<i class="fa-solid fa-shield-halved" style="color:#1a73e8;"></i> Enterprise Admin Console',
-                    html: '<div style="padding:20px; text-align:center;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px; color:#1a73e8;"></i><p style="margin-top:10px; font-size:13px; color:var(--text-muted);">Connecting to Oracle Autonomous Engine...</p></div>',
-                    width: 720,
-                    showConfirmButton: false,
-                    showCloseButton: true
-                });
-            }
-
-            try {
-                const res = await fetch('/api/admin/system-config');
-                if (res.status === 403) {
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Access Restricted',
-                            text: 'Admin Console is strictly reserved for administrative accounts.',
-                            confirmButtonColor: '#1a73e8'
-                        });
-                    } else {
-                        alert('Access restricted to administrators.');
-                    }
-                    return;
-                }
-                if (!res.ok) throw new Error('Failed to retrieve system configuration');
-                const cfg = await res.json();
-
-                const html = `
-                <div style="text-align:left; font-size:13px; color:var(--text-primary); padding:4px 8px;">
-                    <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:10px; padding:16px; margin-bottom:16px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                            <span style="font-weight:700; font-size:12px; text-transform:uppercase; color:var(--accent-blue); letter-spacing:0.5px;">
-                                <i class="fa-solid fa-database"></i> Master Connection Link (Single Unified Engine)
-                            </span>
-                            <span style="background:#e6f4ea; color:#137333; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">
-                                <i class="fa-solid fa-circle-check"></i> ${escapeHtml(cfg.connection_status || 'Operational')}
-                            </span>
-                        </div>
-                        <div style="display:flex; align-items:center; background:var(--surface-1); border:1px solid var(--border-color); border-radius:8px; padding:10px 12px; margin-top:6px;">
-                            <i class="fa-solid fa-lock" style="color:#1a73e8; margin-right:10px; font-size:14px;" title="Read-Only Security Lock"></i>
-                            <input type="text" value="${escapeHtml(cfg.master_ords_url || '')}" readonly disabled style="width:100%; border:none; background:transparent; font-family:monospace; font-size:12px; color:var(--text-primary); cursor:not-allowed;" />
-                        </div>
-                        <div style="display:flex; align-items:center; margin-top:8px; font-size:11px; color:var(--text-muted, #70757a);">
-                            <i class="fa-solid fa-shield-halved" style="margin-right:6px; color:#1a73e8;"></i>
-                            <span><b>Read-Only Master Link:</b> Configured strictly in server code / .env. Cannot be edited from UI to ensure perimeter security.</span>
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
-                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
-                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Active AI Providers</div>
-                            <div style="font-size:22px; font-weight:800; color:#1a73e8; margin-top:4px;">${cfg.active_providers_count || 0}</div>
-                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Dynamic from Oracle DB</div>
-                        </div>
-                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
-                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">External API Keys</div>
-                            <div style="font-size:22px; font-weight:800; color:#188038; margin-top:4px;">${cfg.active_external_apis_count || 0}</div>
-                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Dynamic from Oracle DB</div>
-                        </div>
-                        <div style="background:var(--surface-2); border:1px solid var(--border-color); border-radius:8px; padding:12px; text-align:center;">
-                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Enterprise Tables</div>
-                            <div style="font-size:22px; font-weight:800; color:#f2994a; margin-top:4px;">${cfg.active_endpoints_count || 0}</div>
-                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">User-Assigned via APEX</div>
-                        </div>
-                    </div>
-
-                    <div style="background:rgba(26,115,232,0.06); border:1px solid rgba(26,115,232,0.2); border-radius:8px; padding:12px; font-size:11.5px; line-height:1.5;">
-                        <div style="font-weight:700; color:#1a73e8; margin-bottom:4px;">
-                            <i class="fa-solid fa-certificate"></i> Zero-Hardcoding Architecture Verified
-                        </div>
-                        <div>All external keys, AI models, and endpoint schemas are dynamically loaded from your Oracle APEX tables (<code>PROVIDERS</code>, <code>AI_EXTERNAL_APIS</code>, <code>USER_ENDPOINTS</code>) through the single master link above. No API keys or mock fallback data are hardcoded in application code.</div>
-                    </div>
-                </div>`;
-
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: '<i class="fa-solid fa-shield-halved" style="color:#1a73e8;"></i> Enterprise Admin Console',
-                        html: html,
-                        width: 720,
-                        confirmButtonText: 'Done',
-                        confirmButtonColor: '#1a73e8',
-                        scrollbarPadding: false,
-                        showCloseButton: true
-                    });
-                }
-            } catch (err) {
+            if (!isUserAdmin()) {
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Admin Console Error',
-                        text: err.message || 'Could not load admin system configuration.',
+                        title: 'Access Restricted',
+                        text: 'Site Settings & Admin Console are strictly reserved for administrative accounts.',
                         confirmButtonColor: '#1a73e8'
                     });
+                } else {
+                    alert('Access restricted to administrators.');
+                }
+                return;
+            }
+
+            const adminView = document.getElementById('adminConsoleView');
+            const chatScroll = document.querySelector('.chat-scroll-area');
+            const inputWrap = document.querySelector('.input-wrapper');
+            const expView = document.getElementById('tableExplorerView');
+            const docView = document.getElementById('docExplorerView');
+
+            if (expView) expView.style.display = 'none';
+            if (docView) docView.style.display = 'none';
+            if (chatScroll) chatScroll.style.display = 'none';
+            if (inputWrap) inputWrap.style.display = 'none';
+
+            if (adminView) {
+                adminView.style.display = 'flex';
+                await loadAdminConsoleData();
+            }
+        }
+
+        function closeAdminConsole() {
+            const adminView = document.getElementById('adminConsoleView');
+            const chatScroll = document.querySelector('.chat-scroll-area');
+            const inputWrap = document.querySelector('.input-wrapper');
+
+            if (adminView) adminView.style.display = 'none';
+            if (chatScroll) chatScroll.style.display = 'flex';
+            if (inputWrap) inputWrap.style.display = 'block';
+            setTimeout(scrollToBottom, 50);
+        }
+
+        async function loadAdminConsoleData() {
+            try {
+                // 1. Settings
+                const sRes = await fetch('/api/admin/settings');
+                if (sRes.ok) {
+                    const s = await sRes.json();
+                    if (document.getElementById('adminOwnerName')) document.getElementById('adminOwnerName').value = s.owner_name || '';
+                    if (document.getElementById('adminAppName')) document.getElementById('adminAppName').value = s.app_name || '';
+                    if (document.getElementById('adminTopbarMark')) document.getElementById('adminTopbarMark').value = s.topbar_mark || '';
+                    if (document.getElementById('adminResumeLink')) document.getElementById('adminResumeLink').value = s.resume_link || '';
+                    if (document.getElementById('adminCompanyName')) document.getElementById('adminCompanyName').value = s.company_name || '';
+                    if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.watermark_text || '';
+                    if (document.getElementById('adminFooterTagline')) document.getElementById('adminFooterTagline').value = s.footer_tagline || '';
+                    if (document.getElementById('adminContactEmail')) document.getElementById('adminContactEmail').value = s.contact_email || '';
+                    if (document.getElementById('adminContactPhone')) document.getElementById('adminContactPhone').value = s.contact_phone || '';
+                    if (document.getElementById('adminContactPhoneDigits')) document.getElementById('adminContactPhoneDigits').value = s.contact_phone_digits || '';
+                    if (document.getElementById('adminWhatsappNumber')) document.getElementById('adminWhatsappNumber').value = s.whatsapp_number || '';
+                }
+
+                // 2. Master Link & System Stats
+                const cRes = await fetch('/api/admin/system-config');
+                if (cRes.ok) {
+                    const c = await cRes.json();
+                    if (document.getElementById('adminMasterOrdsUrl')) document.getElementById('adminMasterOrdsUrl').value = c.master_ords_url || '';
+                    if (document.getElementById('adminConnectionStatusBadge')) {
+                        document.getElementById('adminConnectionStatusBadge').innerHTML = `<i class="fa-solid fa-circle-check"></i> ${escapeHtml(c.connection_status || 'Connected & Operational')}`;
+                    }
+                }
+
+                // 3. AI Providers
+                const pRes = await fetch('/api/providers');
+                if (pRes.ok) {
+                    const pData = await pRes.json();
+                    const providers = (pData && pData.providers) ? pData.providers : (Array.isArray(pData) ? pData : []);
+                    renderAdminProviders(providers);
+                }
+
+                // 4. External APIs
+                const eRes = await fetch('/api/admin/external-apis');
+                if (eRes.ok) {
+                    const eData = await eRes.json();
+                    const apis = (eData && eData.items) ? eData.items : [];
+                    renderAdminExternalApis(apis);
+                }
+            } catch (err) {
+                console.error('Error loading admin console data:', err);
+            }
+        }
+
+        function renderAdminProviders(providers) {
+            const tbody = document.getElementById('adminProvidersTableBody');
+            const badge = document.getElementById('adminProvidersCountBadge');
+            if (badge) badge.innerText = `${providers.length} Active Providers`;
+            if (!tbody) return;
+
+            if (!providers || !providers.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-muted);">No AI providers currently loaded from ORDS.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = providers.map((p, idx) => `
+                <tr>
+                    <td style="font-family:monospace; font-weight:600; color:var(--accent-blue);">${escapeHtml(String(p.provider_id || idx + 1))}</td>
+                    <td><strong>${escapeHtml(p.provider_name || 'AI Provider')}</strong></td>
+                    <td style="font-family:monospace; font-size:12px; color:var(--text-muted);">${escapeHtml(p.model_name || 'openai/gpt-oss-120b')}</td>
+                    <td><span class="admin-badge info">Priority #${escapeHtml(String(p.priority_order || 1))}</span></td>
+                    <td><span class="admin-badge success"><i class="fa-solid fa-circle-check"></i> ACTIVE</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderAdminExternalApis(apis) {
+            const tbody = document.getElementById('adminExternalApisTableBody');
+            const badge = document.getElementById('adminExternalApisCountBadge');
+            if (badge) badge.innerText = `${apis.length} Active External APIs`;
+            if (!tbody) return;
+
+            if (!apis || !apis.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:16px; color:var(--text-muted);">No external APIs configured in Oracle table AI_EXTERNAL_APIS.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = apis.map(a => `
+                <tr>
+                    <td style="font-family:monospace; font-weight:600; color:#059669;">${escapeHtml(String(a.api_id || ''))}</td>
+                    <td><strong>${escapeHtml(a.service_name || '')}</strong></td>
+                    <td><span class="admin-badge info">${escapeHtml(a.api_type || 'SEARCH')}</span></td>
+                    <td style="font-family:monospace; font-size:11.5px; color:var(--text-muted);">${escapeHtml(a.endpoint_url || '')}</td>
+                    <td style="font-family:monospace; font-size:12px;"><code>${escapeHtml(a.api_key || '***')}</code></td>
+                    <td><span class="admin-badge info">Priority #${escapeHtml(String(a.priority_order || 1))}</span></td>
+                    <td><span style="font-size:12px; font-weight:500;">${escapeHtml(String(a.daily_limit || 'Unlimited'))}</span></td>
+                    <td><span class="admin-badge success"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(a.status || 'ACTIVE')}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        async function saveAdminSettings() {
+            const ownerName = (document.getElementById('adminOwnerName')?.value || '').trim();
+            const appName = (document.getElementById('adminAppName')?.value || '').trim();
+            const topbarMark = (document.getElementById('adminTopbarMark')?.value || '').trim();
+            const resumeLink = (document.getElementById('adminResumeLink')?.value || '').trim();
+            const companyName = (document.getElementById('adminCompanyName')?.value || '').trim();
+            const watermarkText = (document.getElementById('adminWatermarkText')?.value || '').trim();
+            const footerTagline = (document.getElementById('adminFooterTagline')?.value || '').trim();
+            const contactEmail = (document.getElementById('adminContactEmail')?.value || '').trim();
+            const contactPhone = (document.getElementById('adminContactPhone')?.value || '').trim();
+            const contactPhoneDigits = (document.getElementById('adminContactPhoneDigits')?.value || '').trim();
+            const whatsappNumber = (document.getElementById('adminWhatsappNumber')?.value || '').trim();
+
+            const payload = {
+                owner_name: ownerName,
+                app_name: appName,
+                topbar_mark: topbarMark,
+                resume_link: resumeLink,
+                company_name: companyName,
+                watermark_text: watermarkText,
+                footer_tagline: footerTagline,
+                contact_email: contactEmail,
+                contact_phone: contactPhone,
+                contact_phone_digits: contactPhoneDigits,
+                whatsapp_number: whatsappNumber
+            };
+
+            try {
+                const res = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (typeof notify === 'function') {
+                        notify('Site settings & branding saved successfully!', 'success');
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Settings Saved',
+                            text: 'Site settings, company name, and document watermarks updated successfully.',
+                            confirmButtonColor: '#10b981',
+                            timer: 2000
+                        });
+                    }
+
+                    // Dynamically apply to UI elements in real time
+                    if (appName) {
+                        document.title = appName;
+                        document.querySelectorAll('.brand-sb-title').forEach(el => el.innerText = appName);
+                    }
+                    if (window.APP_CONFIG) {
+                        window.APP_CONFIG.company_name = companyName;
+                        window.APP_CONFIG.pdf_company = companyName;
+                        window.APP_CONFIG.footer_watermark = watermarkText;
+                        if (typeof FILE_COMPANY !== 'undefined') FILE_COMPANY = companyName;
+                        if (typeof PDF_COMPANY !== 'undefined') PDF_COMPANY = companyName;
+                        if (typeof PDF_CREDIT !== 'undefined') PDF_CREDIT = watermarkText;
+                    }
+                } else {
+                    const err = await res.json();
+                    if (typeof notify === 'function') {
+                        notify(err.detail || 'Failed to save settings', 'error');
+                    } else {
+                        alert('Error: ' + (err.detail || 'Failed to save settings'));
+                    }
+                }
+            } catch (e) {
+                if (typeof notify === 'function') {
+                    notify('Network error: ' + e.message, 'error');
+                } else {
+                    alert('Network error: ' + e.message);
                 }
             }
         }
