@@ -669,7 +669,7 @@ def fetch_eulerpool_stock(symbol_or_query: str) -> Optional[Dict[str, Any]]:
         keys_pool = get_active_keys_for_type("FINANCE")
     except Exception:
         import os
-        keys_pool = [{"api_key": os.getenv("EULERPOOL_API_KEY", "eu_prod_1794002761034_8gcodzj7yue").strip()}]
+        keys_pool = [{"api_key": os.getenv("EULERPOOL_API_KEY", "").strip()}]
 
     if not keys_pool:
         return None

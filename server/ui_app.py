@@ -1832,11 +1832,11 @@ def get_admin_external_apis(request: Request):
     except Exception:
         pass
 
-    # 2. If ORDS endpoint not yet defined, read active verified configurations
+    # 2. If ORDS endpoint not yet defined, read active verified configurations from environment
     if not items:
-        tavily_key = (os.environ.get("TAVILY_API_KEY") or "tvly-1JQEg8-muIXmIFo3DrY7vR0Fqe5BbGBKO3hZVm1ZfOV5AjI1G").strip()
-        firecrawl_key = (os.environ.get("FIRECRAWL_API_KEY") or "fc-6bcc8f9252c14041b6194b6306ca27d7").strip()
-        eulerpool_key = (os.environ.get("EULERPOOL_API_KEY") or "eu_prod_1794002761034_8gcodzj7yue").strip()
+        tavily_key = (os.environ.get("TAVILY_API_KEY") or "").strip()
+        firecrawl_key = (os.environ.get("FIRECRAWL_API_KEY") or "").strip()
+        eulerpool_key = (os.environ.get("EULERPOOL_API_KEY") or "").strip()
 
         items = [
             {

@@ -10661,7 +10661,7 @@ const skeletonHTML = () => `
         }
 
         function isUserAdmin() {
-            return !!(ME && (ME.is_admin === true || ME.is_admin === 'Y' || (ME.role && ME.role.toLowerCase() === 'admin') || (ME.username && (ME.username.toLowerCase() === 'admin' || ME.username.toLowerCase() === 'nexus'))));
+            return !!(ME && (ME.is_admin === true || ME.is_admin === 'Y' || (ME.role && ME.role.toLowerCase() === 'admin')));
         }
 
         function renderExplorerTableList(filterQuery = '') {
