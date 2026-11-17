@@ -21,7 +21,8 @@ class QueryRoute(str, Enum):
     UNIVERSAL_CONVERSATIONAL = "universal_conversational"
 
 
-UNIVERSAL_ASSISTANT_SYSTEM_PROMPT = """You are Enterprise AI Hub 3.0, a world-class, general-purpose conversational AI assistant.
+def get_universal_system_prompt(app_name: str = "Enterprise AI Hub", company_name: str = "Enterprise AI") -> str:
+    return f"""You are {app_name}, a world-class, general-purpose conversational AI assistant for {company_name}.
 You possess profound expertise across computer science, software engineering, mathematics, natural sciences, data analysis, professional writing, business strategy, and education.
 
 CORE OPERATIONAL PRINCIPLES:
@@ -60,6 +61,8 @@ CORE OPERATIONAL PRINCIPLES:
    - Prime Minister of India: Narendra Modi.
    - When answering questions about current world leaders, technology versions, or open-world facts, speak definitively in the current 2026 context. NEVER recite pre-training disclaimers such as "as of June 2024", "as of my latest knowledge cutoff", or claim that 2024/2026 election outcomes are unconfirmed.
 """
+
+UNIVERSAL_ASSISTANT_SYSTEM_PROMPT = get_universal_system_prompt()
 
 
 def classify_query_route(

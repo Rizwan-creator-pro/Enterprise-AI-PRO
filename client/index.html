@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Enterprise AI Hub</title>
     <script>
-        // Set the theme before first paint so there's no light-flash on a dark-preferring device.
+        // Set theme & dynamic branding before first paint so there's zero flicker on reload.
         (function () {
             try {
                 var mode = localStorage.getItem('ai_theme_mode') || 'system';
@@ -16,8 +16,27 @@
                 document.documentElement.classList.add(localStorage.getItem('ai_authed') === '1' ? 'sk-app' : 'sk-login');
                 if (localStorage.getItem('ai_sb_collapsed') === '1') document.documentElement.classList.add('sk-collapsed');
                 if (localStorage.getItem('ai_wide_mode') === '1') document.documentElement.classList.add('sk-wide');
+
+                // Instant branding restoration from cache
+                var cachedApp = localStorage.getItem('ai_app_name');
+                if (cachedApp) {
+                    document.title = cachedApp;
+                }
             } catch (e) {}
         })();
+
+        // Pre-paint DOM branding injection
+        document.addEventListener('DOMContentLoaded', function () {
+            try {
+                var cachedApp = localStorage.getItem('ai_app_name');
+                if (cachedApp) {
+                    document.querySelectorAll('.brand-sb-title').forEach(function(el) { el.innerText = cachedApp; });
+                    document.querySelectorAll('.brand-title').forEach(function(el) { el.innerText = cachedApp; });
+                    var lg = document.querySelector('.lg-brand span');
+                    if (lg) lg.innerText = cachedApp;
+                }
+            } catch (e) {}
+        });
     </script>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -5942,6 +5961,42 @@
         }
         initMarked();
 
+        function applyAppBranding(cfg) {
+            if (!cfg) return;
+            window.APP_CONFIG = cfg;
+            const appName = (cfg.app_name || '').trim() || 'Enterprise AI Hub';
+            const companyName = (cfg.company_name || '').trim() || 'Enterprise AI';
+            const watermarkText = (cfg.footer_watermark || cfg.watermark_text || '').trim() || 'Enterprise AI Hub • Confidential';
+
+            document.title = appName;
+            document.querySelectorAll('.brand-sb-title').forEach(el => el.innerText = appName);
+            document.querySelectorAll('.brand-title').forEach(el => el.innerText = appName);
+            const lgBrand = document.querySelector('.lg-brand span');
+            if (lgBrand) lgBrand.innerText = appName;
+            document.querySelectorAll('.ma-brand').forEach(el => el.setAttribute('title', appName));
+
+            try { localStorage.setItem('ai_app_name', appName); } catch(e) {}
+            try { localStorage.setItem('ai_company_name', companyName); } catch(e) {}
+            try { localStorage.setItem('ai_watermark_text', watermarkText); } catch(e) {}
+
+            window.FILE_COMPANY = companyName;
+            window.PDF_COMPANY = companyName;
+            window.PDF_CREDIT = watermarkText;
+            if (typeof BASE_TITLE !== 'undefined') BASE_TITLE = appName;
+        }
+
+        async function syncAppBrandingConfig() {
+            try {
+                const r = await fetch('/api/config');
+                if (r.ok) {
+                    const c = await r.json();
+                    applyAppBranding(c);
+                }
+            } catch (e) {
+                console.warn('Failed to sync app config:', e);
+            }
+        }
+
         function bootAppOnLoad() {
             initWideMode();
             try { renderVoiceLang(); } catch(e) {}
@@ -5949,6 +6004,7 @@
             try { renderOutsideDb(); } catch(e) {}
             try { renderResponseDepth(); } catch(e) {}
             try { loadProviders(); } catch(e) {}
+            try { syncAppBrandingConfig(); } catch(e) {}
             bootAuth();
         }
 
@@ -11648,6 +11704,7 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                     if (document.getElementById('adminAppName')) document.getElementById('adminAppName').value = s.app_name || '';
                     if (document.getElementById('adminCompanyName')) document.getElementById('adminCompanyName').value = s.company_name || '';
                     if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.watermark_text || '';
+                    applyAppBranding(s);
                 }
 
                 // 2. Master Link & System Stats
@@ -11749,6 +11806,8 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
 
                 if (res.ok) {
                     const data = await res.json();
+                    applyAppBranding(payload);
+
                     if (typeof notify === 'function') {
                         notify('Site settings & branding saved successfully!', 'success');
                     } else if (typeof Swal !== 'undefined') {
@@ -11759,20 +11818,6 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                             confirmButtonColor: '#10b981',
                             timer: 2000
                         });
-                    }
-
-                    // Dynamically apply to UI elements in real time
-                    if (appName) {
-                        document.title = appName;
-                        document.querySelectorAll('.brand-sb-title').forEach(el => el.innerText = appName);
-                    }
-                    if (window.APP_CONFIG) {
-                        window.APP_CONFIG.company_name = companyName;
-                        window.APP_CONFIG.pdf_company = companyName;
-                        window.APP_CONFIG.footer_watermark = watermarkText;
-                        if (typeof FILE_COMPANY !== 'undefined') FILE_COMPANY = companyName;
-                        if (typeof PDF_COMPANY !== 'undefined') PDF_COMPANY = companyName;
-                        if (typeof PDF_CREDIT !== 'undefined') PDF_CREDIT = watermarkText;
                     }
                 } else {
                     const err = await res.json();
@@ -12224,6 +12269,7 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                 const r = await fetch('/api/config');
                 if (r.ok) {
                     const c = await r.json();
+                    applyAppBranding(c);
                     if (c.max_upload_images) maxUploadImages = parseInt(c.max_upload_images) || 5;
                     if (c.max_upload_docs) maxUploadDocs = parseInt(c.max_upload_docs) || 3;
                     if (c.max_image_size_mb) maxImageSizeMb = parseInt(c.max_image_size_mb) || 15;

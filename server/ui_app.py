@@ -2148,8 +2148,10 @@ PLANNER_ROUTING_SYSTEM_PROMPT = PLANNER_SYSTEM_PROMPT
 
 
 def _get_synthesizer_prompt() -> str:
-    company = _get_app_config().get("company_name", "Enterprise AI")
-    return f"""You are the senior enterprise data analyst for {company}.
+    cfg = _get_app_config()
+    company = cfg.get("company_name", "Enterprise AI")
+    app_n = cfg.get("app_name", "Enterprise AI Hub")
+    return f"""You are {app_n}'s senior enterprise data analyst for {company}.
 You deliver direct, concise, high-value answers from verified enterprise data.
 
 STRICT BREVITY & QUALITY RULES:
@@ -2179,8 +2181,10 @@ STRICT BREVITY & QUALITY RULES:
 - When answering questions about current world leaders, technology versions, or open-world facts, speak definitively in the current 2026 context. NEVER recite pre-training disclaimers such as "as of June 2024", "as of my latest knowledge cutoff", or claim that 2024 election outcomes / post-2024 events are unconfirmed."""
 
 def _get_general_synthesizer_prompt() -> str:
-    company = _get_app_config().get("company_name", "Enterprise AI")
-    return f"""You are Enterprise AI Hub's elite, dynamic intelligence assistant for {company}.
+    cfg = _get_app_config()
+    company = cfg.get("company_name", "Enterprise AI")
+    app_n = cfg.get("app_name", "Enterprise AI Hub")
+    return f"""You are {app_n}'s elite, dynamic intelligence assistant for {company}.
 You operate with advanced multi-modal reasoning, real-time external intelligence feeds, and enterprise visual analytics.
 
 CORE REASONING & PRESENTATION PRINCIPLES:
@@ -3002,7 +3006,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # STAGE 0: Enterprise AI Hub 3.0 Universal Routing Core
     # Decouples general conversational/coding/tutoring inquiries from the SQL planner
     # =========================================================================
-    from agent.universal_router import classify_query_route, QueryRoute, UNIVERSAL_ASSISTANT_SYSTEM_PROMPT
+    from agent.universal_router import classify_query_route, QueryRoute, get_universal_system_prompt
     from agent.model_router import model_router
 
     route_info = classify_query_route(
@@ -3022,7 +3026,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     ])
     if req_outside_enabled and detected_route == QueryRoute.UNIVERSAL_CONVERSATIONAL and not has_docs and not is_factual_inquiry and not any(k in req.question.lower() for k in ["search", "google", "browse", "online", "latest", "news", "website", "read url"]):
         emit("Formulating comprehensive response…")
-        universal_messages = [{"role": "system", "content": UNIVERSAL_ASSISTANT_SYSTEM_PROMPT + depth_prompt}]
+        cfg_now = _get_app_config()
+        prompt_sys = get_universal_system_prompt(cfg_now.get("app_name", "Enterprise AI Hub"), cfg_now.get("company_name", "Enterprise AI"))
+        universal_messages = [{"role": "system", "content": prompt_sys + depth_prompt}]
         universal_messages.extend(history_msgs)
 
         user_content = req.question

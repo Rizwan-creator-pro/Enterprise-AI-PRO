@@ -112,5 +112,27 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         self.assertIn('id="secExternalApis"', html)
         self.assertIn('id="emailInput"', html)
 
+        # Ensure pre-paint brand caching and instant persistence exist
+        self.assertIn('applyAppBranding', html)
+        self.assertIn('syncAppBrandingConfig', html)
+        self.assertIn("localStorage.getItem('ai_app_name')", html)
+
+    def test_dynamic_agent_name_prompt_generation(self):
+        """Validates that system prompts dynamically inject custom app name and company."""
+        from ui_app import _get_synthesizer_prompt, _get_general_synthesizer_prompt
+        from agent.universal_router import get_universal_system_prompt
+
+        custom_prompt = get_universal_system_prompt("ApexAgent", "Apex Corp")
+        self.assertIn("You are ApexAgent", custom_prompt)
+        self.assertIn("Apex Corp", custom_prompt)
+
+        synth = _get_synthesizer_prompt()
+        self.assertIsInstance(synth, str)
+        self.assertIn("You are", synth)
+
+        gen_synth = _get_general_synthesizer_prompt()
+        self.assertIsInstance(gen_synth, str)
+        self.assertIn("You are", gen_synth)
+
 if __name__ == "__main__":
     unittest.main()
