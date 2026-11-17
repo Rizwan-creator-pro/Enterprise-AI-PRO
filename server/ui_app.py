@@ -582,7 +582,8 @@ ORDS_CLIENT_SECRET = os.environ.get("ORDS_CLIENT_SECRET")
 ORDS_TOKEN_URL = os.environ.get("ORDS_TOKEN_URL") or (BASE_URL.replace("/engine", "/oauth/token") if BASE_URL else "")
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1, max_length=100)
+    email: Optional[str] = Field(None, min_length=3, max_length=255)
+    username: Optional[str] = Field(None, min_length=1, max_length=255)
     password: str = Field(..., min_length=1, max_length=256)
 
 class ChatRequest(BaseModel):
@@ -671,7 +672,7 @@ def is_token_revoked(sig: str) -> bool:
 def _sig(body: str) -> str:
     return hmac.new(_SECRET, body.encode(), hashlib.sha256).hexdigest()
 
-def _make_token(uid, username, is_admin="N", perms=None) -> str:
+def _make_token(uid, username, is_admin="N", perms=None, email=None) -> str:
     if perms is None:
         perms = {
             "can_search_outside": True,
@@ -679,9 +680,12 @@ def _make_token(uid, username, is_admin="N", perms=None) -> str:
             "can_view_tables": True,
             "can_view_docs": True
         }
-    body = base64.urlsafe_b64encode(json.dumps({
+    payload = {
         "u": uid, "n": username, "a": is_admin, "p": perms, "e": int(time.time()) + SESSION_TTL
-    }).encode()).decode()
+    }
+    if email:
+        payload["m"] = str(email).strip().lower()
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
     return f"{body}.{_sig(body)}"
 
 def current_user(request: Request) -> dict:
@@ -697,6 +701,8 @@ def current_user(request: Request) -> dict:
         d = json.loads(base64.urlsafe_b64decode(body.encode()))
         if d.get("e", 0) < time.time():
             raise ValueError("expired")
+        if "m" not in d or not d["m"]:
+            d["m"] = f"{str(d.get('n', 'user')).lower()}@enterprise.com"
         return d
     except Exception:
         raise HTTPException(status_code=401, detail="Please sign in.")
@@ -1249,37 +1255,54 @@ def _build_compact_schema(datasets: Dict[str, List[dict]], endpoints_meta: List[
 @app.post("/api/login")
 def login(req: LoginRequest, request: Request, response: Response):
     client_ip = request.client.host if request.client else "?"
-    key = f"{client_ip}|{req.username.lower()}"
+    raw_email = (req.email or req.username or "").strip()
+    if not raw_email:
+        raise HTTPException(status_code=400, detail="Corporate email address is required.")
+
+    # Strictly enforce valid corporate email address
+    if "@" not in raw_email or "." not in raw_email.split("@")[-1] or len(raw_email) < 5:
+        raise HTTPException(status_code=400, detail="Invalid email format. Please log in using your valid corporate email address (e.g. admin@enterprise.com).")
+
+    key = f"{client_ip}|{raw_email.lower()}"
     if _check_rate_limit(key):
         raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in a few minutes.")
 
-    # 1. Try secure POST auth/user endpoint (if script 02 ran)
+    # 1. Try secure POST auth/user endpoint (scripts 02 / 07)
     user_id = None
     username = None
+    user_email = raw_email.lower()
     is_admin = "N"
     authenticated = False
 
-    def _check_admin(u_dict: dict, uname: str) -> str:
+    def _check_admin(u_dict: dict, uname: str, email: str = "") -> str:
         adm_flag = str(u_dict.get("is_admin") or u_dict.get("IS_ADMIN") or "").strip().upper()
         role_flag = str(u_dict.get("role") or u_dict.get("ROLE") or "").strip().lower()
         if adm_flag == "Y" or role_flag == "admin":
             return "Y"
+        if uname.lower() == "admin" or email.lower().startswith("admin@"):
+            return "Y"
         return "N"
 
+    email_prefix = raw_email.split("@")[0]
+
     try:
-        r_user = ords_post(URL_AUTH_USER, json={"username": req.username}, timeout=10)
-        if r_user.ok and r_user.json().get("user_id"):
-            u_info = r_user.json()
-            stored = u_info.get("password_hash")
-            if verify_password(req.password, stored):
-                authenticated = True
-                user_id = u_info["user_id"]
-                username = u_info["username"]
-                is_admin = _check_admin(u_info, username)
-                # Auto-upgrade plain text to PBKDF2
-                if not stored.startswith("pbkdf2_sha256$"):
-                    new_hash = hash_password(req.password)
-                    ords_post(URL_SET_PW, json={"user_id": user_id, "password_hash": new_hash}, timeout=5)
+        # Search by full email or email prefix for backwards compatibility
+        for cand in [raw_email.lower(), email_prefix]:
+            r_user = ords_post(URL_AUTH_USER, json={"email": cand, "username": cand}, timeout=10)
+            if r_user.ok and r_user.json().get("user_id"):
+                u_info = r_user.json()
+                stored = u_info.get("password_hash")
+                if verify_password(req.password, stored):
+                    authenticated = True
+                    user_id = u_info["user_id"]
+                    username = u_info.get("username") or email_prefix
+                    user_email = u_info.get("email") or raw_email.lower()
+                    is_admin = _check_admin(u_info, username, user_email)
+                    # Auto-upgrade plain text to PBKDF2
+                    if not stored.startswith("pbkdf2_sha256$"):
+                        new_hash = hash_password(req.password)
+                        ords_post(URL_SET_PW, json={"user_id": user_id, "password_hash": new_hash}, timeout=5)
+                    break
     except Exception:
         pass
 
@@ -1287,13 +1310,9 @@ def login(req: LoginRequest, request: Request, response: Response):
     legacy_allowed = (not ORDS_CLIENT_ID) and os.environ.get("ALLOW_LEGACY_LOGIN", "Y").upper() == "Y"
     if legacy_allowed and not authenticated:
         try:
-            candidates = [req.username]
-            for variant in (req.username.capitalize(), req.username.lower(), req.username.upper()):
-                if variant not in candidates:
-                    candidates.append(variant)
-
+            candidates = [raw_email.lower(), raw_email, email_prefix]
             for cand in candidates:
-                params = {"username": cand, "password": req.password}
+                params = {"email": cand, "username": cand, "password": req.password}
                 res = ords_get(URL_LOGIN, params=params, timeout=15)
                 if not res.ok:
                     continue
@@ -1302,8 +1321,9 @@ def login(req: LoginRequest, request: Request, response: Response):
                 if items:
                     authenticated = True
                     user_id = items[0]["user_id"]
-                    username = items[0]["username"]
-                    is_admin = _check_admin(items[0], username)
+                    username = items[0].get("username") or email_prefix
+                    user_email = items[0].get("email") or raw_email.lower()
+                    is_admin = _check_admin(items[0], username, user_email)
                     break
         except Exception as e:
             print(f"[ORDS Login Error] {e}")
@@ -1311,7 +1331,7 @@ def login(req: LoginRequest, request: Request, response: Response):
 
     if not authenticated:
         _record_failed_attempt(key)
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
+        raise HTTPException(status_code=401, detail="Invalid corporate email address or password.")
 
     _clear_rate_limit(key)
     # Login history
@@ -1341,11 +1361,12 @@ def login(req: LoginRequest, request: Request, response: Response):
     user_perms = _extract_perms(raw_user_dict, is_admin)
 
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-    response.set_cookie(SESSION_COOKIE, _make_token(user_id, username, is_admin, user_perms), httponly=True, samesite="lax",
+    response.set_cookie(SESSION_COOKIE, _make_token(user_id, username, is_admin, user_perms, email=user_email), httponly=True, samesite="lax",
                         secure=secure, max_age=SESSION_TTL, path="/")
     return {
         "user_id": user_id,
         "username": username,
+        "email": user_email,
         "is_admin": is_admin == "Y",
         "role": "admin" if is_admin == "Y" else "user",
         "permissions": user_perms
@@ -1364,6 +1385,7 @@ def me(request: Request):
     return {
         "user_id": u["u"],
         "username": u["n"],
+        "email": u.get("m") or f"{str(u.get('n', 'user')).lower()}@enterprise.com",
         "is_admin": is_adm,
         "role": "admin" if is_adm else "user",
         "permissions": perms

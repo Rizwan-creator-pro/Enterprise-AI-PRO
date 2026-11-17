@@ -4981,105 +4981,16 @@
             overflow: hidden;
             position: relative;
         }
-        .admin-sidebar {
-            width: 250px;
-            min-width: 220px;
-            max-width: 270px;
-            background: var(--surface, #ffffff);
-            border-right: 1px solid var(--border-color, #e5e7eb);
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-            overflow-y: auto;
-            padding: 20px 14px;
-            gap: 20px;
-        }
-        .admin-sidebar-brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 0 6px 12px;
-            border-bottom: 1px solid var(--border-color, #e5e7eb);
-        }
-        .admin-brand-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            background: #0ea5e9;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            flex-shrink: 0;
-        }
-        .admin-brand-text {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-        }
-        .admin-brand-title {
-            font-size: 13.5px;
-            font-weight: 700;
-            color: var(--text-main, #0f172a);
-            line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .admin-brand-sub {
-            font-size: 11px;
-            color: var(--text-muted, #64748b);
-        }
-        .admin-nav-group {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-        .admin-nav-header {
-            font-size: 10.5px;
-            font-weight: 700;
-            color: var(--text-muted, #94a3b8);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0 8px 4px;
-        }
-        .admin-nav-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            color: var(--text-muted, #475569);
-            cursor: pointer;
-            transition: 0.15s ease;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .admin-nav-item:hover {
-            background: var(--sidebar-hover, #f1f5f9);
-            color: var(--text-main, #0f172a);
-        }
-        .admin-nav-item.active {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            font-weight: 600;
-        }
-        .admin-nav-item i {
-            font-size: 13.5px;
-            width: 18px;
-            text-align: center;
-        }
         .admin-main-pane {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
             padding: 28px 36px 80px;
             background: var(--bg-color, #f8fafc);
+            width: 100%;
         }
         .admin-container {
-            max-width: 960px;
+            max-width: 1040px;
             margin: 0 auto;
         }
         .admin-page-header {
@@ -5136,9 +5047,6 @@
         @media (max-width: 768px) {
             .admin-form-grid {
                 grid-template-columns: 1fr;
-            }
-            .admin-sidebar {
-                display: none;
             }
             .admin-main-pane {
                 padding: 16px 14px 60px;
@@ -5332,7 +5240,7 @@
                 <h1>Question what&rsquo;s next</h1>
                 <p class="lg-sub">Your thinking partner for big ambitions</p>
                 <div class="lg-card">
-                    <div class="lg-field"><i class="fa-regular fa-user"></i><input type="text" id="usernameInput" placeholder="Enter your username" autocomplete="off" onkeydown="if(event.key==='Enter') document.getElementById('passwordInput').focus()"></div>
+                    <div class="lg-field"><i class="fa-regular fa-envelope"></i><input type="email" id="emailInput" placeholder="Enter your corporate email address" autocomplete="email" onkeydown="if(event.key==='Enter') document.getElementById('passwordInput').focus()"></div>
                     <div class="lg-field"><i class="fa-solid fa-lock"></i><input type="password" id="passwordInput" placeholder="Enter your password" onkeydown="if(event.key==='Enter') doLogin()"><i class="fa-regular fa-eye eye" id="pwEye" onclick="togglePw()"></i></div>
                     <button class="lg-btn" id="loginBtn" type="button" onclick="doLogin()">Sign in</button>
                     <p id="systemError" class="lg-error"></p>
@@ -5588,40 +5496,12 @@
                 </div>
 
                 <div class="admin-view-body">
-                    <!-- Left Sidebar (APEX Store Admin Center style) -->
-                    <aside class="admin-sidebar" id="adminSidebar">
-                        <div class="admin-sidebar-brand">
-                            <div class="admin-brand-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                            <div class="admin-brand-text">
-                                <span class="admin-brand-title">Admin Center</span>
-                                <span class="admin-brand-sub">Oracle Autonomous V2.4</span>
-                            </div>
-                        </div>
-
-                        <div class="admin-nav-group">
-                            <div class="admin-nav-header">Navigation</div>
-                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole()"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
-                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole(); openTableExplorer();"><i class="fa-solid fa-database"></i> <span>Products & Datasets</span></a>
-                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole(); openDocExplorer();"><i class="fa-solid fa-book-open"></i> <span>Guides & Architecture</span></a>
-                            <a class="admin-nav-item active" href="javascript:void(0)"><i class="fa-solid fa-sliders"></i> <span>Site Settings</span></a>
-                            <a class="admin-nav-item" href="javascript:void(0)" onclick="openUsageDashboard();"><i class="fa-solid fa-chart-line"></i> <span>Analytics & Usage</span></a>
-                        </div>
-
-                        <div class="admin-nav-group">
-                            <div class="admin-nav-header">System</div>
-                            <a class="admin-nav-item" href="#secMasterLink"><i class="fa-solid fa-link"></i> <span>Autonomous Master Link</span></a>
-                            <a class="admin-nav-item" href="#secProviders"><i class="fa-solid fa-microchip"></i> <span>AI Providers</span></a>
-                            <a class="admin-nav-item" href="#secExternalApis"><i class="fa-solid fa-network-wired"></i> <span>External APIs</span></a>
-                            <a class="admin-nav-item" href="javascript:void(0)" onclick="closeAdminConsole()"><i class="fa-solid fa-right-from-bracket"></i> <span>Return to Chat</span></a>
-                        </div>
-                    </aside>
-
                     <!-- Main Content Pane -->
                     <main class="admin-main-pane" id="adminMainPane">
                         <div class="admin-container">
                             <div class="admin-page-header">
-                                <h1 class="admin-page-title">Site Settings</h1>
-                                <p class="admin-page-sub">Configure enterprise branding, file export watermarks, single read-only autonomous master link, AI models, and external APIs.</p>
+                                <h1 class="admin-page-title">Enterprise Admin Center</h1>
+                                <p class="admin-page-sub">Configure enterprise branding, file export watermarks, autonomous master link, AI models, and external APIs.</p>
                             </div>
 
                             <!-- Card 1: Identity & Enterprise Branding -->
@@ -5640,14 +5520,6 @@
                                         <input type="text" class="admin-input" id="adminAppName" placeholder="e.g. Enterprise AI Hub" />
                                     </div>
                                     <div class="admin-form-group">
-                                        <label class="admin-label">Top-Bar Mark <span class="tip" title="Short domain or corporate mark shown in the header">?</span></label>
-                                        <input type="text" class="admin-input" id="adminTopbarMark" placeholder="e.g. digitalcreator.tech" />
-                                    </div>
-                                    <div class="admin-form-group">
-                                        <label class="admin-label">CV / Resume Link <span class="tip" title="External URL or document link for resume/portfolio">?</span></label>
-                                        <input type="text" class="admin-input" id="adminResumeLink" placeholder="cv.pdf or https://..." />
-                                    </div>
-                                    <div class="admin-form-group">
                                         <label class="admin-label">Company Name (For Export Files) <span class="tip" title="Company name applied on all PDF, Word, Excel, and PowerPoint headers and creators">?</span></label>
                                         <input type="text" class="admin-input" id="adminCompanyName" placeholder="e.g. Enterprise AI" />
                                     </div>
@@ -5658,43 +5530,7 @@
                                 </div>
                             </div>
 
-                            <!-- Card 2: Footer & Navigation -->
-                            <div class="admin-card accent-blue" id="secFooter">
-                                <div class="admin-card-header">
-                                    <div class="admin-card-title"><i class="fa-solid fa-window-maximize" style="color:#3b82f6;"></i> Footer & Navigation</div>
-                                </div>
-                                <div class="admin-form-group full-width">
-                                    <label class="admin-label">Footer Tagline & Copyright <span class="tip" title="Tagline and copyright statement rendered at footer of reports and interface">?</span></label>
-                                    <textarea class="admin-textarea" id="adminFooterTagline" placeholder="Oracle APEX developer — building production utilities for classic report reporting, exports, and formatting."></textarea>
-                                </div>
-                            </div>
-
-                            <!-- Card 3: Contact Details -->
-                            <div class="admin-card accent-amber" id="secContact">
-                                <div class="admin-card-header">
-                                    <div class="admin-card-title"><i class="fa-solid fa-address-book" style="color:#f59e0b;"></i> Contact Details</div>
-                                </div>
-                                <div class="admin-form-grid">
-                                    <div class="admin-form-group">
-                                        <label class="admin-label">Email <span class="tip" title="Support email address">?</span></label>
-                                        <input type="email" class="admin-input" id="adminContactEmail" placeholder="you@example.com" />
-                                    </div>
-                                    <div class="admin-form-group">
-                                        <label class="admin-label">Phone (Display Format) <span class="tip" title="Human-readable phone format">?</span></label>
-                                        <input type="text" class="admin-input" id="adminContactPhone" placeholder="+92 323 700 4270" />
-                                    </div>
-                                    <div class="admin-form-group">
-                                        <label class="admin-label">Phone (Digits Only, For Tel: Links) <span class="tip" title="Digits only with country code for phone links">?</span></label>
-                                        <input type="text" class="admin-input" id="adminContactPhoneDigits" placeholder="923237004270" />
-                                    </div>
-                                    <div class="admin-form-group">
-                                        <label class="admin-label">WhatsApp Number (Digits Only) <span class="tip" title="WhatsApp phone number with country code">?</span></label>
-                                        <input type="text" class="admin-input" id="adminWhatsappNumber" placeholder="923237004270" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Card 4: Master Connection Link (Single Unified Engine) -->
+                            <!-- Card 2: Master Connection Link (Single Unified Engine) -->
                             <div class="admin-card accent-indigo" id="secMasterLink">
                                 <div class="admin-card-header">
                                     <div class="admin-card-title"><i class="fa-solid fa-lock" style="color:#6366f1;"></i> Master Connection Link (Single Unified Engine)</div>
@@ -6870,33 +6706,48 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
         async function doLogin() {
             const btn = document.getElementById('loginBtn');
             if (btn.disabled) return;                       // already signing in (double click / Enter twice)
-            const uEl = document.getElementById('usernameInput'), pEl = document.getElementById('passwordInput');
-            const u = uEl.value, p = pEl.value;
+            const uEl = document.getElementById('emailInput') || document.getElementById('usernameInput');
+            const pEl = document.getElementById('passwordInput');
+            const emailVal = (uEl ? uEl.value : '').trim();
+            const p = pEl ? pEl.value : '';
             const errBox = document.getElementById('systemError');
             errBox.style.display = 'none';
+
+            if (!emailVal) {
+                errBox.innerText = "Please enter your corporate email address.";
+                errBox.style.display = 'block';
+                return;
+            }
+            if (!emailVal.includes('@') || !emailVal.split('@')[1].includes('.')) {
+                errBox.innerText = "Invalid email format. Please enter a valid corporate email address (e.g. admin@enterprise.com).";
+                errBox.style.display = 'block';
+                return;
+            }
+
             const label = btn.innerHTML;
             btn.disabled = true; btn.innerHTML = '<span class="lg-spin"></span>Logging in...';
-            uEl.readOnly = pEl.readOnly = true;
+            if (uEl) uEl.readOnly = true;
+            if (pEl) pEl.readOnly = true;
 
             try {
                 const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username: u, password: p })
+                    body: JSON.stringify({ email: emailVal, username: emailVal, password: p })
                 });
                 if (res.ok) {
                     const data = await res.json();
                     ME = data;
                     try { localStorage.setItem('ai_authed', '1'); } catch (e) {}
-                    setUserName(data.username);
+                    setUserName(data.username || emailVal.split('@')[0]);
                     try { applyRolePermissions(ME); } catch(pe) { console.error('applyRolePermissions error:', pe); }
                     isFirstLoad = true;
                     showApp();
                     startNewSession(); loadProviders();
-                    pEl.value = '';
+                    if (pEl) pEl.value = '';
                 } else {
                     const d = await res.json().catch(() => ({}));
-                    errBox.innerText = res.status === 429 ? (d.detail || "Too many attempts.") : "Login Failed: Invalid username or password.";
+                    errBox.innerText = res.status === 429 ? (d.detail || "Too many attempts.") : (d.detail || "Login Failed: Invalid email address or password.");
                     errBox.style.display = 'block';
                 }
             } catch(e) {
@@ -6904,7 +6755,8 @@ let ME = null;   // identity lives in the server session cookie (HttpOnly); only
                 errBox.style.display = 'block';
             } finally {
                 btn.disabled = false; btn.innerHTML = label;
-                uEl.readOnly = pEl.readOnly = false;
+                if (uEl) uEl.readOnly = false;
+                if (pEl) pEl.readOnly = false;
             }
         }
 
@@ -11746,15 +11598,8 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                     const s = await sRes.json();
                     if (document.getElementById('adminOwnerName')) document.getElementById('adminOwnerName').value = s.owner_name || '';
                     if (document.getElementById('adminAppName')) document.getElementById('adminAppName').value = s.app_name || '';
-                    if (document.getElementById('adminTopbarMark')) document.getElementById('adminTopbarMark').value = s.topbar_mark || '';
-                    if (document.getElementById('adminResumeLink')) document.getElementById('adminResumeLink').value = s.resume_link || '';
                     if (document.getElementById('adminCompanyName')) document.getElementById('adminCompanyName').value = s.company_name || '';
                     if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.watermark_text || '';
-                    if (document.getElementById('adminFooterTagline')) document.getElementById('adminFooterTagline').value = s.footer_tagline || '';
-                    if (document.getElementById('adminContactEmail')) document.getElementById('adminContactEmail').value = s.contact_email || '';
-                    if (document.getElementById('adminContactPhone')) document.getElementById('adminContactPhone').value = s.contact_phone || '';
-                    if (document.getElementById('adminContactPhoneDigits')) document.getElementById('adminContactPhoneDigits').value = s.contact_phone_digits || '';
-                    if (document.getElementById('adminWhatsappNumber')) document.getElementById('adminWhatsappNumber').value = s.whatsapp_number || '';
                 }
 
                 // 2. Master Link & System Stats
@@ -11837,28 +11682,14 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         async function saveAdminSettings() {
             const ownerName = (document.getElementById('adminOwnerName')?.value || '').trim();
             const appName = (document.getElementById('adminAppName')?.value || '').trim();
-            const topbarMark = (document.getElementById('adminTopbarMark')?.value || '').trim();
-            const resumeLink = (document.getElementById('adminResumeLink')?.value || '').trim();
             const companyName = (document.getElementById('adminCompanyName')?.value || '').trim();
             const watermarkText = (document.getElementById('adminWatermarkText')?.value || '').trim();
-            const footerTagline = (document.getElementById('adminFooterTagline')?.value || '').trim();
-            const contactEmail = (document.getElementById('adminContactEmail')?.value || '').trim();
-            const contactPhone = (document.getElementById('adminContactPhone')?.value || '').trim();
-            const contactPhoneDigits = (document.getElementById('adminContactPhoneDigits')?.value || '').trim();
-            const whatsappNumber = (document.getElementById('adminWhatsappNumber')?.value || '').trim();
 
             const payload = {
                 owner_name: ownerName,
                 app_name: appName,
-                topbar_mark: topbarMark,
-                resume_link: resumeLink,
                 company_name: companyName,
-                watermark_text: watermarkText,
-                footer_tagline: footerTagline,
-                contact_email: contactEmail,
-                contact_phone: contactPhone,
-                contact_phone_digits: contactPhoneDigits,
-                whatsapp_number: whatsappNumber
+                watermark_text: watermarkText
             };
 
             try {

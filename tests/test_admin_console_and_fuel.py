@@ -2,15 +2,18 @@ import unittest
 import os
 import sys
 import json
+import base64
 from pathlib import Path
+from unittest.mock import MagicMock
 
 # Ensure server module path is available
 SERVER_DIR = Path(__file__).resolve().parent.parent / "server"
 if str(SERVER_DIR) not in sys.path:
     sys.path.insert(0, str(SERVER_DIR))
 
+from fastapi import HTTPException
 from agent.external_intelligence import fetch_live_fuel_prices, _FUEL_PRICE_CACHE
-from ui_app import _get_app_config, AdminSettingsRequest
+from ui_app import _get_app_config, AdminSettingsRequest, LoginRequest, _make_token, login
 
 class TestAdminConsoleAndFuelRates(unittest.TestCase):
     def setUp(self):
@@ -58,6 +61,56 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         self.assertEqual(req.owner_name, "Test Architect")
         self.assertEqual(req.company_name, "Apex Global Corp")
         self.assertEqual(req.watermark_text, "STRICTLY CONFIDENTIAL")
+
+    def test_email_only_login_validation(self):
+        """Validates that login strictly requires a valid corporate email address."""
+        # Non-email username should be rejected with 400
+        req_invalid = LoginRequest(username="admin", password="password123")
+        req_mock = MagicMock()
+        req_mock.client.host = "127.0.0.1"
+        res_mock = MagicMock()
+        with self.assertRaises(HTTPException) as ctx:
+            login(req_invalid, req_mock, res_mock)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("email", ctx.exception.detail.lower())
+
+    def test_token_and_email_session(self):
+        """Validates that token contains the user's verified corporate email."""
+        tok = _make_token(101, "admin", is_admin="Y", email="admin@enterprise.com")
+        self.assertIsInstance(tok, str)
+        self.assertIn(".", tok)
+        body = tok.split(".")[0]
+        data = json.loads(base64.urlsafe_b64decode(body.encode()))
+        self.assertEqual(data.get("m"), "admin@enterprise.com")
+        self.assertEqual(data.get("n"), "admin")
+        self.assertEqual(data.get("a"), "Y")
+
+    def test_admin_console_markup_sanitization(self):
+        """Validates that extra sidebar and template leftovers are absent from index.html."""
+        index_path = Path(__file__).resolve().parent.parent / "client" / "index.html"
+        html = index_path.read_text(encoding="utf-8")
+
+        # Ensure redundant inner sidebar is gone
+        self.assertNotIn('id="adminSidebar"', html)
+        self.assertNotIn('class="admin-sidebar"', html)
+
+        # Ensure template leftovers are gone
+        self.assertNotIn('id="adminTopbarMark"', html)
+        self.assertNotIn('id="adminResumeLink"', html)
+        self.assertNotIn('id="secFooter"', html)
+        self.assertNotIn('id="secContact"', html)
+        self.assertNotIn('id="adminFooterTagline"', html)
+        self.assertNotIn('id="adminContactEmail"', html)
+
+        # Ensure agent-relevant elements are present
+        self.assertIn('id="adminOwnerName"', html)
+        self.assertIn('id="adminAppName"', html)
+        self.assertIn('id="adminCompanyName"', html)
+        self.assertIn('id="adminWatermarkText"', html)
+        self.assertIn('id="secMasterLink"', html)
+        self.assertIn('id="secProviders"', html)
+        self.assertIn('id="secExternalApis"', html)
+        self.assertIn('id="emailInput"', html)
 
 if __name__ == "__main__":
     unittest.main()
