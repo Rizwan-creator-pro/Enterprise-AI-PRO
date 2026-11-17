@@ -42,6 +42,7 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         """Validates that app_config holds complete identity and file export branding fields."""
         cfg = _get_app_config()
         self.assertIn("app_name", cfg)
+        self.assertIn("app_icon", cfg)
         self.assertIn("company_name", cfg)
         self.assertIn("footer_watermark", cfg)
         self.assertIn("owner_name", cfg)
@@ -54,11 +55,13 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         req = AdminSettingsRequest(
             owner_name="Test Architect",
             app_name="Custom AI Portal",
+            app_icon="fa-solid fa-robot",
             company_name="Apex Global Corp",
             watermark_text="STRICTLY CONFIDENTIAL",
             footer_tagline="Custom legal disclaimer"
         )
         self.assertEqual(req.owner_name, "Test Architect")
+        self.assertEqual(req.app_icon, "fa-solid fa-robot")
         self.assertEqual(req.company_name, "Apex Global Corp")
         self.assertEqual(req.watermark_text, "STRICTLY CONFIDENTIAL")
 
@@ -105,17 +108,26 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         # Ensure agent-relevant elements are present
         self.assertIn('id="adminOwnerName"', html)
         self.assertIn('id="adminAppName"', html)
+        self.assertIn('id="adminAppIcon"', html)
+        self.assertIn('id="adminIconPreview"', html)
         self.assertIn('id="adminCompanyName"', html)
         self.assertIn('id="adminWatermarkText"', html)
         self.assertIn('id="secMasterLink"', html)
         self.assertIn('id="secProviders"', html)
         self.assertIn('id="secExternalApis"', html)
         self.assertIn('id="emailInput"', html)
+        self.assertIn('id="loginBrandText"', html)
+        self.assertIn('id="loginBrandIcon"', html)
+
+        # Ensure BASE_TITLE is mutable (let, not const) so branding updates don't throw TypeError
+        self.assertIn('let BASE_TITLE =', html)
+        self.assertNotIn('const BASE_TITLE =', html)
 
         # Ensure pre-paint brand caching and instant persistence exist
         self.assertIn('applyAppBranding', html)
         self.assertIn('syncAppBrandingConfig', html)
         self.assertIn("localStorage.getItem('ai_app_name')", html)
+        self.assertIn("localStorage.getItem('ai_app_icon')", html)
 
     def test_dynamic_agent_name_prompt_generation(self):
         """Validates that system prompts dynamically inject custom app name and company."""

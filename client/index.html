@@ -29,11 +29,18 @@
         document.addEventListener('DOMContentLoaded', function () {
             try {
                 var cachedApp = localStorage.getItem('ai_app_name');
+                var cachedIcon = localStorage.getItem('ai_app_icon');
                 if (cachedApp) {
-                    document.querySelectorAll('.brand-sb-title').forEach(function(el) { el.innerText = cachedApp; });
-                    document.querySelectorAll('.brand-title').forEach(function(el) { el.innerText = cachedApp; });
-                    var lg = document.querySelector('.lg-brand span');
-                    if (lg) lg.innerText = cachedApp;
+                    document.querySelectorAll('.brand-dynamic-text').forEach(function(el) { el.innerText = cachedApp; });
+                    var lgSpan = document.querySelector('#loginOverlay .lg-brand span, #loginBrandText');
+                    if (lgSpan) lgSpan.innerText = cachedApp;
+                }
+                if (cachedIcon) {
+                    document.querySelectorAll('.brand-dynamic-icon').forEach(function(el) {
+                        el.className = 'brand-dynamic-icon ' + cachedIcon;
+                    });
+                    var lgIcon = document.querySelector('#loginOverlay .lg-brand i, #loginBrandIcon');
+                    if (lgIcon) lgIcon.className = 'brand-dynamic-icon ' + cachedIcon;
                 }
             } catch (e) {}
         });
@@ -3718,6 +3725,26 @@
         .top-bar-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .brand-sb-title { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600; color: var(--text-main); white-space: nowrap; }
         .brand-sb-title .pro-badge { font-size: 9.5px; padding: 1.5px 6px; border-radius: 4px; background: var(--accent-blue); color: #fff; font-weight: 600; }
+        .admin-icon-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-2);
+            color: var(--text-muted);
+            font-size: 11.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .admin-icon-pill:hover {
+            background: var(--surface-hover);
+            color: var(--text-main);
+            border-color: var(--accent-blue);
+            transform: translateY(-1px);
+        }
         .pwa-install-btn {
             color: var(--text-muted) !important;
             border: 1px solid var(--border-color) !important;
@@ -5301,7 +5328,7 @@
     </div>
 
     <div id="loginOverlay">
-        <div class="lg-brand"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Enterprise AI Hub</span></div>
+        <div class="lg-brand"><i id="loginBrandIcon" class="brand-dynamic-icon fa-solid fa-wand-magic-sparkles"></i><span id="loginBrandText" class="brand-dynamic-text">Enterprise AI Hub</span></div>
         <div class="lg-main">
             <div class="lg-left">
                 <h1>Question what&rsquo;s next</h1>
@@ -5324,7 +5351,7 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <button type="button" class="sb-toggle" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><path d="M9.5 4.5v15"/></svg></button>
-                <span class="sb-title brand-sb-title">Enterprise AI Hub</span>
+                <span class="sb-title brand-sb-title"><i id="sidebarBrandIcon" class="brand-dynamic-icon fa-solid fa-wand-magic-sparkles" style="color:var(--accent-blue); font-size:14px; margin-right:4px;"></i><span id="sidebarBrandText" class="brand-dynamic-text">Enterprise AI Hub</span></span>
             </div>
             <button class="new-chat-btn" onclick="startNewSession()">
                 <i class="fa-solid fa-plus"></i> New Chat
@@ -5585,6 +5612,25 @@
                                     <div class="admin-form-group">
                                         <label class="admin-label">Site Name / App Name <span class="tip" title="Application display name shown in header and browser title">?</span></label>
                                         <input type="text" class="admin-input" id="adminAppName" placeholder="e.g. Enterprise AI Hub" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">App / Agent Icon <span class="tip" title="FontAwesome icon class for app logo, e.g. fa-solid fa-wand-magic-sparkles, fa-solid fa-brain, fa-solid fa-robot">?</span></label>
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <input type="text" class="admin-input" id="adminAppIcon" placeholder="e.g. fa-solid fa-wand-magic-sparkles" oninput="updateAdminIconPreview(this.value)" />
+                                            <div id="adminIconPreview" style="width:38px; height:38px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--accent-blue); flex-shrink:0;">
+                                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                            </div>
+                                        </div>
+                                        <div class="admin-icon-presets" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-wand-magic-sparkles')"><i class="fa-solid fa-wand-magic-sparkles"></i> Sparkles</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-brain')"><i class="fa-solid fa-brain"></i> Brain</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-robot')"><i class="fa-solid fa-robot"></i> Robot</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-shield-halved')"><i class="fa-solid fa-shield-halved"></i> Shield</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-bolt')"><i class="fa-solid fa-bolt"></i> Bolt</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-microchip')"><i class="fa-solid fa-microchip"></i> Microchip</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-building')"><i class="fa-solid fa-building"></i> Building</button>
+                                            <button type="button" class="admin-icon-pill" onclick="selectAdminIcon('fa-solid fa-globe')"><i class="fa-solid fa-globe"></i> Globe</button>
+                                        </div>
                                     </div>
                                     <div class="admin-form-group">
                                         <label class="admin-label">Company Name (For Export Files) <span class="tip" title="Company name applied on all PDF, Word, Excel, and PowerPoint headers and creators">?</span></label>
@@ -5961,21 +6007,61 @@
         }
         initMarked();
 
+        let CURRENT_APP_NAME = 'Enterprise AI Hub';
+        let CURRENT_APP_ICON = 'fa-solid fa-wand-magic-sparkles';
+
+        function updateAdminIconPreview(val) {
+            const el = document.getElementById('adminIconPreview');
+            if (!el) return;
+            const clean = (val || '').trim() || 'fa-solid fa-wand-magic-sparkles';
+            el.innerHTML = `<i class="${escapeHtml(clean)}"></i>`;
+        }
+        function selectAdminIcon(cls) {
+            const inp = document.getElementById('adminAppIcon');
+            if (inp) {
+                inp.value = cls;
+                updateAdminIconPreview(cls);
+            }
+        }
+
         function applyAppBranding(cfg) {
             if (!cfg) return;
             window.APP_CONFIG = cfg;
             const appName = (cfg.app_name || '').trim() || 'Enterprise AI Hub';
+            const appIcon = (cfg.app_icon || '').trim() || 'fa-solid fa-wand-magic-sparkles';
             const companyName = (cfg.company_name || '').trim() || 'Enterprise AI';
-            const watermarkText = (cfg.footer_watermark || cfg.watermark_text || '').trim() || 'Enterprise AI Hub • Confidential';
+            const watermarkText = (cfg.footer_watermark || cfg.watermark_text || '').trim() || (appName + ' • Confidential');
+
+            CURRENT_APP_NAME = appName;
+            CURRENT_APP_ICON = appIcon;
 
             document.title = appName;
-            document.querySelectorAll('.brand-sb-title').forEach(el => el.innerText = appName);
-            document.querySelectorAll('.brand-title').forEach(el => el.innerText = appName);
-            const lgBrand = document.querySelector('.lg-brand span');
+
+            // Update all dynamic brand text elements (Sidebar & Login screen)
+            document.querySelectorAll('.brand-dynamic-text').forEach(el => { el.innerText = appName; });
+            const lgBrand = document.querySelector('#loginOverlay .lg-brand span, #loginBrandText');
             if (lgBrand) lgBrand.innerText = appName;
-            document.querySelectorAll('.ma-brand').forEach(el => el.setAttribute('title', appName));
+
+            // Update all dynamic brand icon elements (Sidebar & Login screen)
+            document.querySelectorAll('.brand-dynamic-icon').forEach(el => {
+                el.className = 'brand-dynamic-icon ' + appIcon;
+            });
+            const lgBrandIcon = document.querySelector('#loginOverlay .lg-brand i, #loginBrandIcon');
+            if (lgBrandIcon) lgBrandIcon.className = 'brand-dynamic-icon ' + appIcon;
+
+            // Update AI message brand badges
+            document.querySelectorAll('.ma-brand').forEach(el => {
+                el.setAttribute('title', appName);
+                const ic = el.querySelector('i');
+                if (ic) ic.className = appIcon;
+            });
+
+            // Update empty state logo
+            const esLogo = document.querySelector('.empty-state .es-logo i');
+            if (esLogo) esLogo.className = appIcon;
 
             try { localStorage.setItem('ai_app_name', appName); } catch(e) {}
+            try { localStorage.setItem('ai_app_icon', appIcon); } catch(e) {}
             try { localStorage.setItem('ai_company_name', companyName); } catch(e) {}
             try { localStorage.setItem('ai_watermark_text', watermarkText); } catch(e) {}
 
@@ -7306,7 +7392,7 @@ const skeletonHTML = () => `
             }
             row.innerHTML = kind === 'user'
                 ? time + btn('edit-btn', 'fa-regular fa-pen-to-square', 'Edit') + btn('copy-btn', 'fa-regular fa-copy', 'Copy')
-                : `<span class="ma-brand" title="Enterprise AI Hub"><i class="fa-solid fa-wand-magic-sparkles"></i></span>` + btn('copy-btn', 'fa-regular fa-copy', 'Copy') + btn('regen-btn', 'fa-solid fa-rotate-right', 'Regenerate') + time + adminStat;
+                : `<span class="ma-brand" title="${escapeHtml(CURRENT_APP_NAME)}"><i class="${escapeHtml(CURRENT_APP_ICON)}"></i></span>` + btn('copy-btn', 'fa-regular fa-copy', 'Copy') + btn('regen-btn', 'fa-solid fa-rotate-right', 'Regenerate') + time + adminStat;
             const t = row.querySelector('.ma-time'); t.dataset.ts = msgEl.dataset.ts || ''; 
             if (+t.dataset.ts) { t.textContent = fmtAgo(+t.dataset.ts); t.dataset.full = new Date(+t.dataset.ts).toLocaleString(); }
             row.querySelector('.copy-btn').onclick = async e => {
@@ -8178,7 +8264,7 @@ const skeletonHTML = () => `
 
         // ---- running chats (sidebar spinner) + "answer ready" notifications ----
         const runningSids = new Set(), runningTitles = new Map(), serverRunning = new Map();
-        const BASE_TITLE = document.title || 'Enterprise AI Hub';
+        let BASE_TITLE = document.title || 'Enterprise AI Hub';
         function markRunning(sid, text) { runningSids.add(sid); if (text) runningTitles.set(sid, text); paintRunning(); }
         function unmarkRunning(sid) { runningSids.delete(sid); serverRunning.delete(sid); paintRunning(); }
         function paintRunning() {
@@ -9548,7 +9634,7 @@ const skeletonHTML = () => `
         const greeting = () => { const h = new Date().getHours(); return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
         function showEmpty() {   // new chat: Claude-style landing, composer centred under the greeting
             document.querySelector('#appLayout .main-content').classList.add('empty-chat');
-            document.getElementById('chatContainer').innerHTML = '<div class="empty-state"><div class="es-logo"><i class="fa-solid fa-wand-magic-sparkles"></i></div><h2></h2><p class="es-sub">Ask about your company data, build charts, or export a report.</p></div>';
+            document.getElementById('chatContainer').innerHTML = '<div class="empty-state"><div class="es-logo"><i class="' + escapeHtml(CURRENT_APP_ICON) + '"></i></div><h2></h2><p class="es-sub">Ask about your company data, build charts, or export a report.</p></div>';
             const nm = ME && ME.username ? ME.username.charAt(0).toUpperCase() + ME.username.slice(1) : '';
             document.querySelector('.empty-state h2').textContent = nm ? `${greeting()}, ${nm}` : greeting();
             renderDynamicSuggestions();
@@ -11702,6 +11788,10 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                     const s = await sRes.json();
                     if (document.getElementById('adminOwnerName')) document.getElementById('adminOwnerName').value = s.owner_name || '';
                     if (document.getElementById('adminAppName')) document.getElementById('adminAppName').value = s.app_name || '';
+                    if (document.getElementById('adminAppIcon')) {
+                        document.getElementById('adminAppIcon').value = s.app_icon || 'fa-solid fa-wand-magic-sparkles';
+                        updateAdminIconPreview(s.app_icon || 'fa-solid fa-wand-magic-sparkles');
+                    }
                     if (document.getElementById('adminCompanyName')) document.getElementById('adminCompanyName').value = s.company_name || '';
                     if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.watermark_text || '';
                     applyAppBranding(s);
@@ -11787,12 +11877,14 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         async function saveAdminSettings() {
             const ownerName = (document.getElementById('adminOwnerName')?.value || '').trim();
             const appName = (document.getElementById('adminAppName')?.value || '').trim();
+            const appIcon = (document.getElementById('adminAppIcon')?.value || '').trim() || 'fa-solid fa-wand-magic-sparkles';
             const companyName = (document.getElementById('adminCompanyName')?.value || '').trim();
             const watermarkText = (document.getElementById('adminWatermarkText')?.value || '').trim();
 
             const payload = {
                 owner_name: ownerName,
                 app_name: appName,
+                app_icon: appIcon,
                 company_name: companyName,
                 watermark_text: watermarkText
             };

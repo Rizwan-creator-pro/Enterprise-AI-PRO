@@ -166,6 +166,7 @@ def _get_app_config():
     return {
         "company_name": "Enterprise AI",
         "app_name": "Enterprise AI Hub",
+        "app_icon": "fa-solid fa-wand-magic-sparkles",
         "version": "2.4.0-PRO",
         "version_badge": "PRO",
         "pdf_company": "Enterprise AI",
@@ -1738,6 +1739,7 @@ def get_admin_system_config(request: Request):
 class AdminSettingsRequest(BaseModel):
     owner_name: Optional[str] = None
     app_name: Optional[str] = None
+    app_icon: Optional[str] = None
     company_name: Optional[str] = None
     topbar_mark: Optional[str] = None
     resume_link: Optional[str] = None
@@ -1760,6 +1762,7 @@ def get_admin_settings(request: Request):
     return {
         "owner_name": cfg.get("owner_name", "M. Rizwan"),
         "app_name": cfg.get("app_name", "Enterprise AI Hub"),
+        "app_icon": cfg.get("app_icon", "fa-solid fa-wand-magic-sparkles"),
         "company_name": cfg.get("company_name", "Enterprise AI"),
         "topbar_mark": cfg.get("topbar_mark", "enterprise.ai.corp"),
         "resume_link": cfg.get("resume_link", "https://enterprise.ai"),
@@ -1793,6 +1796,8 @@ def update_admin_settings(req: AdminSettingsRequest, request: Request):
         cfg["owner_name"] = req.owner_name.strip()
     if req.app_name is not None:
         cfg["app_name"] = req.app_name.strip()
+    if req.app_icon is not None:
+        cfg["app_icon"] = req.app_icon.strip() or "fa-solid fa-wand-magic-sparkles"
     if req.company_name is not None:
         clean_company = req.company_name.strip()
         cfg["company_name"] = clean_company
