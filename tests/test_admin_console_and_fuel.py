@@ -20,7 +20,7 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         _FUEL_PRICE_CACHE.clear()
 
     def test_official_pso_fuel_rates(self):
-        """Validates that fetch_live_fuel_prices dynamically retrieves verified OGRA / PSO rates."""
+        """Validates that fetch_live_fuel_prices dynamically retrieves verified rates from GlobalPetrolPrices and PSO."""
         fuel = fetch_live_fuel_prices("Pakistan")
         self.assertIsInstance(fuel, dict)
         self.assertIn("petrol", fuel)
@@ -31,10 +31,26 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
 
         # Dynamic live rate format validation
         if fuel.get("petrol"):
-            self.assertTrue(fuel["petrol"].startswith("Rs."))
+            self.assertTrue(fuel["petrol"].startswith("Rs.") or "PKR" in fuel["petrol"] or "USD" in fuel["petrol"])
         if fuel.get("diesel"):
-            self.assertTrue(fuel["diesel"].startswith("Rs."))
-        self.assertTrue("PSO" in fuel["source"] or "OGRA" in fuel["source"])
+            self.assertTrue(fuel["diesel"].startswith("Rs.") or "PKR" in fuel["diesel"] or "USD" in fuel["diesel"])
+        self.assertTrue("PSO" in fuel["source"] or "GlobalPetrolPrices" in fuel["source"])
+
+    def test_globalpetrolprices_worldwide_integration(self):
+        """Validates that GlobalPetrolPrices.com provides verified international and worldwide rates."""
+        # 1. Worldwide average benchmark
+        world = fetch_live_fuel_prices("Worldwide")
+        self.assertIsInstance(world, dict)
+        self.assertEqual(world["country"], "Worldwide (Global Average)")
+        self.assertIn("USD", world.get("petrol", ""))
+        self.assertIn("GlobalPetrolPrices.com", world.get("source", ""))
+
+        # 2. International country benchmark (USA)
+        usa = fetch_live_fuel_prices("USA")
+        self.assertIsInstance(usa, dict)
+        self.assertEqual(usa["country"], "USA")
+        self.assertIn("USD", usa.get("petrol", ""))
+        self.assertIn("GlobalPetrolPrices.com", usa.get("source", ""))
 
     def test_app_config_structure(self):
         """Validates that app_config holds complete identity and file export branding fields."""

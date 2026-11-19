@@ -3738,32 +3738,51 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     # Check for live fuel / petroleum prices request
     if fuel_intent:
         if not fuel_data:
-            emit("Retrieving live verified fuel & petroleum rates (OGRA / PSO)...")
-            fuel_data = fetch_live_fuel_prices(fuel_intent.get("country", "Pakistan"))
+            c_target = fuel_intent.get("country", "Pakistan")
+            emit(f"Retrieving live verified fuel & petroleum rates from GlobalPetrolPrices.com ({c_target})...")
+            fuel_data = fetch_live_fuel_prices(c_target)
         if fuel_data:
             fuel_raw = fuel_data
             snippets_txt = "\n".join(fuel_raw.get("snippets", []))
             eff_dt = fuel_raw.get("effective_date") or time.strftime("%B %d, %Y")
-            p_str = fuel_raw.get("petrol") or "See live PSO notification below"
-            d_str = fuel_raw.get("diesel") or "See live PSO notification below"
-            ho_str = fuel_raw.get("hi_octane") or "See live dispatch"
-            sko_str = fuel_raw.get("kerosene") or "See live dispatch"
-            ldo_str = fuel_raw.get("ldo") or "See live dispatch"
-            lpg_str = fuel_raw.get("lpg") or "See live dispatch"
+            p_str = fuel_raw.get("petrol") or "See live notification below"
+            d_str = fuel_raw.get("diesel") or "See live notification below"
+            ho_str = fuel_raw.get("hi_octane") or "N/A"
+            sko_str = fuel_raw.get("kerosene") or "N/A"
+            ldo_str = fuel_raw.get("ldo") or "N/A"
+            lpg_str = fuel_raw.get("lpg") or "N/A"
+            c_display = fuel_raw.get("country", "Pakistan")
+            src_str = fuel_raw.get("source", "GlobalPetrolPrices.com")
+            url_str = fuel_raw.get("url", "https://www.globalpetrolprices.com/")
+
+            world_avg_lines = ""
+            if fuel_raw.get("world_gasoline_avg") or fuel_raw.get("world_diesel_avg"):
+                world_avg_lines = (
+                    f"\n- Worldwide Benchmark (Global Average): Gasoline {fuel_raw.get('world_gasoline_avg', 'N/A')}/L, "
+                    f"Diesel {fuel_raw.get('world_diesel_avg', 'N/A')}/L."
+                )
+
+            extra_products = ""
+            if ho_str != "N/A":
+                extra_products += f"\n- Hi-Octane (Octane+ / 97): {ho_str}"
+            if sko_str != "N/A":
+                extra_products += f"\n- Superior Kerosene Oil (SKO): {sko_str}"
+            if ldo_str != "N/A":
+                extra_products += f"\n- Light Diesel Oil (LDO): {ldo_str}"
+            if lpg_str != "N/A":
+                extra_products += f"\n- LPG: {lpg_str}"
+
             synth_user_prompt += (
-                f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} (EFFECTIVE: {eff_dt} AS OF {fuel_raw['timestamp']})]:\n"
-                f"- Petrol (Premier Euro 5): {p_str}\n"
-                f"- High-Speed Diesel (Hi-Cetane Euro 5): {d_str}\n"
-                f"- Hi-Octane (Al-Tron 97 / Octane+): {ho_str}\n"
-                f"- Superior Kerosene Oil (SKO): {sko_str}\n"
-                f"- Light Diesel Oil (LDO): {ldo_str}\n"
-                f"- LPG: {lpg_str}\n\n"
-                f"Live Official Dispatches & PSO POL Archive Records:\n{snippets_txt}\n\n"
+                f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({c_display.upper()}) - SOURCE: {src_str} ({url_str}) (EFFECTIVE: {eff_dt} AS OF {fuel_raw['timestamp']})]:\n"
+                f"- Petrol / Gasoline: {p_str}\n"
+                f"- Diesel: {d_str}{extra_products}{world_avg_lines}\n\n"
+                f"Live Official Dispatches & GlobalPetrolPrices Records:\n{snippets_txt}\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. State clearly in the very first sentence: Official Fuel Prices in Pakistan (Effective: {eff_dt}): Petrol (Premier Euro 5) is {p_str} and High-Speed Diesel (Hi-Cetane Euro 5) is {d_str}.\n"
-                f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category.\n"
-                f"3. Strictly IGNORE historical range boundaries, old blogs (e.g. PakWheels old articles), or outdated price tags.\n"
-                f"4. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan by OGRA."
+                f"1. State clearly in the very first sentence: Official Fuel Prices for {c_display} (Effective: {eff_dt}, Source: {src_str}): Petrol / Gasoline is {p_str} and Diesel is {d_str}.\n"
+                f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category / Global Comparison.\n"
+                f"3. When worldwide averages are provided, include a comparison stating whether {c_display} is above or below the global average.\n"
+                f"4. Cite https://www.globalpetrolprices.com/ as the verified international fuel price monitoring portal.\n"
+                f"5. Strictly IGNORE historical range boundaries, old blogs, or outdated price tags."
             )
 
     # Check for live Firecrawl web intelligence (scrape, search, crawl, extract)

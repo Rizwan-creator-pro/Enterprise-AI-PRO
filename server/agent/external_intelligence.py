@@ -887,10 +887,169 @@ def fetch_stock_quote(symbol_or_query: str) -> Optional[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# GlobalPetrolPrices.com International & Worldwide Directory
+# ---------------------------------------------------------------------------
+COUNTRY_SLUG_MAP: Dict[str, str] = {
+    "pakistan": "Pakistan",
+    "usa": "USA",
+    "united states": "USA",
+    "us": "USA",
+    "america": "USA",
+    "united kingdom": "United-Kingdom",
+    "uk": "United-Kingdom",
+    "britain": "United-Kingdom",
+    "great britain": "United-Kingdom",
+    "england": "United-Kingdom",
+    "uae": "United-Arab-Emirates",
+    "united arab emirates": "United-Arab-Emirates",
+    "dubai": "United-Arab-Emirates",
+    "abu dhabi": "United-Arab-Emirates",
+    "saudi arabia": "Saudi-Arabia",
+    "saudi": "Saudi-Arabia",
+    "ksa": "Saudi-Arabia",
+    "india": "India",
+    "canada": "Canada",
+    "germany": "Germany",
+    "france": "France",
+    "china": "China",
+    "japan": "Japan",
+    "australia": "Australia",
+    "russia": "Russia",
+    "turkey": "Turkey",
+    "turkiye": "Turkey",
+    "iran": "Iran",
+    "iraq": "Iraq",
+    "kuwait": "Kuwait",
+    "qatar": "Qatar",
+    "oman": "Oman",
+    "bahrain": "Bahrain",
+    "egypt": "Egypt",
+    "bangladesh": "Bangladesh",
+    "sri lanka": "Sri-Lanka",
+    "malaysia": "Malaysia",
+    "indonesia": "Indonesia",
+    "singapore": "Singapore",
+    "brazil": "Brazil",
+    "south africa": "South-Africa",
+    "italy": "Italy",
+    "spain": "Spain",
+    "netherlands": "Netherlands",
+    "switzerland": "Switzerland",
+    "sweden": "Sweden",
+    "norway": "Norway",
+    "new zealand": "New-Zealand"
+}
+
+def fetch_from_globalpetrolprices(country_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Scrapes real-time fuel benchmarks directly from https://www.globalpetrolprices.com/
+    Returns verified retail prices for gasoline (petrol), diesel, effective notification dates,
+    and worldwide average comparison benchmarks.
+    """
+    from bs4 import BeautifulSoup
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    c_lower = (country_name or "Pakistan").strip().lower()
+
+    if c_lower in ["international", "world", "worldwide", "global"]:
+        try:
+            r_g = requests.get("https://www.globalpetrolprices.com/gasoline_prices/", headers=headers, timeout=6)
+            r_d = requests.get("https://www.globalpetrolprices.com/diesel_prices/", headers=headers, timeout=6)
+            txt_g = BeautifulSoup(r_g.text, "html.parser").get_text() if r_g.status_code == 200 else ""
+            txt_d = BeautifulSoup(r_d.text, "html.parser").get_text() if r_d.status_code == 200 else ""
+
+            m_g = re.search(r"average price of gasoline around the world is\s+([\d.]+)\s+(?:U\.S\.\s*Dollar|USD)", txt_g, re.I)
+            m_d = re.search(r"average price of diesel around the world is\s+([\d.]+)\s+(?:U\.S\.\s*Dollar|USD)", txt_d, re.I)
+            m_dt = re.search(r"(\d{1,2}-[A-Za-z]+-\d{4})", txt_g)
+
+            p_usd = f"USD {m_g.group(1)} / liter" if m_g else None
+            d_usd = f"USD {m_d.group(1)} / liter" if m_d else None
+            eff_dt = m_dt.group(1) if m_dt else None
+
+            return {
+                "country": "Worldwide (Global Average)",
+                "petrol": p_usd,
+                "diesel": d_usd,
+                "effective_date": eff_dt,
+                "world_gasoline_avg": p_usd,
+                "world_diesel_avg": d_usd,
+                "source": "GlobalPetrolPrices.com (Worldwide Benchmark)",
+                "url": "https://www.globalpetrolprices.com/gasoline_prices/"
+            }
+        except Exception as e:
+            logger.debug(f"[GlobalPetrolPrices] Worldwide query notice: {e}")
+            return None
+
+    slug = COUNTRY_SLUG_MAP.get(c_lower) or country_name.strip().title().replace(" ", "-")
+    try:
+        url_g = f"https://www.globalpetrolprices.com/{slug}/gasoline_prices/"
+        url_d = f"https://www.globalpetrolprices.com/{slug}/diesel_prices/"
+        r_g = requests.get(url_g, headers=headers, timeout=6)
+        if r_g.status_code != 200:
+            return None
+        r_d = requests.get(url_d, headers=headers, timeout=6)
+
+        txt_g = BeautifulSoup(r_g.text, "html.parser").get_text()
+        txt_d = BeautifulSoup(r_d.text, "html.parser").get_text() if r_d.status_code == 200 else ""
+
+        m_gas = re.search(
+            r"The current gasoline price in\s+(?:the\s+)?(.+?)\s+is\s+([A-Za-z$€£¥₹Rs.\s]*?)\s*([\d,.]+)\s+per\s+liter(?:\s+or\s+(USD\s*[\d,.]+)\s+per\s+liter)?(?:.*?updated\s+on\s+([A-Za-z0-9-]+))?",
+            txt_g, re.I
+        )
+        m_die = re.search(
+            r"The current price of diesel fuel in\s+(?:the\s+)?(.+?)\s+is\s+([A-Za-z$€£¥₹Rs.\s]*?)\s*([\d,.]+)\s+per\s+liter(?:\s+or\s+(USD\s*[\d,.]+)\s+per\s+liter)?(?:.*?update\s+from\s+([A-Za-z0-9-]+))?",
+            txt_d, re.I
+        )
+        m_world_g = re.search(r"average price of gasoline in the world is\s+(USD\s*[\d,.]+)\s+per\s+liter", txt_g, re.I)
+        m_world_d = re.search(r"world average diesel price is\s+(USD\s*[\d,.]+)\s+per\s+liter", txt_d, re.I)
+
+        petrol_str = None
+        eff_date = None
+        if m_gas:
+            c_curr = (m_gas.group(2) or "").strip()
+            c_val = m_gas.group(3).strip()
+            c_usd = (m_gas.group(4) or "").strip()
+            eff_date = (m_gas.group(5) or "").strip()
+            if c_usd and c_curr and c_curr != "USD":
+                petrol_str = f"{c_curr} {c_val} / liter ({c_usd} / liter)"
+            elif c_curr:
+                petrol_str = f"{c_curr} {c_val} / liter"
+            else:
+                petrol_str = f"{c_val} / liter"
+
+        diesel_str = None
+        if m_die:
+            d_curr = (m_die.group(2) or "").strip()
+            d_val = m_die.group(3).strip()
+            d_usd = (m_die.group(4) or "").strip()
+            if not eff_date:
+                eff_date = (m_die.group(5) or "").strip()
+            if d_usd and d_curr and d_curr != "USD":
+                diesel_str = f"{d_curr} {d_val} / liter ({d_usd} / liter)"
+            elif d_curr:
+                diesel_str = f"{d_curr} {d_val} / liter"
+            else:
+                diesel_str = f"{d_val} / liter"
+
+        c_display = slug.replace("-", " ")
+        return {
+            "country": c_display,
+            "petrol": petrol_str,
+            "diesel": diesel_str,
+            "effective_date": eff_date,
+            "world_gasoline_avg": m_world_g.group(1) if m_world_g else None,
+            "world_diesel_avg": m_world_d.group(1) if m_world_d else None,
+            "source": f"GlobalPetrolPrices.com ({c_display})",
+            "url": url_g
+        }
+    except Exception as e:
+        logger.debug(f"[GlobalPetrolPrices] Fetch exception for {country_name}: {e}")
+        return None
+
 # Live Fuel & Petroleum Intelligence
 # ---------------------------------------------------------------------------
 def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Detects if user is asking about petrol, diesel, fuel, or petroleum prices."""
+    """Detects if user is asking about petrol, diesel, fuel, or petroleum prices and detects the target country."""
     t = text.lower().strip()
     fuel_keywords = [
         "petrol", "diesel", "fuel", "gasoline", "kerosene", "hi-octane", "hsd", "ldo",
@@ -908,14 +1067,17 @@ def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Opt
     if not any(k in t for k in intent_triggers) and not any(k in t for k in ["petrol", "diesel", "fuel price"]):
         return None
 
-    country = default_country or "Pakistan"
-    if any(k in t for k in ["global", "world", "international", "brent", "wti", "us"]):
-        country = "International"
-    elif "uae" in t or "dubai" in t:
-        country = "UAE"
-    elif "india" in t:
-        country = "India"
+    # Detect requested country or worldwide context
+    detected_country = None
+    if any(k in t for k in ["worldwide", "world wide", "global", "international", "world average", "in the world", "around the world"]):
+        detected_country = "Worldwide"
+    else:
+        for c_key in sorted(COUNTRY_SLUG_MAP.keys(), key=lambda x: -len(x)):
+            if re.search(r"\b" + re.escape(c_key) + r"\b", t):
+                detected_country = COUNTRY_SLUG_MAP[c_key]
+                break
 
+    country = detected_country or default_country or "Pakistan"
     return {"type": "fuel", "country": country, "query": text}
 
 
@@ -946,6 +1108,43 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
     ldo_price = None
     lpg_price = None
     effective_date = None
+
+    # Step 0: Query GlobalPetrolPrices.com for international / worldwide or national benchmarks
+    gpp_data = fetch_from_globalpetrolprices(country)
+    if gpp_data:
+        if not effective_date and gpp_data.get("effective_date"):
+            effective_date = gpp_data["effective_date"]
+        if not petrol_price and gpp_data.get("petrol"):
+            petrol_price = gpp_data["petrol"]
+        if not diesel_price and gpp_data.get("diesel"):
+            diesel_price = gpp_data["diesel"]
+        snippets.append(
+            f"- **GlobalPetrolPrices.com ({gpp_data['country']})**: Petrol/Gasoline is {gpp_data.get('petrol')}, "
+            f"Diesel is {gpp_data.get('diesel')} (Effective: {gpp_data.get('effective_date')}). "
+            f"World average: Gasoline {gpp_data.get('world_gasoline_avg', 'N/A')}/L, Diesel {gpp_data.get('world_diesel_avg', 'N/A')}/L."
+        )
+
+        # For non-Pakistan queries or worldwide queries, GlobalPetrolPrices.com is the definitive authority
+        if cache_key != "pakistan":
+            result = {
+                "country": gpp_data["country"],
+                "petrol": petrol_price,
+                "diesel": diesel_price,
+                "hi_octane": None,
+                "kerosene": None,
+                "ldo": None,
+                "lpg": None,
+                "effective_date": effective_date or time.strftime("%B %d, %Y"),
+                "world_gasoline_avg": gpp_data.get("world_gasoline_avg"),
+                "world_diesel_avg": gpp_data.get("world_diesel_avg"),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "source": gpp_data.get("source", f"GlobalPetrolPrices.com ({gpp_data['country']})"),
+                "url": gpp_data.get("url", "https://www.globalpetrolprices.com/"),
+                "snippets": snippets[:6]
+            }
+            _FUEL_PRICE_CACHE[cache_key] = result
+            _FUEL_PRICE_CACHE_TIME = now
+            return result
 
     # Step 1: Query Official Pakistan State Oil (PSO) POL Archives directly via Firecrawl/Tavily
     try:
@@ -1087,6 +1286,17 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
 
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
+    # If petrol or diesel were not found in PSO archive tables, fall back to GlobalPetrolPrices.com
+    if not petrol_price and gpp_data and gpp_data.get("petrol"):
+        petrol_price = gpp_data["petrol"]
+    if not diesel_price and gpp_data and gpp_data.get("diesel"):
+        diesel_price = gpp_data["diesel"]
+    if not effective_date and gpp_data and gpp_data.get("effective_date"):
+        effective_date = gpp_data["effective_date"]
+
+    world_g = gpp_data.get("world_gasoline_avg") if gpp_data else None
+    world_d = gpp_data.get("world_diesel_avg") if gpp_data else None
+
     # Dynamic official rate result - strictly dynamically fetched without hardcoded price values
     result = {
         "country": country,
@@ -1097,8 +1307,11 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
         "ldo": ldo_price,
         "lpg": lpg_price,
         "effective_date": effective_date or time.strftime("%B %d, %Y"),
+        "world_gasoline_avg": world_g,
+        "world_diesel_avg": world_d,
         "timestamp": timestamp,
-        "source": "Pakistan State Oil (PSO) POL Archives & OGRA Official Rates",
+        "source": "Pakistan State Oil (PSO) POL Archives & GlobalPetrolPrices.com",
+        "url": gpp_data.get("url") if gpp_data else "https://www.globalpetrolprices.com/Pakistan/gasoline_prices/",
         "snippets": snippets[:6]
     }
 
