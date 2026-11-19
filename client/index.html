@@ -5640,6 +5640,26 @@
                                         <label class="admin-label">Document Watermark Text <span class="tip" title="Confidentiality watermark stamp embedded on document exports">?</span></label>
                                         <input type="text" class="admin-input" id="adminWatermarkText" placeholder="e.g. Enterprise AI Hub • Confidential" />
                                     </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Topbar Mark / System Domain <span class="tip" title="Enterprise domain mark shown in app top navigation">?</span></label>
+                                        <input type="text" class="admin-input" id="adminTopbarMark" placeholder="e.g. enterprise.ai.corp" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Contact Email <span class="tip" title="Corporate administrator contact email address">?</span></label>
+                                        <input type="email" class="admin-input" id="adminContactEmail" placeholder="e.g. admin@enterprise.ai" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Contact Phone <span class="tip" title="Official corporate contact phone and WhatsApp number">?</span></label>
+                                        <input type="text" class="admin-input" id="adminContactPhone" placeholder="e.g. +92 323 700 4270" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Max Upload Images <span class="tip" title="Maximum allowed images attached per prompt (1 - 20)">?</span></label>
+                                        <input type="number" class="admin-input" id="adminMaxUploadImages" min="1" max="20" placeholder="5" />
+                                    </div>
+                                    <div class="admin-form-group">
+                                        <label class="admin-label">Max Upload Documents <span class="tip" title="Maximum allowed documents (PDF, Word, Excel, CSV) attached per prompt (1 - 20)">?</span></label>
+                                        <input type="number" class="admin-input" id="adminMaxUploadDocs" min="1" max="20" placeholder="3" />
+                                    </div>
                                 </div>
                             </div>
 
@@ -6064,6 +6084,17 @@
             try { localStorage.setItem('ai_app_icon', appIcon); } catch(e) {}
             try { localStorage.setItem('ai_company_name', companyName); } catch(e) {}
             try { localStorage.setItem('ai_watermark_text', watermarkText); } catch(e) {}
+
+            if (cfg.topbar_mark) {
+                document.querySelectorAll('.topbar-mark-text, #topbarMarkText').forEach(el => { el.innerText = cfg.topbar_mark; });
+                try { localStorage.setItem('ai_topbar_mark', cfg.topbar_mark); } catch(e) {}
+            }
+            if (cfg.max_upload_images && typeof maxUploadImages !== 'undefined') {
+                maxUploadImages = parseInt(cfg.max_upload_images, 10) || 5;
+            }
+            if (cfg.max_upload_docs && typeof maxUploadDocs !== 'undefined') {
+                maxUploadDocs = parseInt(cfg.max_upload_docs, 10) || 3;
+            }
 
             window.FILE_COMPANY = companyName;
             window.PDF_COMPANY = companyName;
@@ -11793,7 +11824,12 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                         updateAdminIconPreview(s.app_icon || 'fa-solid fa-wand-magic-sparkles');
                     }
                     if (document.getElementById('adminCompanyName')) document.getElementById('adminCompanyName').value = s.company_name || '';
-                    if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.watermark_text || '';
+                    if (document.getElementById('adminWatermarkText')) document.getElementById('adminWatermarkText').value = s.footer_watermark || s.watermark_text || '';
+                    if (document.getElementById('adminTopbarMark')) document.getElementById('adminTopbarMark').value = s.topbar_mark || '';
+                    if (document.getElementById('adminContactEmail')) document.getElementById('adminContactEmail').value = s.contact_email || '';
+                    if (document.getElementById('adminContactPhone')) document.getElementById('adminContactPhone').value = s.contact_phone || '';
+                    if (document.getElementById('adminMaxUploadImages')) document.getElementById('adminMaxUploadImages').value = s.max_upload_images || 5;
+                    if (document.getElementById('adminMaxUploadDocs')) document.getElementById('adminMaxUploadDocs').value = s.max_upload_docs || 3;
                     applyAppBranding(s);
                 }
 
@@ -11879,14 +11915,25 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const appName = (document.getElementById('adminAppName')?.value || '').trim();
             const appIcon = (document.getElementById('adminAppIcon')?.value || '').trim() || 'fa-solid fa-wand-magic-sparkles';
             const companyName = (document.getElementById('adminCompanyName')?.value || '').trim();
+            const topbarMark = (document.getElementById('adminTopbarMark')?.value || '').trim();
+            const contactEmail = (document.getElementById('adminContactEmail')?.value || '').trim();
+            const contactPhone = (document.getElementById('adminContactPhone')?.value || '').trim();
             const watermarkText = (document.getElementById('adminWatermarkText')?.value || '').trim();
+            const maxUploadImages = parseInt(document.getElementById('adminMaxUploadImages')?.value || '5', 10) || 5;
+            const maxUploadDocs = parseInt(document.getElementById('adminMaxUploadDocs')?.value || '3', 10) || 3;
 
             const payload = {
                 owner_name: ownerName,
                 app_name: appName,
                 app_icon: appIcon,
                 company_name: companyName,
-                watermark_text: watermarkText
+                topbar_mark: topbarMark,
+                contact_email: contactEmail,
+                contact_phone: contactPhone,
+                watermark_text: watermarkText,
+                footer_watermark: watermarkText,
+                max_upload_images: maxUploadImages,
+                max_upload_docs: maxUploadDocs
             };
 
             try {

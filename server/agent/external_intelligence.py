@@ -951,7 +951,7 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
     try:
         from agent.firecrawl_intelligence import search_web
         # Prioritize PSO POL Archives where official notification rates are maintained
-        pso_query = "site:psopk.com pol archives premier euro 5 330 360" if cache_key == "pakistan" else f"{country} fuel prices official"
+        pso_query = "site:psopk.com pol archives premier euro 5" if cache_key == "pakistan" else f"{country} fuel prices official"
         fc_res = search_web(pso_query, limit=3)
         if fc_res and fc_res.get("success") and fc_res.get("results"):
             parsed_entries = []
@@ -1085,31 +1085,18 @@ def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
         except Exception as web_err:
             logger.debug(f"[Fuel Intelligence] Web search fallback notice: {web_err}")
 
-    # Official verified benchmarks from OGRA / PSO Notification
-    if not petrol_price and cache_key == "pakistan":
-        petrol_price = "Rs. 330.00"
-    if not diesel_price and cache_key == "pakistan":
-        diesel_price = "Rs. 360.00"
-    if not hi_octane_price and cache_key == "pakistan":
-        hi_octane_price = "Rs. 399.00"
-    if not kerosene_price and cache_key == "pakistan":
-        kerosene_price = "Rs. 283.64"
-    if not ldo_price and cache_key == "pakistan":
-        ldo_price = "Rs. 231.72"
-    if not lpg_price and cache_key == "pakistan":
-        lpg_price = "Rs. 294.08 / kg"
-
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
+    # Dynamic official rate result - strictly dynamically fetched without hardcoded price values
     result = {
         "country": country,
-        "petrol": petrol_price or "Rs. 330.00",
-        "diesel": diesel_price or "Rs. 360.00",
-        "hi_octane": hi_octane_price or "Rs. 399.00",
-        "kerosene": kerosene_price or "Rs. 283.64",
-        "ldo": ldo_price or "Rs. 231.72",
-        "lpg": lpg_price or "Rs. 294.08 / kg",
-        "effective_date": effective_date or "November 14, 2026",
+        "petrol": petrol_price,
+        "diesel": diesel_price,
+        "hi_octane": hi_octane_price,
+        "kerosene": kerosene_price,
+        "ldo": ldo_price,
+        "lpg": lpg_price,
+        "effective_date": effective_date or time.strftime("%B %d, %Y"),
         "timestamp": timestamp,
         "source": "Pakistan State Oil (PSO) POL Archives & OGRA Official Rates",
         "snippets": snippets[:6]

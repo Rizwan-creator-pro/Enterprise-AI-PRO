@@ -164,16 +164,20 @@ def _get_app_config():
             except Exception:
                 pass
     return {
+        "owner_name": "M. Rizwan",
         "company_name": "Enterprise AI",
         "app_name": "Enterprise AI Hub",
         "app_icon": "fa-solid fa-wand-magic-sparkles",
+        "topbar_mark": "enterprise.ai.corp",
+        "contact_email": "admin@enterprise.ai",
+        "contact_phone": "+92 323 700 4270",
         "version": "2.4.0-PRO",
         "version_badge": "PRO",
         "pdf_company": "Enterprise AI",
         "file_prefix": "Enterprise_AI",
         "footer_watermark": "Enterprise AI Hub • Autonomous Intelligence Platform • Confidential",
         "software_creator": "Enterprise AI Engineering Team",
-        "contact_info": "support@enterprise.ai",
+        "contact_info": "admin@enterprise.ai",
         "system_title": "Enterprise AI Hub System Architecture & Technical Specifications",
         "doc_subtitle": "Autonomous Agent Specifications, In-Memory Deterministic Sandbox & Oracle ORDS",
         "greeting_sub": "Ask about enterprise data, run in-memory calculations, or generate verified reports.",
@@ -1744,11 +1748,14 @@ class AdminSettingsRequest(BaseModel):
     topbar_mark: Optional[str] = None
     resume_link: Optional[str] = None
     watermark_text: Optional[str] = None
+    footer_watermark: Optional[str] = None
     footer_tagline: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_phone_digits: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    max_upload_images: Optional[int] = None
+    max_upload_docs: Optional[int] = None
     ask_visitor_location: Optional[bool] = False
     social_links: Optional[List[Dict[str, str]]] = None
 
@@ -1767,11 +1774,14 @@ def get_admin_settings(request: Request):
         "topbar_mark": cfg.get("topbar_mark", "enterprise.ai.corp"),
         "resume_link": cfg.get("resume_link", "https://enterprise.ai"),
         "watermark_text": cfg.get("footer_watermark", "Enterprise AI Hub • Autonomous Intelligence Platform • Confidential"),
+        "footer_watermark": cfg.get("footer_watermark", "Enterprise AI Hub • Autonomous Intelligence Platform • Confidential"),
         "footer_tagline": cfg.get("footer_tagline", "Oracle APEX developer — building production utilities for classic report reporting, exports, and formatting."),
         "contact_email": cfg.get("contact_email", "admin@enterprise.ai"),
         "contact_phone": cfg.get("contact_phone", "+92 323 700 4270"),
         "contact_phone_digits": cfg.get("contact_phone_digits", "923237004270"),
         "whatsapp_number": cfg.get("whatsapp_number", "923237004270"),
+        "max_upload_images": cfg.get("max_upload_images", 5),
+        "max_upload_docs": cfg.get("max_upload_docs", 3),
         "ask_visitor_location": cfg.get("ask_visitor_location", False),
         "social_links": cfg.get("social_links", [])
     }
@@ -1807,7 +1817,9 @@ def update_admin_settings(req: AdminSettingsRequest, request: Request):
         cfg["topbar_mark"] = req.topbar_mark.strip()
     if req.resume_link is not None:
         cfg["resume_link"] = req.resume_link.strip()
-    if req.watermark_text is not None:
+    if req.footer_watermark is not None:
+        cfg["footer_watermark"] = req.footer_watermark.strip()
+    elif req.watermark_text is not None:
         cfg["footer_watermark"] = req.watermark_text.strip()
     if req.footer_tagline is not None:
         cfg["footer_tagline"] = req.footer_tagline.strip()
@@ -1816,10 +1828,18 @@ def update_admin_settings(req: AdminSettingsRequest, request: Request):
         cfg["contact_info"] = req.contact_email.strip()
     if req.contact_phone is not None:
         cfg["contact_phone"] = req.contact_phone.strip()
+        digits = re.sub(r'\D', '', req.contact_phone)
+        if digits:
+            cfg["contact_phone_digits"] = digits
+            cfg["whatsapp_number"] = digits
     if req.contact_phone_digits is not None:
         cfg["contact_phone_digits"] = req.contact_phone_digits.strip()
     if req.whatsapp_number is not None:
         cfg["whatsapp_number"] = req.whatsapp_number.strip()
+    if req.max_upload_images is not None:
+        cfg["max_upload_images"] = max(1, min(20, int(req.max_upload_images)))
+    if req.max_upload_docs is not None:
+        cfg["max_upload_docs"] = max(1, min(20, int(req.max_upload_docs)))
     if req.ask_visitor_location is not None:
         cfg["ask_visitor_location"] = bool(req.ask_visitor_location)
     if req.social_links is not None:
@@ -2466,7 +2486,7 @@ async def run_hybrid_orchestrator(
         fuel_int = extract_fuel_intent(question)
         forex_int = extract_forex_intent(question)
         stock_int = extract_stock_intent(question, history_msgs or [])
-        weather_int = extract_weather_intent(question, default_city=client_city)
+        weather_int = extract_weather_intent(question)
 
         is_weather_context = any(
             wk in question.lower()
@@ -2491,9 +2511,8 @@ async def run_hybrid_orchestrator(
                         stock_found = True
                 if not stock_found:
                     external_tool_calls.append({"tool": "stock", "symbol": stock_int})
-            elif (weather_int or is_weather_context) and not any(t.get("tool") == "weather" for t in external_tool_calls):
-                c_w = weather_int or (client_city.strip() if client_city else None) or "Lahore"
-                external_tool_calls.append({"tool": "weather", "city": c_w})
+            elif weather_int and not any(t.get("tool") == "weather" for t in external_tool_calls):
+                external_tool_calls.append({"tool": "weather", "city": weather_int})
         else:
             is_realworld_query = not has_db_intent or any(
                 kw in question.lower()
@@ -2504,14 +2523,6 @@ async def run_hybrid_orchestrator(
             )
             if is_realworld_query and not has_db_intent and not any(t.get("tool") == "web_search" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "web_search", "query": question})
-
-        # Sanitize any plan-generated weather tool calls to auto-localize if defaulting to Lahore
-        for tool_call in external_tool_calls:
-            if tool_call.get("tool") == "weather":
-                call_city = tool_call.get("city", "").strip()
-                if (not call_city or call_city.lower() == "lahore") and "lahore" not in question.lower():
-                    if client_city and client_city.strip():
-                        tool_call["city"] = client_city.strip().title()
     else:
         # WHITELISTED ENTERPRISE FEEDS: When general_ai_enabled is False, only allow
         # the 3 verified real-time business feeds: Fuel, Forex, and PSX stocks/indices.
@@ -2823,9 +2834,7 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         can_search_ext = True
         is_outside_db = True
         from agent.weather_helper import extract_weather_cities
-        weather_cities = extract_weather_cities(orch_question, default_city=c_city)
-        if not weather_cities and any(k in req.question.lower() for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain"]):
-            weather_cities = [c_city.title() if c_city else "Lahore"]
+        weather_cities = extract_weather_cities(orch_question)
         weather_city = weather_cities[0] if weather_cities else None
         firecrawl_intent = detect_firecrawl_intent(orch_question)
         direct_urls = extract_urls_from_text(orch_question)
@@ -3734,18 +3743,25 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         if fuel_data:
             fuel_raw = fuel_data
             snippets_txt = "\n".join(fuel_raw.get("snippets", []))
+            eff_dt = fuel_raw.get("effective_date") or time.strftime("%B %d, %Y")
+            p_str = fuel_raw.get("petrol") or "See live PSO notification below"
+            d_str = fuel_raw.get("diesel") or "See live PSO notification below"
+            ho_str = fuel_raw.get("hi_octane") or "See live dispatch"
+            sko_str = fuel_raw.get("kerosene") or "See live dispatch"
+            ldo_str = fuel_raw.get("ldo") or "See live dispatch"
+            lpg_str = fuel_raw.get("lpg") or "See live dispatch"
             synth_user_prompt += (
-                f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} (EFFECTIVE: {fuel_raw.get('effective_date', 'November 13, 2026')} AS OF {fuel_raw['timestamp']})]:\n"
-                f"- Petrol (Premier Euro 5): {fuel_raw['petrol']} / litre\n"
-                f"- High-Speed Diesel (Hi-Cetane Euro 5): {fuel_raw['diesel']} / litre\n"
-                f"- Hi-Octane (Al-Tron 97 / Octane+): {fuel_raw['hi_octane']} / litre\n"
-                f"- Superior Kerosene Oil (SKO): {fuel_raw['kerosene']} / litre\n"
-                f"- Light Diesel Oil (LDO): {fuel_raw['ldo']} / litre\n"
-                f"- LPG: {fuel_raw['lpg']}\n\n"
+                f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({fuel_raw['country'].upper()}) - SOURCE: {fuel_raw['source']} (EFFECTIVE: {eff_dt} AS OF {fuel_raw['timestamp']})]:\n"
+                f"- Petrol (Premier Euro 5): {p_str}\n"
+                f"- High-Speed Diesel (Hi-Cetane Euro 5): {d_str}\n"
+                f"- Hi-Octane (Al-Tron 97 / Octane+): {ho_str}\n"
+                f"- Superior Kerosene Oil (SKO): {sko_str}\n"
+                f"- Light Diesel Oil (LDO): {ldo_str}\n"
+                f"- LPG: {lpg_str}\n\n"
                 f"Live Official Dispatches & PSO POL Archive Records:\n{snippets_txt}\n\n"
                 f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. State clearly in the very first sentence: Official Fuel Prices in Pakistan (Effective: {fuel_raw.get('effective_date', 'November 13, 2026')}): Petrol (Premier Euro 5) is {fuel_raw['petrol']}/litre and High-Speed Diesel (Hi-Cetane Euro 5) is {fuel_raw['diesel']}/litre.\n"
-                f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate (Rs./Litre), and Category.\n"
+                f"1. State clearly in the very first sentence: Official Fuel Prices in Pakistan (Effective: {eff_dt}): Petrol (Premier Euro 5) is {p_str} and High-Speed Diesel (Hi-Cetane Euro 5) is {d_str}.\n"
+                f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category.\n"
                 f"3. Strictly IGNORE historical range boundaries, old blogs (e.g. PakWheels old articles), or outdated price tags.\n"
                 f"4. Note that standard petrol and HSD are uniformly priced nationwide across all cities in Pakistan by OGRA."
             )

@@ -32,7 +32,7 @@ KNOWN_CITIES = [
     "dubai", "new york", "tokyo", "paris", "beijing", "toronto"
 ]
 
-def extract_weather_cities(text: str, default_city: Optional[str] = None) -> List[str]:
+def extract_weather_cities(text: str) -> List[str]:
     """Detects if the query asks about weather and extracts all target locations in prompt order."""
     t = text.lower().strip()
     if not any(k in t for k in ["weather", "temperature", "forecast", "climate", "mausam", "rain today", "is it raining"]):
@@ -64,14 +64,11 @@ def extract_weather_cities(text: str, default_city: Optional[str] = None) -> Lis
         if c not in ["current", "today", "todays", "today's", "live", "local", "the", "what is the", "how is the", "check"]:
             return [c.title()]
 
-    if default_city and str(default_city).strip():
-        return [str(default_city).strip().title()]
-
     return []
 
-def extract_weather_intent(text: str, default_city: Optional[str] = None) -> Optional[str]:
+def extract_weather_intent(text: str) -> Optional[str]:
     """Detects if the query asks about weather and extracts the primary target location."""
-    cities = extract_weather_cities(text, default_city=default_city)
+    cities = extract_weather_cities(text)
     return cities[0] if cities else None
 
 def fetch_wttr_in(city_name: str) -> Optional[Dict[str, Any]]:

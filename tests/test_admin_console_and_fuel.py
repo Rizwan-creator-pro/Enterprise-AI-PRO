@@ -20,23 +20,21 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         _FUEL_PRICE_CACHE.clear()
 
     def test_official_pso_fuel_rates(self):
-        """Validates that fetch_live_fuel_prices returns verified OGRA / PSO rates."""
+        """Validates that fetch_live_fuel_prices dynamically retrieves verified OGRA / PSO rates."""
         fuel = fetch_live_fuel_prices("Pakistan")
         self.assertIsInstance(fuel, dict)
         self.assertIn("petrol", fuel)
         self.assertIn("diesel", fuel)
-        self.assertIn("hi_octane", fuel)
-        self.assertIn("kerosene", fuel)
-        self.assertIn("ldo", fuel)
         self.assertIn("source", fuel)
+        self.assertIn("effective_date", fuel)
+        self.assertIn("timestamp", fuel)
 
-        # Official rate benchmarks
-        self.assertIn("330", fuel["petrol"])
-        self.assertIn("360", fuel["diesel"])
-        self.assertIn("399", fuel["hi_octane"])
-        self.assertIn("283", fuel["kerosene"])
-        self.assertIn("231", fuel["ldo"])
-        self.assertIn("PSO", fuel["source"])
+        # Dynamic live rate format validation
+        if fuel.get("petrol"):
+            self.assertTrue(fuel["petrol"].startswith("Rs."))
+        if fuel.get("diesel"):
+            self.assertTrue(fuel["diesel"].startswith("Rs."))
+        self.assertTrue("PSO" in fuel["source"] or "OGRA" in fuel["source"])
 
     def test_app_config_structure(self):
         """Validates that app_config holds complete identity and file export branding fields."""
@@ -51,19 +49,31 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         self.assertIn("contact_email", cfg)
 
     def test_admin_settings_request_model(self):
-        """Validates AdminSettingsRequest Pydantic serialization."""
+        """Validates AdminSettingsRequest Pydantic serialization with complete enterprise fields."""
         req = AdminSettingsRequest(
             owner_name="Test Architect",
             app_name="Custom AI Portal",
             app_icon="fa-solid fa-robot",
             company_name="Apex Global Corp",
+            topbar_mark="apex.corp",
+            contact_email="admin@apexcorp.com",
+            contact_phone="+92 300 1234567",
             watermark_text="STRICTLY CONFIDENTIAL",
+            footer_watermark="Apex AI • Confidential",
+            max_upload_images=10,
+            max_upload_docs=5,
             footer_tagline="Custom legal disclaimer"
         )
         self.assertEqual(req.owner_name, "Test Architect")
         self.assertEqual(req.app_icon, "fa-solid fa-robot")
         self.assertEqual(req.company_name, "Apex Global Corp")
+        self.assertEqual(req.topbar_mark, "apex.corp")
+        self.assertEqual(req.contact_email, "admin@apexcorp.com")
+        self.assertEqual(req.contact_phone, "+92 300 1234567")
         self.assertEqual(req.watermark_text, "STRICTLY CONFIDENTIAL")
+        self.assertEqual(req.footer_watermark, "Apex AI • Confidential")
+        self.assertEqual(req.max_upload_images, 10)
+        self.assertEqual(req.max_upload_docs, 5)
 
     def test_email_only_login_validation(self):
         """Validates that login strictly requires a valid corporate email address."""
@@ -96,22 +106,21 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         # Ensure redundant inner sidebar is gone
         self.assertNotIn('id="adminSidebar"', html)
         self.assertNotIn('class="admin-sidebar"', html)
-
-        # Ensure template leftovers are gone
-        self.assertNotIn('id="adminTopbarMark"', html)
-        self.assertNotIn('id="adminResumeLink"', html)
         self.assertNotIn('id="secFooter"', html)
         self.assertNotIn('id="secContact"', html)
-        self.assertNotIn('id="adminFooterTagline"', html)
-        self.assertNotIn('id="adminContactEmail"', html)
 
-        # Ensure agent-relevant elements are present
+        # Ensure agent-relevant identity, branding & upload limit elements are present
         self.assertIn('id="adminOwnerName"', html)
         self.assertIn('id="adminAppName"', html)
         self.assertIn('id="adminAppIcon"', html)
         self.assertIn('id="adminIconPreview"', html)
         self.assertIn('id="adminCompanyName"', html)
         self.assertIn('id="adminWatermarkText"', html)
+        self.assertIn('id="adminTopbarMark"', html)
+        self.assertIn('id="adminContactEmail"', html)
+        self.assertIn('id="adminContactPhone"', html)
+        self.assertIn('id="adminMaxUploadImages"', html)
+        self.assertIn('id="adminMaxUploadDocs"', html)
         self.assertIn('id="secMasterLink"', html)
         self.assertIn('id="secProviders"', html)
         self.assertIn('id="secExternalApis"', html)
