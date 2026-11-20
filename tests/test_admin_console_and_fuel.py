@@ -237,5 +237,30 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         self.assertIsNotNone(report.get("cheapest_petrol"))
         self.assertIsNotNone(report.get("world_gasoline_avg"))
 
+    def test_fuel_report_not_hijacked_by_file_export_clarification(self):
+        """Validates that 'give me fuel report' is never treated as a database PDF export request."""
+        from ui_app import _asked_kinds
+        from agent.external_intelligence import extract_fuel_date_range, extract_fuel_intent
+
+        q = "give me fuel report from 01-Nov-2026 to 14-Nov-2026"
+        # 1. _asked_kinds should NOT claim this is a database PDF export
+        kinds = _asked_kinds(q)
+        self.assertEqual(kinds, [])
+
+        # 2. Fuel intent and date range must be extracted accurately
+        intent = extract_fuel_intent(q)
+        self.assertIsNotNone(intent)
+        self.assertTrue(intent.get("is_date_range"))
+        self.assertEqual(intent.get("from_date"), "01-Nov-2026")
+        self.assertEqual(intent.get("to_date"), "14-Nov-2026")
+
+        # 3. "TO TODAY" query must extract valid date range
+        q_today = "FUEL RATES FROM 01-NOVEMBER-2026 TO TODAY"
+        d1, d2 = extract_fuel_date_range(q_today)
+        self.assertIsNotNone(d1)
+        self.assertIsNotNone(d2)
+        self.assertEqual(d1.day, 1)
+        self.assertEqual(d1.month, 11)
+
 if __name__ == "__main__":
     unittest.main()

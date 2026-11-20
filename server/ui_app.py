@@ -1951,13 +1951,21 @@ def _asked_kinds(question: str):
     if is_chart_inquiry and not has_explicit_file_ext:
         return []
 
+    # Real-world intelligence feeds (fuel rates, fuel reports, weather, forex, stock market):
+    # Words like "report" in "fuel report" or "weather report" are NOT file exports or database queries!
+    from agent.external_intelligence import extract_fuel_intent, extract_forex_intent, extract_stock_intent
+    from agent.weather_helper import extract_weather_intent
+    is_external_feed = bool(extract_fuel_intent(question) or extract_forex_intent(question) or extract_stock_intent(question, []) or extract_weather_intent(question))
+    if is_external_feed and not has_explicit_file_ext:
+        return []
+
     # Explicit "all files" / "all formats" / "all reports" / "zip" request
     if (re.search(r"\b(all|tamam|saari|sab|every)\b.{0,25}\b(files?|formats?|reports?|dashboards?|exports?)\b|\ball (files?|formats?|reports?)\b|\b(files?|formats?)\b.{0,15}\b(all|tamam|saari)\b", q)
         or re.search(r"\b(all\s+files|all\s+file|all\s+formats?|all\s+reports?)\b", q)
         or re.search(r"\b(zip|archive)\b", q)):
         return ["pdf", "excel", "word", "ppt"]
     found = [k for k, pat in _KIND_PATTERNS if re.search(pat, q)]
-    if not found and re.search(r"\b(export|file|files|download|report|save as)\b", q) and not is_chart_inquiry:
+    if not found and re.search(r"\b(export|file|files|download|report|save as)\b", q) and not is_chart_inquiry and not is_external_feed:
         return ["pdf", "excel"]
     return found
 
@@ -2154,13 +2162,15 @@ RULES:
    - If weather, currency, or stocks: include {{"tool": "weather", "city": "..."}}, {{"tool": "forex", "pair": "..."}}, {{"tool": "stock", "symbol": "..."}}. For stocks, always use official uppercase ticker symbol (e.g. "ILP" for Interloop, "JKSM" for JK Spinning Mills, "SYS" for Systems, "LUCK" for Lucky Cement).
    - You can combine enterprise database analysis with live open-web tools in a single execution plan!
 
-14. REAL-WORLD, COMMODITIES, FUEL & NEWS INQUIRIES: When the user asks about real-world topics, petrol/diesel/fuel rates, gold/silver prices, commodities, inflation, weather, forex/currency, stock market, sports, world events, or anything outside enterprise warehouse tables:
+14. REAL-WORLD, COMMODITIES, FUEL & NEWS INQUIRIES: When the user asks about real-world topics, petrol/diesel/fuel rates, fuel reports, date-range fuel calculations, gold/silver prices, commodities, inflation, weather, forex/currency, stock market, sports, world events, or anything outside enterprise warehouse tables:
    - Set "mode": "direct_answer"
    - NEVER select an internal database table (do NOT assign "PRODUCTS" or "Employees Directory" to fuel, gold, or weather inquiries)!
-   - ALWAYS include {{"tool": "web_search", "query": "..."}} in "external_tools".
+   - NEVER trigger table clarification (mode: "clarification_needed") for fuel reports or real-world inquiries, even if words like "report", "give me", or "data" appear!
+   - ALWAYS include {{"tool": "fuel", "country": "..."}} or {{"tool": "web_search", "query": "..."}} in "external_tools".
 
 15. CONVERSATIONAL TABLE CLARIFICATION (STOP GUESSING TABLES):
-- When a user gives an ambiguous visualization, data exploration, or file export command (e.g. "Give me the data as a PDF:", "export to PDF", "download as excel", "word document", "show a chart", "draw a graph", "plot this", "visualize", "export to ppt", "give me data", "show data"):
+- When a user gives an ambiguous visualization, data exploration, or file export command for database records (e.g. "Give me the data as a PDF:", "export to PDF", "download as excel", "word document", "show a chart", "draw a graph", "plot this", "visualize", "export to ppt", "give me data", "show data"):
+- EXCEPTION: Inquiries about fuel prices, fuel rate reports, weather, forex, or stocks are real-world feeds, NEVER database table clarification requests!
 - If the current message text does NOT explicitly name a valid database table (EVEN IF a table was looked at previously in conversation history):
    - You MUST treat the query as ambiguous and stop guessing entirely!
    - NEVER default to or assume "Employees Directory", "PRODUCTS", or any prior table!
@@ -2945,8 +2955,9 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     has_file_export_kw = bool(file_export_match) or bool(_asked_kinds(req.question))
     matched_in_q = _match_endpoint(req.question, endpoints)
     matched_eps_in_q = _match_endpoints_multi(req.question, endpoints)
+    is_specialized_feed = bool(fuel_intent or forex_intent or stock_intent or weather_city or has_whitelisted_feed)
 
-    if has_file_export_kw and not matched_in_q and not matched_eps_in_q and not has_images and not has_docs:
+    if has_file_export_kw and not matched_in_q and not matched_eps_in_q and not has_images and not has_docs and not is_specialized_feed:
         kw = file_export_match.group(1).lower() if file_export_match else "pdf"
         if any(x in kw for x in ["excel", "xls", "spreadsheet"]):
             doc_type = "Excel"
@@ -3206,10 +3217,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
         matched_in_q = _match_endpoint(req.question, endpoints)
 
         needs_clarification = (
-            plan.get("mode") == "clarification_needed"
-            or bool(plan.get("clarification_message"))
-            or (has_file_export_kw and not matched_in_q and not matched_eps_in_q)
-            or (is_ambiguous_request and not matched_in_q and not has_history_table and not (fuel_intent or forex_intent or stock_intent or weather_city))
+            not is_specialized_feed and (
+                plan.get("mode") == "clarification_needed"
+                or bool(plan.get("clarification_message"))
+                or (has_file_export_kw and not matched_in_q and not matched_eps_in_q)
+                or (is_ambiguous_request and not matched_in_q and not has_history_table)
+            )
         )
 
         if needs_clarification:

@@ -1056,6 +1056,8 @@ def parse_fuel_date_str(s: Any) -> Optional[datetime]:
     if isinstance(s, datetime):
         return s
     s_clean = str(s).strip()
+    if s_clean.lower() in ["today", "now", "current", "present"]:
+        return datetime.now()
     s_clean = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', s_clean, flags=re.IGNORECASE)
     formats = [
         "%d-%b-%Y", "%d-%B-%Y", "%d %b %Y", "%d %B %Y",
@@ -1094,7 +1096,15 @@ def extract_fuel_date_range(query: str) -> Tuple[Optional[datetime], Optional[da
         except Exception:
             pass
 
-    # 2. "between X and Y"
+    # 2. "from X to/till today|now" e.g. "FUEL RATES FROM 01-NOVEMBER-2026 TO TODAY"
+    m_to_today = re.search(r'\b(?:from\s+)?(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+[A-Za-z]+[\s\-\/]+\d{2,4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4})\s+(?:to|till|until|-)\s+(today|now|current|present)\b', t, re.IGNORECASE)
+    if m_to_today:
+        d1 = parse_fuel_date_str(m_to_today.group(1))
+        d2 = datetime.now()
+        if d1:
+            return (min(d1, d2), max(d1, d2))
+
+    # 3. "between X and Y"
     m_between = re.search(r'\bbetween\s+([A-Za-z0-9\s\-\/\.,]+?)\s+and\s+([A-Za-z0-9\s\-\/\.,]+?)(?:\s+for|\s+in|\s+report|\?|$)', t, re.IGNORECASE)
     if m_between:
         d1 = parse_fuel_date_str(m_between.group(1))
@@ -1102,7 +1112,7 @@ def extract_fuel_date_range(query: str) -> Tuple[Optional[datetime], Optional[da
         if d1 and d2:
             return (min(d1, d2), max(d1, d2))
 
-    # 3. "from X to/till Y" or "X to/till/- Y"
+    # 4. "from X to/till Y" or "X to/till/- Y"
     patterns = [
         r'(?:from\s+)?(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+[A-Za-z]+[\s\-\/]+\d{2,4})\s+(?:to|till|until|-)\s+(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+[A-Za-z]+[\s\-\/]+\d{2,4})',
         r'(?:from\s+)?(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(?:to|till|until|-)\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
