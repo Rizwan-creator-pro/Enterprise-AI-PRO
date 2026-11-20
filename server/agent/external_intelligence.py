@@ -11,7 +11,8 @@ import requests
 import re
 import json
 import time
-from typing import Optional, Dict, Any, Tuple, List
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Tuple, List, Union
 
 # Common stock symbol aliases
 GLOBAL_STOCK_SYMBOLS = {
@@ -1048,13 +1049,283 @@ def fetch_from_globalpetrolprices(country_name: str) -> Optional[Dict[str, Any]]
 
 # Live Fuel & Petroleum Intelligence
 # ---------------------------------------------------------------------------
+def parse_fuel_date_str(s: Any) -> Optional[datetime]:
+    """Parses date string or returns datetime directly."""
+    if not s:
+        return None
+    if isinstance(s, datetime):
+        return s
+    s_clean = str(s).strip()
+    s_clean = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', s_clean, flags=re.IGNORECASE)
+    formats = [
+        "%d-%b-%Y", "%d-%B-%Y", "%d %b %Y", "%d %B %Y",
+        "%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%Y/%m/%d",
+        "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y",
+        "%d-%b", "%d %b", "%d-%B", "%d %B"
+    ]
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(s_clean, fmt)
+            if "%Y" not in fmt and "%y" not in fmt:
+                dt = dt.replace(year=datetime.now().year)
+            return dt
+        except Exception:
+            continue
+    return None
+
+
+def extract_fuel_date_range(query: str) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """Extracts from and to date ranges from natural language queries."""
+    t = query.strip()
+
+    # 1. Month-only pattern e.g. "for November 2026", "in Nov 2026", "November 2026"
+    m_month = re.search(r'\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{4})\b', t, re.IGNORECASE)
+    if m_month and not re.search(r'\b(from|to|till|until|between|-)\b', t, re.IGNORECASE):
+        m_name = m_month.group(1)
+        yr = int(m_month.group(2))
+        try:
+            start_dt = datetime.strptime(f"1 {m_name} {yr}", "%d %b %Y" if len(m_name) <= 4 else "%d %B %Y")
+            if start_dt.month == 12:
+                next_month = start_dt.replace(year=yr + 1, month=1, day=1)
+            else:
+                next_month = start_dt.replace(month=start_dt.month + 1, day=1)
+            end_dt = next_month - timedelta(days=1)
+            return start_dt, end_dt
+        except Exception:
+            pass
+
+    # 2. "between X and Y"
+    m_between = re.search(r'\bbetween\s+([A-Za-z0-9\s\-\/\.,]+?)\s+and\s+([A-Za-z0-9\s\-\/\.,]+?)(?:\s+for|\s+in|\s+report|\?|$)', t, re.IGNORECASE)
+    if m_between:
+        d1 = parse_fuel_date_str(m_between.group(1))
+        d2 = parse_fuel_date_str(m_between.group(2))
+        if d1 and d2:
+            return (min(d1, d2), max(d1, d2))
+
+    # 3. "from X to/till Y" or "X to/till/- Y"
+    patterns = [
+        r'(?:from\s+)?(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+[A-Za-z]+[\s\-\/]+\d{2,4})\s+(?:to|till|until|-)\s+(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+[A-Za-z]+[\s\-\/]+\d{2,4})',
+        r'(?:from\s+)?(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(?:to|till|until|-)\s+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+        r'(?:from\s+)?([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4})\s+(?:to|till|until|-)\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4})',
+        r'(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+)\s+(?:to|till|until|-)\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:\s+\d{4})?)'
+    ]
+    for pat in patterns:
+        m = re.search(pat, t, re.IGNORECASE)
+        if m:
+            s1 = m.group(1)
+            s2 = m.group(2)
+            d1 = parse_fuel_date_str(s1)
+            d2 = parse_fuel_date_str(s2)
+            if d1 and d2:
+                return (min(d1, d2), max(d1, d2))
+
+    return None, None
+
+
+def extract_comparison_countries(text: str) -> List[str]:
+    """Finds all mentioned countries in order of appearance for multi-country comparisons."""
+    t = text.lower().strip()
+    matches = []
+    for alias, slug in COUNTRY_SLUG_MAP.items():
+        for m in re.finditer(r'\b' + re.escape(alias) + r'\b', t):
+            matches.append((m.start(), slug))
+
+    matches.sort(key=lambda x: x[0])
+    found = []
+    seen = set()
+    for _, slug in matches:
+        if slug not in seen:
+            seen.add(slug)
+            found.append(slug.replace("-", " "))
+    return found
+
+
+def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[datetime, str]) -> Optional[Dict[str, Any]]:
+    """
+    Scrapes and computes historical fuel rates for Pakistan from petrolratetoday.pk.
+    Groups contiguous days with identical rates into official date-range rows.
+    Computes Days, Rate, Total Amount, Total Days, and weighted Average Fuel Rate.
+    """
+    from_dt = parse_fuel_date_str(from_val) if isinstance(from_val, str) else from_val
+    to_dt = parse_fuel_date_str(to_val) if isinstance(to_val, str) else to_val
+    if not from_dt or not to_dt:
+        return None
+
+    if from_dt > to_dt:
+        from_dt, to_dt = to_dt, from_dt
+
+    daily_records = []
+    try:
+        from bs4 import BeautifulSoup
+        url = "https://petrolratetoday.pk/petrol-price-history"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, "html.parser")
+            tables = soup.find_all("table")
+            if tables:
+                for tr in tables[0].find_all("tr"):
+                    tds = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
+                    if len(tds) >= 4:
+                        d_dt = parse_fuel_date_str(tds[0])
+                        if not d_dt:
+                            continue
+                        m_p = re.search(r'([\d.]+)', tds[1].replace(',', ''))
+                        if m_p:
+                            rate = float(m_p.group(1))
+                            daily_records.append({"date": d_dt, "rate": rate})
+    except Exception as e:
+        logger.debug(f"[Fuel History] petrolratetoday.pk fetch exception: {e}")
+
+    # Filter within range [from_dt, to_dt]
+    in_range = [rec for rec in daily_records if from_dt.date() <= rec["date"].date() <= to_dt.date()]
+    in_range.sort(key=lambda x: x["date"])
+
+    if not in_range:
+        return None
+
+    # Group contiguous dates with identical rates
+    grouped_rows = []
+    curr_start = in_range[0]["date"]
+    curr_end = in_range[0]["date"]
+    curr_rate = in_range[0]["rate"]
+
+    for rec in in_range[1:]:
+        if rec["rate"] == curr_rate:
+            curr_end = rec["date"]
+        else:
+            days = (curr_end - curr_start).days + 1
+            grouped_rows.append({
+                "from_date": curr_start.strftime("%d-%b-%Y"),
+                "till_date": curr_end.strftime("%d-%b-%Y"),
+                "days": days,
+                "rate": curr_rate,
+                "amount": round(days * curr_rate, 2)
+            })
+            curr_start = rec["date"]
+            curr_end = rec["date"]
+            curr_rate = rec["rate"]
+
+    # Append final group
+    days = (curr_end - curr_start).days + 1
+    grouped_rows.append({
+        "from_date": curr_start.strftime("%d-%b-%Y"),
+        "till_date": curr_end.strftime("%d-%b-%Y"),
+        "days": days,
+        "rate": curr_rate,
+        "amount": round(days * curr_rate, 2)
+    })
+
+    total_days = sum(row["days"] for row in grouped_rows)
+    total_amount = round(sum(row["amount"] for row in grouped_rows), 2)
+    avg_rate = round(total_amount / total_days, 2) if total_days > 0 else 0.0
+
+    return {
+        "type": "fuel_history_report",
+        "country": "Pakistan",
+        "from_date": from_dt.strftime("%d-%b-%Y"),
+        "till_date": to_dt.strftime("%d-%b-%Y"),
+        "from_display": from_dt.strftime("%d-%B-%Y").upper(),
+        "till_display": to_dt.strftime("%d-%B-%Y").upper(),
+        "rows": grouped_rows,
+        "total_days": total_days,
+        "total_amount": total_amount,
+        "average_rate": avg_rate,
+        "source": "petrolratetoday.pk | JK Group Enterprise Intelligence Portal",
+        "url": "https://petrolratetoday.pk/petrol-price-history",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+
+def fetch_multi_country_fuel_comparison(countries: List[str]) -> Dict[str, Any]:
+    """
+    Fetches real-time fuel benchmarks across multiple countries via GlobalPetrolPrices.com.
+    Calculates USD equivalents and percentage variances against the World Average benchmark.
+    """
+    items = []
+    world_g_str = None
+    world_d_str = None
+    world_g_val = None
+    world_d_val = None
+
+    for c in countries:
+        gpp = fetch_from_globalpetrolprices(c)
+        if not gpp:
+            continue
+
+        if not world_g_str and gpp.get("world_gasoline_avg"):
+            world_g_str = gpp["world_gasoline_avg"]
+            m_wg = re.search(r'([\d.]+)', world_g_str)
+            if m_wg:
+                world_g_val = float(m_wg.group(1))
+
+        if not world_d_str and gpp.get("world_diesel_avg"):
+            world_d_str = gpp["world_diesel_avg"]
+            m_wd = re.search(r'([\d.]+)', world_d_str)
+            if m_wd:
+                world_d_val = float(m_wd.group(1))
+
+        p_str = gpp.get("petrol") or "N/A"
+        d_str = gpp.get("diesel") or "N/A"
+        eff_dt = gpp.get("effective_date") or "Latest"
+
+        p_usd = None
+        m_pusd = re.search(r'USD\s*([\d.]+)', p_str)
+        if m_pusd:
+            p_usd = float(m_pusd.group(1))
+
+        d_usd = None
+        m_dusd = re.search(r'USD\s*([\d.]+)', d_str)
+        if m_dusd:
+            d_usd = float(m_dusd.group(1))
+
+        diff_status = "N/A"
+        if p_usd and world_g_val:
+            diff = p_usd - world_g_val
+            pct = (diff / world_g_val) * 100
+            if abs(pct) < 1.0:
+                diff_status = "At World Average"
+            elif pct < 0:
+                diff_status = f"{abs(pct):.1f}% Below World Avg"
+            else:
+                diff_status = f"+{pct:.1f}% Above World Avg"
+
+        items.append({
+            "country": gpp.get("country", c),
+            "petrol_local": p_str,
+            "petrol_usd": p_usd,
+            "diesel_local": d_str,
+            "diesel_usd": d_usd,
+            "effective_date": eff_dt,
+            "diff_vs_world_gas": diff_status,
+            "source_url": gpp.get("url")
+        })
+
+    valid_usd = [it for it in items if it["petrol_usd"] is not None]
+    cheapest = min(valid_usd, key=lambda x: x["petrol_usd"])["country"] if valid_usd else "N/A"
+    highest = max(valid_usd, key=lambda x: x["petrol_usd"])["country"] if valid_usd else "N/A"
+
+    return {
+        "type": "fuel_comparison_report",
+        "countries": countries,
+        "items": items,
+        "cheapest_petrol": cheapest,
+        "highest_petrol": highest,
+        "world_gasoline_avg": world_g_str or "USD 1.38",
+        "world_diesel_avg": world_d_str or "USD 1.57",
+        "source": "GlobalPetrolPrices.com",
+        "url": "https://www.globalpetrolprices.com/",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+
 def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Detects if user is asking about petrol, diesel, fuel, or petroleum prices and detects the target country."""
+    """Detects if user is asking about petrol, diesel, fuel, petroleum prices, date-range reports, or country comparisons."""
     t = text.lower().strip()
     fuel_keywords = [
         "petrol", "diesel", "fuel", "gasoline", "kerosene", "hi-octane", "hsd", "ldo",
         "lpg", "cng", "petroleum", "crude oil", "oil price", "fuel price", "petrol price",
-        "diesel price", "fuel rate", "petrol rate"
+        "diesel price", "fuel rate", "petrol rate", "fuel report"
     ]
     if not any(k in t for k in fuel_keywords):
         return None
@@ -1062,15 +1333,29 @@ def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Opt
     intent_triggers = [
         "price", "rate", "cost", "today", "current", "latest", "now", "kya hai",
         "kitna", "kitne", "aaj", "bhav", "in pakistan", "karachi", "lahore", "islamabad",
-        "faisalabad", "hike", "drop", "increase", "decrease", "update", "relief", "what is", "how much"
+        "faisalabad", "hike", "drop", "increase", "decrease", "update", "relief", "what is", "how much",
+        "report", "history", "average", "avg", "between", "from", "till", "until",
+        "compare", "comparison", "vs", "versus", "difference", "cheaper", "expensive", "calculation", "calculations"
     ]
-    if not any(k in t for k in intent_triggers) and not any(k in t for k in ["petrol", "diesel", "fuel price"]):
+    if not any(k in t for k in intent_triggers) and not any(k in t for k in ["petrol", "diesel", "fuel price", "fuel report"]):
         return None
+
+    # Check for date range
+    from_dt, to_dt = extract_fuel_date_range(text)
+    is_date_range = bool(from_dt and to_dt)
+    from_date_str = from_dt.strftime("%d-%b-%Y") if from_dt else None
+    to_date_str = to_dt.strftime("%d-%b-%Y") if to_dt else None
+
+    # Check for comparison / multiple countries
+    countries = extract_comparison_countries(text)
+    is_comparison = len(countries) >= 2 or (len(countries) >= 1 and any(w in t for w in ["compare", "comparison", "vs", "versus", "difference", "cheaper", "expensive"]))
 
     # Detect requested country or worldwide context
     detected_country = None
     if any(k in t for k in ["worldwide", "world wide", "global", "international", "world average", "in the world", "around the world"]):
         detected_country = "Worldwide"
+    elif countries:
+        detected_country = countries[0]
     else:
         for c_key in sorted(COUNTRY_SLUG_MAP.keys(), key=lambda x: -len(x)):
             if re.search(r"\b" + re.escape(c_key) + r"\b", t):
@@ -1078,20 +1363,47 @@ def extract_fuel_intent(text: str, default_country: Optional[str] = None) -> Opt
                 break
 
     country = detected_country or default_country or "Pakistan"
-    return {"type": "fuel", "country": country, "query": text}
+    return {
+        "type": "fuel",
+        "country": country,
+        "countries": countries,
+        "is_comparison": is_comparison,
+        "is_date_range": is_date_range,
+        "from_date": from_date_str,
+        "to_date": to_date_str,
+        "query": text
+    }
 
 
 # Cache for live fuel prices (30 minutes)
 _FUEL_PRICE_CACHE: Dict[str, Dict[str, Any]] = {}
 _FUEL_PRICE_CACHE_TIME: float = 0.0
 
-def fetch_live_fuel_prices(country: str = "Pakistan") -> Dict[str, Any]:
+def fetch_live_fuel_prices(
+    country: str = "Pakistan",
+    is_comparison: bool = False,
+    countries: Optional[List[str]] = None,
+    is_date_range: bool = False,
+    from_date: Optional[Union[str, datetime]] = None,
+    to_date: Optional[Union[str, datetime]] = None
+) -> Dict[str, Any]:
     """
     Retrieves live fuel & petroleum benchmark rates via real-time search & official feeds.
-    Prioritizes official PSO (Pakistan State Oil) POL Archives and OGRA notification feeds.
-    Provides verified rates for Petrol (Premier Euro 5), High-Speed Diesel (Hi-Cetane Euro 5),
-    Hi-Octane (Al-Tron 97 / Octane+), Kerosene (SKO), Light Diesel Oil (LDO), and LPG.
+    Supports single country rates, historical date-range calculation reports, and multi-country comparisons.
     """
+    # 1. Date Range Fuel History Report
+    if is_date_range and from_date and to_date:
+        hist_report = fetch_pakistan_fuel_history(from_date, to_date)
+        if hist_report:
+            return hist_report
+
+    # 2. Multi-Country Comparison Report
+    if is_comparison and countries and len(countries) >= 2:
+        comp_report = fetch_multi_country_fuel_comparison(countries)
+        if comp_report and comp_report.get("items"):
+            return comp_report
+
+    # 3. Standard Single-Country / Global Rate Lookup
     global _FUEL_PRICE_CACHE, _FUEL_PRICE_CACHE_TIME
     now = time.time()
     cache_key = (country or "Pakistan").strip().lower()

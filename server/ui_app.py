@@ -2424,7 +2424,12 @@ async def execute_tool_task(tool_call: Dict[str, Any]) -> Dict[str, Any]:
 
         elif tool_type == "fuel":
             country = tool_call.get("country", "Pakistan")
-            data = await asyncio.to_thread(fetch_live_fuel_prices, country)
+            is_comp = tool_call.get("is_comparison", False)
+            countries = tool_call.get("countries", [])
+            is_dr = tool_call.get("is_date_range", False)
+            from_d = tool_call.get("from_date")
+            to_d = tool_call.get("to_date")
+            data = await asyncio.to_thread(fetch_live_fuel_prices, country, is_comp, countries, is_dr, from_d, to_d)
             return {"tool": tool_type, "success": bool(data), "data": data}
 
     except Exception as exc:
@@ -2500,7 +2505,15 @@ async def run_hybrid_orchestrator(
             external_tool_calls = [t for t in external_tool_calls if t.get("tool") not in ("web_search", "browse_url")]
             if fuel_int and not any(t.get("tool") == "fuel" for t in external_tool_calls):
                 cntry = fuel_int.get("country") or client_country or "Pakistan"
-                external_tool_calls.append({"tool": "fuel", "country": cntry})
+                external_tool_calls.append({
+                    "tool": "fuel",
+                    "country": cntry,
+                    "is_comparison": fuel_int.get("is_comparison", False),
+                    "countries": fuel_int.get("countries", []),
+                    "is_date_range": fuel_int.get("is_date_range", False),
+                    "from_date": fuel_int.get("from_date"),
+                    "to_date": fuel_int.get("to_date")
+                })
             elif forex_int and not any(t.get("tool") == "forex" for t in external_tool_calls):
                 external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
             elif stock_int:
@@ -2537,7 +2550,15 @@ async def run_hybrid_orchestrator(
 
         if fuel_int:
             cntry = fuel_int.get("country") or client_country or "Pakistan"
-            external_tool_calls.append({"tool": "fuel", "country": cntry})
+            external_tool_calls.append({
+                "tool": "fuel",
+                "country": cntry,
+                "is_comparison": fuel_int.get("is_comparison", False),
+                "countries": fuel_int.get("countries", []),
+                "is_date_range": fuel_int.get("is_date_range", False),
+                "from_date": fuel_int.get("from_date"),
+                "to_date": fuel_int.get("to_date")
+            })
         elif forex_int:
             external_tool_calls.append({"tool": "forex", "pair": f"{forex_int.get('base','USD')}/{forex_int.get('target','PKR')}"})
         elif stock_int:
@@ -3739,51 +3760,134 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
     if fuel_intent:
         if not fuel_data:
             c_target = fuel_intent.get("country", "Pakistan")
-            emit(f"Retrieving live verified fuel & petroleum rates from GlobalPetrolPrices.com ({c_target})...")
-            fuel_data = fetch_live_fuel_prices(c_target)
+            is_comp = fuel_intent.get("is_comparison", False)
+            countries = fuel_intent.get("countries", [])
+            is_dr = fuel_intent.get("is_date_range", False)
+            from_d = fuel_intent.get("from_date")
+            to_d = fuel_intent.get("to_date")
+            if is_dr:
+                emit(f"Retrieving historical fuel calculation report from petrolratetoday.pk ({from_d} to {to_d})...")
+            elif is_comp:
+                emit(f"Retrieving international fuel comparisons from GlobalPetrolPrices.com ({', '.join(countries)})...")
+            else:
+                emit(f"Retrieving live verified fuel & petroleum rates from GlobalPetrolPrices.com ({c_target})...")
+            fuel_data = fetch_live_fuel_prices(c_target, is_comp, countries, is_dr, from_d, to_d)
         if fuel_data:
             fuel_raw = fuel_data
-            snippets_txt = "\n".join(fuel_raw.get("snippets", []))
-            eff_dt = fuel_raw.get("effective_date") or time.strftime("%B %d, %Y")
-            p_str = fuel_raw.get("petrol") or "See live notification below"
-            d_str = fuel_raw.get("diesel") or "See live notification below"
-            ho_str = fuel_raw.get("hi_octane") or "N/A"
-            sko_str = fuel_raw.get("kerosene") or "N/A"
-            ldo_str = fuel_raw.get("ldo") or "N/A"
-            lpg_str = fuel_raw.get("lpg") or "N/A"
-            c_display = fuel_raw.get("country", "Pakistan")
-            src_str = fuel_raw.get("source", "GlobalPetrolPrices.com")
-            url_str = fuel_raw.get("url", "https://www.globalpetrolprices.com/")
+            if fuel_raw.get("type") == "fuel_history_report":
+                from_d = fuel_raw.get("from_date", "")
+                till_d = fuel_raw.get("till_date", "")
+                from_disp = fuel_raw.get("from_display", from_d.upper())
+                till_disp = fuel_raw.get("till_display", till_d.upper())
+                avg_rate = fuel_raw.get("average_rate", 0.0)
+                total_days = fuel_raw.get("total_days", 0)
+                total_amount = fuel_raw.get("total_amount", 0.0)
+                rows = fuel_raw.get("rows", [])
 
-            world_avg_lines = ""
-            if fuel_raw.get("world_gasoline_avg") or fuel_raw.get("world_diesel_avg"):
-                world_avg_lines = (
-                    f"\n- Worldwide Benchmark (Global Average): Gasoline {fuel_raw.get('world_gasoline_avg', 'N/A')}/L, "
-                    f"Diesel {fuel_raw.get('world_diesel_avg', 'N/A')}/L."
+                table_lines = [
+                    "| From Date Effective | Till Date | Days | Rate | Total Amount |",
+                    "| :--- | :--- | :---: | :---: | :---: |"
+                ]
+                for r in rows:
+                    table_lines.append(f"| {r['from_date']} | {r['till_date']} | {r['days']} | {r['rate']:.2f} | {r['amount']:.2f} |")
+                table_lines.append(f"| **Total Days** | | **{total_days}** | **Total:** | **{total_amount:.2f}** |")
+                table_lines.append(f"| | | | **Avg.** | **Rs. {avg_rate:.2f}** |")
+                table_lines.append(f"| **Average Fuel Rate** | | | | **Rs. {avg_rate:.2f}** |")
+                tbl_str = "\n".join(table_lines)
+
+                synth_user_prompt += (
+                    f"\n\n[OFFICIAL FUEL HISTORY & EMPLOYEE REIMBURSEMENT REPORT ({from_d} TO {till_d}) - SOURCE: petrolratetoday.pk | JK Group Enterprise Intelligence Portal]:\n"
+                    f"Period: {from_d} to {till_d}\n"
+                    f"Total Days: {total_days}\n"
+                    f"Total Amount: Rs. {total_amount:.2f}\n"
+                    f"Average Fuel Rate: Rs. {avg_rate:.2f}\n\n"
+                    f"Table Data:\n{tbl_str}\n\n"
+                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"1. You MUST format your response as an official corporate fuel memo matching the corporate standard:\n"
+                    f"Dear Fasih,\n\n"
+                    f"Please update Avg. Fuel Rate **Rs. {avg_rate:.2f}** for the period **{from_d} to {till_d}** for Employees Fuel Calculations.\n\n"
+                    f"### FUEL RATES FROM {from_disp} TO {till_disp}\n\n"
+                    f"2. Render the exact markdown table above with all sub-periods, Days, Rate, Total Amount, Total Days, Total Amount, and Average Fuel Rate.\n"
+                    f"3. Include the bottom summary line: *Official Source: petrolratetoday.pk | JK Group Enterprise Intelligence Portal*.\n"
+                    f"4. Do NOT alter the numbers or dates; use the exact calculated figures provided."
                 )
 
-            extra_products = ""
-            if ho_str != "N/A":
-                extra_products += f"\n- Hi-Octane (Octane+ / 97): {ho_str}"
-            if sko_str != "N/A":
-                extra_products += f"\n- Superior Kerosene Oil (SKO): {sko_str}"
-            if ldo_str != "N/A":
-                extra_products += f"\n- Light Diesel Oil (LDO): {ldo_str}"
-            if lpg_str != "N/A":
-                extra_products += f"\n- LPG: {lpg_str}"
+            elif fuel_raw.get("type") == "fuel_comparison_report":
+                items = fuel_raw.get("items", [])
+                world_g = fuel_raw.get("world_gasoline_avg", "USD 1.38")
+                world_d = fuel_raw.get("world_diesel_avg", "USD 1.57")
+                cheapest = fuel_raw.get("cheapest_petrol", "N/A")
+                highest = fuel_raw.get("highest_petrol", "N/A")
 
-            synth_user_prompt += (
-                f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({c_display.upper()}) - SOURCE: {src_str} ({url_str}) (EFFECTIVE: {eff_dt} AS OF {fuel_raw['timestamp']})]:\n"
-                f"- Petrol / Gasoline: {p_str}\n"
-                f"- Diesel: {d_str}{extra_products}{world_avg_lines}\n\n"
-                f"Live Official Dispatches & GlobalPetrolPrices Records:\n{snippets_txt}\n\n"
-                f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                f"1. State clearly in the very first sentence: Official Fuel Prices for {c_display} (Effective: {eff_dt}, Source: {src_str}): Petrol / Gasoline is {p_str} and Diesel is {d_str}.\n"
-                f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category / Global Comparison.\n"
-                f"3. When worldwide averages are provided, include a comparison stating whether {c_display} is above or below the global average.\n"
-                f"4. Cite https://www.globalpetrolprices.com/ as the verified international fuel price monitoring portal.\n"
-                f"5. Strictly IGNORE historical range boundaries, old blogs, or outdated price tags."
-            )
+                comp_table = [
+                    f"| Country | Gasoline / Petrol (Local) | Gasoline (USD/L) | Diesel (Local) | Diesel (USD/L) | Effective Date | Status vs. World Avg ({world_g}/L) |",
+                    "| :--- | :--- | :---: | :--- | :---: | :---: | :---: |"
+                ]
+                for item in items:
+                    p_usd = f"${item['petrol_usd']:.2f}" if item.get('petrol_usd') is not None else "N/A"
+                    d_usd = f"${item['diesel_usd']:.2f}" if item.get('diesel_usd') is not None else "N/A"
+                    comp_table.append(
+                        f"| {item['country']} | {item.get('petrol_local', 'N/A')} | {p_usd} | {item.get('diesel_local', 'N/A')} | {d_usd} | {item.get('effective_date', 'Latest')} | {item.get('diff_vs_world_gas', 'N/A')} |"
+                    )
+                tbl_str = "\n".join(comp_table)
+
+                synth_user_prompt += (
+                    f"\n\n[GLOBAL MULTI-COUNTRY FUEL & PETROLEUM BENCHMARK COMPARISON - SOURCE: GlobalPetrolPrices.com]:\n"
+                    f"Countries Compared: {', '.join(fuel_raw.get('countries', []))}\n"
+                    f"World Gasoline Benchmark: {world_g}\n"
+                    f"World Diesel Benchmark: {world_d}\n"
+                    f"Cheapest Petrol: {cheapest}\n"
+                    f"Highest Petrol: {highest}\n\n"
+                    f"Comparison Table:\n{tbl_str}\n\n"
+                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"1. Provide a direct, executive comparative analysis of fuel prices across the requested countries.\n"
+                    f"2. Present the full comparative table above showing local prices, USD per liter, diesel prices, and status vs the global average.\n"
+                    f"3. Highlight key insights (e.g. {cheapest} has the lowest petrol price among compared countries, while {highest} has the highest; note how each compares to the global benchmark).\n"
+                    f"4. Cite https://www.globalpetrolprices.com/ as the official verified international data source."
+                )
+
+            else:
+                snippets_txt = "\n".join(fuel_raw.get("snippets", []))
+                eff_dt = fuel_raw.get("effective_date") or time.strftime("%B %d, %Y")
+                p_str = fuel_raw.get("petrol") or "See live notification below"
+                d_str = fuel_raw.get("diesel") or "See live notification below"
+                ho_str = fuel_raw.get("hi_octane") or "N/A"
+                sko_str = fuel_raw.get("kerosene") or "N/A"
+                ldo_str = fuel_raw.get("ldo") or "N/A"
+                lpg_str = fuel_raw.get("lpg") or "N/A"
+                c_display = fuel_raw.get("country", "Pakistan")
+                src_str = fuel_raw.get("source", "GlobalPetrolPrices.com")
+                url_str = fuel_raw.get("url", "https://www.globalpetrolprices.com/")
+
+                world_avg_lines = ""
+                if fuel_raw.get("world_gasoline_avg") or fuel_raw.get("world_diesel_avg"):
+                    world_avg_lines = (
+                        f"\n- Worldwide Benchmark (Global Average): Gasoline {fuel_raw.get('world_gasoline_avg', 'N/A')}/L, "
+                        f"Diesel {fuel_raw.get('world_diesel_avg', 'N/A')}/L."
+                    )
+
+                extra_products = ""
+                if ho_str != "N/A":
+                    extra_products += f"\n- Hi-Octane (Octane+ / 97): {ho_str}"
+                if sko_str != "N/A":
+                    extra_products += f"\n- Superior Kerosene Oil (SKO): {sko_str}"
+                if ldo_str != "N/A":
+                    extra_products += f"\n- Light Diesel Oil (LDO): {ldo_str}"
+                if lpg_str != "N/A":
+                    extra_products += f"\n- LPG: {lpg_str}"
+
+                synth_user_prompt += (
+                    f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({c_display.upper()}) - SOURCE: {src_str} ({url_str}) (EFFECTIVE: {eff_dt} AS OF {fuel_raw.get('timestamp', '')})]:\n"
+                    f"- Petrol / Gasoline: {p_str}\n"
+                    f"- Diesel: {d_str}{extra_products}{world_avg_lines}\n\n"
+                    f"Live Official Dispatches & GlobalPetrolPrices Records:\n{snippets_txt}\n\n"
+                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                    f"1. State clearly in the very first sentence: Official Fuel Prices for {c_display} (Effective: {eff_dt}, Source: {src_str}): Petrol / Gasoline is {p_str} and Diesel is {d_str}.\n"
+                    f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category / Global Comparison.\n"
+                    f"3. When worldwide averages are provided, include a comparison stating whether {c_display} is above or below the global average.\n"
+                    f"4. Cite https://www.globalpetrolprices.com/ as the verified international fuel price monitoring portal.\n"
+                    f"5. Strictly IGNORE historical range boundaries, old blogs, or outdated price tags."
+                )
 
     # Check for live Firecrawl web intelligence (scrape, search, crawl, extract)
     firecrawl_result_data = None

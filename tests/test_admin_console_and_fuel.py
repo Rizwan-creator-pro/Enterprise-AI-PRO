@@ -171,5 +171,71 @@ class TestAdminConsoleAndFuelRates(unittest.TestCase):
         self.assertIsInstance(gen_synth, str)
         self.assertIn("You are", gen_synth)
 
+    def test_fuel_date_range_intent_and_calculation(self):
+        """Validates date-range fuel extraction and precise weighted average calculation matching the corporate standard."""
+        from agent.external_intelligence import extract_fuel_intent, fetch_live_fuel_prices
+
+        # 1. Intent extraction
+        q = "Fuel Rate Update - 01-Nov-2026 to 14-Nov-2026"
+        intent = extract_fuel_intent(q)
+        self.assertIsNotNone(intent)
+        self.assertTrue(intent.get("is_date_range"))
+        self.assertEqual(intent.get("from_date"), "01-Nov-2026")
+        self.assertEqual(intent.get("to_date"), "14-Nov-2026")
+
+        # 2. Calculation report
+        report = fetch_live_fuel_prices(
+            is_date_range=True,
+            from_date=intent["from_date"],
+            to_date=intent["to_date"]
+        )
+        self.assertIsInstance(report, dict)
+        self.assertEqual(report.get("type"), "fuel_history_report")
+        self.assertEqual(report.get("total_days"), 14)
+        self.assertEqual(report.get("total_amount"), 4932.98)
+        self.assertEqual(report.get("average_rate"), 352.36)
+        self.assertEqual(len(report.get("rows", [])), 10)
+
+        # First row: 01-Nov-2026 to 02-Nov-2026 (2 days @ 377.91 = 755.82)
+        r0 = report["rows"][0]
+        self.assertEqual(r0["from_date"], "01-Nov-2026")
+        self.assertEqual(r0["till_date"], "02-Nov-2026")
+        self.assertEqual(r0["days"], 2)
+        self.assertEqual(r0["rate"], 377.91)
+        self.assertEqual(r0["amount"], 755.82)
+
+        # Last row: 14-Nov-2026 (1 day @ 330.00 = 330.00)
+        r_last = report["rows"][-1]
+        self.assertEqual(r_last["from_date"], "14-Nov-2026")
+        self.assertEqual(r_last["till_date"], "14-Nov-2026")
+        self.assertEqual(r_last["days"], 1)
+        self.assertEqual(r_last["rate"], 330.00)
+        self.assertEqual(r_last["amount"], 330.00)
+
+    def test_fuel_multi_country_comparison_intent_and_report(self):
+        """Validates multi-country fuel comparison intent extraction and cross-border benchmarking."""
+        from agent.external_intelligence import extract_fuel_intent, fetch_live_fuel_prices
+
+        # 1. Multi-country intent extraction
+        q = "compare fuel prices in Pakistan, UAE, Saudi Arabia, and USA"
+        intent = extract_fuel_intent(q)
+        self.assertIsNotNone(intent)
+        self.assertTrue(intent.get("is_comparison"))
+        countries = intent.get("countries", [])
+        self.assertIn("Pakistan", countries)
+        self.assertIn("Saudi Arabia", countries)
+        self.assertIn("USA", countries)
+
+        # 2. Comparison report fetch
+        report = fetch_live_fuel_prices(
+            is_comparison=True,
+            countries=["Pakistan", "Saudi Arabia", "USA"]
+        )
+        self.assertIsInstance(report, dict)
+        self.assertEqual(report.get("type"), "fuel_comparison_report")
+        self.assertTrue(len(report.get("items", [])) >= 2)
+        self.assertIsNotNone(report.get("cheapest_petrol"))
+        self.assertIsNotNone(report.get("world_gasoline_avg"))
+
 if __name__ == "__main__":
     unittest.main()
