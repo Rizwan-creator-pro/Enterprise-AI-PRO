@@ -7,12 +7,15 @@ Connects the AI Agent to the live outside world:
 4. Live Economic Indicators & Central Bank Spot Rates
 """
 
+import logging
 import requests
 import re
 import json
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple, List, Union
+
+logger = logging.getLogger(__name__)
 
 # Common stock symbol aliases
 GLOBAL_STOCK_SYMBOLS = {
@@ -1241,7 +1244,7 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
         "total_days": total_days,
         "total_amount": total_amount,
         "average_rate": avg_rate,
-        "source": "petrolratetoday.pk | JK Group Enterprise Intelligence Portal",
+        "source": "petrolratetoday.pk",
         "url": "https://petrolratetoday.pk/petrol-price-history",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }

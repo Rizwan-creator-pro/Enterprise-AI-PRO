@@ -1724,7 +1724,7 @@
             .et-drawer-backdrop {
                 display: block !important;
             }
-            .et-left-pane, .doc-toc-pane {
+            .et-left-pane, .doc-toc-pane, .prompt-toc-pane {
                 position: absolute !important;
                 top: 0 !important;
                 left: 0 !important;
@@ -1740,7 +1740,7 @@
                 background: var(--surface) !important;
                 border-right: 1px solid var(--border-color) !important;
             }
-            .et-left-pane.open, .doc-toc-pane.open {
+            .et-left-pane.open, .doc-toc-pane.open, .prompt-toc-pane.open {
                 transform: translateX(0) !important;
             }
             .et-card-scroll {
@@ -2006,6 +2006,354 @@
             .doc-title-h1 {
                 font-size: 24px;
             }
+        }
+
+        /* ================= Enterprise Prompt Library Explorer ================= */
+        .prompt-explorer-view {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            inset: 0;
+            background: var(--bg-color);
+            z-index: 55;
+            overflow: hidden;
+            animation: fadeIn .2s ease;
+        }
+        .prompt-toc-pane {
+            width: 270px;
+            min-width: 240px;
+            max-width: 310px;
+            border-right: 1px solid var(--border-color);
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .prompt-toc-heading {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--text-faint);
+            padding: 14px 18px 8px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .prompt-toc-nav {
+            list-style: none;
+            margin: 0;
+            padding: 6px 12px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .prompt-toc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 13.5px;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: .15s;
+        }
+        .prompt-toc-item:hover {
+            background: var(--sidebar-hover);
+            color: var(--text-main);
+        }
+        .prompt-toc-item.active {
+            background: rgba(26,115,232,0.1);
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+        .prompt-toc-item .pti-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .prompt-toc-item .pti-count {
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 12px;
+            background: var(--surface-2);
+            color: var(--text-faint);
+            font-weight: 600;
+        }
+        .prompt-toc-item.active .pti-count {
+            background: rgba(26,115,232,0.18);
+            color: var(--accent-blue);
+        }
+        .prompt-content-pane {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 28px 36px 64px;
+            background: var(--bg-color);
+        }
+        @media (max-width: 768px) {
+            .prompt-content-pane {
+                padding: 16px 14px 48px;
+            }
+        }
+        .prompt-cat-header {
+            margin-bottom: 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .prompt-cat-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0 0 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .prompt-cat-desc {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.5;
+        }
+        .prompt-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+        @media (max-width: 640px) {
+            .prompt-cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .prompt-card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all .2s ease;
+            position: relative;
+            cursor: pointer;
+        }
+        .prompt-card:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+        .prompt-card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .prompt-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .prompt-badge {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 6px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .prompt-badge.fuel { background: #fee2e2; color: #dc2626; }
+        .prompt-badge.psx { background: #d1fae5; color: #059669; }
+        .prompt-badge.forex { background: #dbeafe; color: #1d4ed8; }
+        .prompt-badge.oracle { background: #ede9fe; color: #6d28d9; }
+        .prompt-badge.weather { background: #fef3c7; color: #d97706; }
+        .prompt-badge.firecrawl { background: #fce7f3; color: #be185d; }
+        .prompt-card-query {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12.5px;
+            line-height: 1.45;
+            color: var(--text-main);
+            background: var(--surface-2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+        .prompt-card-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            line-height: 1.45;
+        }
+        .prompt-card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: auto;
+        }
+        .btn-run-prompt {
+            flex: 1;
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-blue);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            transition: .15s;
+        }
+        .btn-run-prompt:hover {
+            opacity: 0.92;
+            transform: scale(1.01);
+        }
+        .btn-insert-prompt {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-2);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: .15s;
+        }
+        .btn-insert-prompt:hover {
+            background: var(--border-color);
+            color: var(--text-main);
+        }
+
+        /* ================= Sidebar Prompt Library Button ================= */
+        .sidebar-prompt-lib-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 10px 14px;
+            margin: 6px 0 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(245, 158, 11, 0.28);
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.04));
+            color: var(--text-main);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-sizing: border-box;
+        }
+        .sidebar-prompt-lib-btn:hover {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.08));
+            border-color: rgba(245, 158, 11, 0.5);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.12);
+        }
+        .sidebar-prompt-lib-btn .spl-left {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .sidebar-prompt-lib-btn .sb-lib-pill {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #f59e0b;
+            color: #fff;
+            letter-spacing: 0.04em;
+        }
+
+        /* ================= Pin UI Prompt Composer Quick Actions Deck ================= */
+        .composer-prompt-deck {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 0 4px 8px;
+            margin-bottom: 2px;
+            max-width: 100%;
+        }
+        .composer-prompt-deck::-webkit-scrollbar { display: none; }
+        .cpd-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--surface);
+            color: var(--text-muted);
+            font: inherit;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .cpd-chip:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-main);
+            background: var(--surface-2);
+            transform: translateY(-1.5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .cpd-chip.fuel:hover { border-color: #ef4444; color: #ef4444; }
+        .cpd-chip.psx:hover { border-color: #10b981; color: #10b981; }
+        .cpd-chip.forex:hover { border-color: #3b82f6; color: #3b82f6; }
+        .cpd-chip.weather:hover { border-color: #f59e0b; color: #f59e0b; }
+        .cpd-chip.all-prompts {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.35);
+            color: #d97706;
+            font-weight: 600;
+        }
+        .cpd-chip.all-prompts:hover {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: #fff;
+        }
+        html[data-theme="dark"] .cpd-chip.all-prompts {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+        html[data-theme="dark"] .cpd-chip.all-prompts:hover {
+            background: #f59e0b;
+            color: #000;
+        }
+
+        /* ================= Pin UI Liquid Voice Animation ================= */
+        #micBtn.recording {
+            position: relative;
+            background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25), 0 0 16px rgba(239, 68, 68, 0.35);
+            animation: liquidVoicePulse 1.6s infinite ease-in-out;
+        }
+        @keyframes liquidVoicePulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
         @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(217,48,37,.35); } 50% { box-shadow: 0 0 0 8px rgba(217,48,37,0); } }
@@ -5356,6 +5704,10 @@
             <button class="new-chat-btn" onclick="startNewSession()">
                 <i class="fa-solid fa-plus"></i> New Chat
             </button>
+            <button type="button" class="sidebar-prompt-lib-btn" onclick="openPromptLibrary()" title="Browse Curated Enterprise Prompts (Petrol, PSX, Forex, Weather)">
+                <span class="spl-left"><i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i> <span>Prompt Library</span></span>
+                <span class="sb-lib-pill">TABS</span>
+            </button>
             <div class="sidebar-search-wrap">
                 <i class="fa-solid fa-magnifying-glass sb-search-icon"></i>
                 <input type="text" id="chatSearchInput" class="sb-search-input" placeholder="Search chats..." autocomplete="off" oninput="filterChatHistory(this.value)" />
@@ -5383,6 +5735,12 @@
                         <i class="fa-solid fa-database"></i>
                         <div class="pi-text"><span class="pi-name">Authorized Tables</span><span class="pi-sub">Browse live datasets & schemas</span></div>
                         <span class="pop-badge">STUDIO</span>
+                    </div>
+
+                    <div class="pop-item" id="menuPromptsItem" onclick="closeMenus(); openPromptLibrary()">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i>
+                        <div class="pi-text"><span class="pi-name">Prompt Library</span><span class="pi-sub">Petrol, PSX, Forex & Stock Prompts</span></div>
+                        <span class="pop-badge" style="background:#fef3c7; color:#d97706; font-weight:700;">PROMPTS</span>
                     </div>
 
                     <div class="pop-item" id="menuDocsItem" onclick="closeMenus(); openDocExplorer()">
@@ -5499,6 +5857,9 @@
                         <i class="fa-solid fa-shapes"></i>
                         <span class="artifacts-count-badge" id="chatArtifactsBadge" style="display:none;">0</span>
                     </button>
+                    <button type="button" class="top-action-btn prompt-library-toggle-btn" id="promptLibraryBtn" onclick="openPromptLibrary()" title="Enterprise Prompt Library (Petrol, PSX, Forex)" aria-label="Open Prompt Library">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-blue);"></i>
+                    </button>
                     <button type="button" class="prompt-nav-toggle icon-only" id="promptNavToggleBtn" onclick="togglePromptNav()" title="Prompts in this conversation" aria-label="Toggle prompts outline"><i class="fa-solid fa-list-ul"></i></button>
                 </div>
             </div>
@@ -5568,6 +5929,43 @@
                         <ul class="doc-toc-nav" id="docTocNav"></ul>
                     </aside>
                     <main class="doc-content-pane" id="docContentPane"></main>
+                </div>
+            </div>
+
+            <!-- Enterprise Prompt Library Explorer View -->
+            <div class="table-explorer-view prompt-explorer-view" id="promptExplorerView" style="display:none;">
+                <div class="et-topbar">
+                    <div class="et-title-wrap">
+                        <button type="button" class="et-back-btn" onclick="closePromptLibrary()" title="Back to Chat"><i class="fa-solid fa-arrow-left"></i> <span>Back to Chat</span></button>
+                        <button type="button" class="et-mob-nav-btn" id="promptMobNavBtn" onclick="togglePromptDrawer()" title="Categories"><i class="fa-solid fa-list-ul"></i> <span>Categories</span></button>
+                        <div class="et-title">
+                            <span class="doc-title-desktop"><i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i> Enterprise Prompt Library</span>
+                            <span class="doc-badge doc-title-desktop" style="background:#fef3c7; color:#d97706; font-weight:700;">ONE-CLICK INTELLIGENCE</span>
+                            <span class="doc-nav-mobile" id="promptNavTitle">Prompts</span>
+                        </div>
+                    </div>
+                    <div class="et-top-actions">
+                        <span style="font-size:12.5px; color:var(--text-muted); margin-right:8px;" class="doc-title-desktop">Click any prompt to run directly in chat</span>
+                    </div>
+                </div>
+                <div class="et-body">
+                    <div class="et-drawer-backdrop" id="promptDrawerBackdrop" onclick="togglePromptDrawer(false)"></div>
+                    <aside class="prompt-toc-pane" id="promptTocPane">
+                        <div class="et-left-pane-header">
+                            <span class="et-lph-title"><i class="fa-solid fa-layer-group"></i> Categories</span>
+                            <button type="button" class="et-lph-close" onclick="togglePromptDrawer(false)" aria-label="Close drawer"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="et-search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="promptSearchInput" placeholder="Filter prompts..." oninput="filterPromptLibrary(this.value)" autocomplete="off" />
+                        </div>
+                        <div class="prompt-toc-heading">INTELLIGENCE STREAMS</div>
+                        <ul class="prompt-toc-nav" id="promptCategoryNav"></ul>
+                    </aside>
+                    <main class="prompt-content-pane" id="promptContentPane">
+                        <div class="prompt-cat-header" id="promptCatHeader"></div>
+                        <div class="prompt-cards-grid" id="promptCardsGrid"></div>
+                    </main>
                 </div>
             </div>
 
@@ -5739,6 +6137,27 @@
                                 </div>
                             </div>
 
+                            <!-- Card 7: Curated Prompt Library & Pre-Configured Workflows -->
+                            <div class="admin-card accent-amber" id="secPromptLibraryCard">
+                                <div class="admin-card-header">
+                                    <div class="admin-card-title"><i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i> Enterprise Prompt Library & Quick Actions</div>
+                                    <span class="admin-badge warning">Interactive</span>
+                                </div>
+                                <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">
+                                    Pre-configured enterprise queries covering Petrol & POL calculations, Pakistan Stock Exchange (PSX DPS, Firecrawl & POL/EORL Primary), Interbank Currency / Forex, and Autonomous Oracle datasets.
+                                </p>
+                                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                                    <button type="button" class="admin-btn" style="background:var(--surface-2); border:1px solid var(--border-color); color:var(--text-main); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="closeAdminConsole(); openPromptLibrary('petrol')"><i class="fa-solid fa-gas-pump" style="color:#ef4444;"></i> Petrol Prompts</button>
+                                    <button type="button" class="admin-btn" style="background:var(--surface-2); border:1px solid var(--border-color); color:var(--text-main); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="closeAdminConsole(); openPromptLibrary('psx')"><i class="fa-solid fa-chart-line" style="color:#10b981;"></i> PSX & Stock Market</button>
+                                    <button type="button" class="admin-btn" style="background:var(--surface-2); border:1px solid var(--border-color); color:var(--text-main); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="closeAdminConsole(); openPromptLibrary('forex')"><i class="fa-solid fa-dollar-sign" style="color:#3b82f6;"></i> Dollar & Forex</button>
+                                    <button type="button" class="admin-btn" style="background:var(--surface-2); border:1px solid var(--border-color); color:var(--text-main); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="closeAdminConsole(); openPromptLibrary('tables')"><i class="fa-solid fa-database" style="color:#8b5cf6;"></i> Oracle Datasets</button>
+                                    <button type="button" class="admin-btn" style="background:var(--surface-2); border:1px solid var(--border-color); color:var(--text-main); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="closeAdminConsole(); openPromptLibrary('weather')"><i class="fa-solid fa-cloud-sun" style="color:#f59e0b;"></i> Weather Logistics</button>
+                                </div>
+                                <button type="button" class="admin-save-btn" style="background:#f59e0b; border:none; padding:8px 18px;" onclick="closeAdminConsole(); openPromptLibrary()">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Full Prompt Library
+                                </button>
+                            </div>
+
                             <!-- Bottom Action -->
                             <div style="margin-top:28px; margin-bottom:40px; display:flex; align-items:center; gap:16px;">
                                 <button type="button" class="admin-save-btn" onclick="saveAdminSettings()">
@@ -5760,6 +6179,26 @@
             <div class="input-wrapper">
                 <div id="popBackdrop" class="pop-backdrop" onclick="closeMenus()"></div>
                 <button type="button" id="jumpBtn" class="jump-btn" title="Scroll to latest" aria-label="Scroll to latest message" onclick="scrollToBottom(true)"><i class="fa-solid fa-arrow-down"></i></button>
+
+                <!-- Pin UI Inspired Quick Prompt Actions Deck -->
+                <div class="composer-prompt-deck" id="composerPromptDeck">
+                    <button type="button" class="cpd-chip fuel" onclick="runLibraryPrompt('Fuel rates from 01-November-2026 to today')">
+                        <i class="fa-solid fa-gas-pump"></i> <span>Fuel Rates</span>
+                    </button>
+                    <button type="button" class="cpd-chip psx" onclick="runLibraryPrompt('What is the share price of POL on PSX?')">
+                        <i class="fa-solid fa-chart-line"></i> <span>POL Stock</span>
+                    </button>
+                    <button type="button" class="cpd-chip forex" onclick="runLibraryPrompt('What is the USD to PKR exchange rate today?')">
+                        <i class="fa-solid fa-dollar-sign"></i> <span>USD/PKR</span>
+                    </button>
+                    <button type="button" class="cpd-chip weather" onclick="runLibraryPrompt('Weather forecast for Karachi')">
+                        <i class="fa-solid fa-cloud-sun"></i> <span>Weather</span>
+                    </button>
+                    <button type="button" class="cpd-chip all-prompts" onclick="openPromptLibrary()" title="Browse all curated prompts">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Prompt Library</span>
+                    </button>
+                </div>
+
                 <div class="composer">
                     <div id="composerImageTray" class="composer-image-tray" style="display:none;"></div>
                     <textarea id="userInput" rows="1" dir="auto" placeholder="Ask anything, / for actions" autocomplete="off" oninput="autoGrow()" onkeydown="onInputKey(event)"></textarea>
@@ -5816,6 +6255,10 @@
                                     </div>
                                 </div>
                             </div>
+                            <button type="button" class="mode-toggle-btn prompt-deck-btn" onclick="openPromptLibrary()" title="Browse Curated Prompts (Petrol, PSX, Forex, Weather)">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i>
+                                <span class="lbl-full">Prompts</span>
+                            </button>
 
                         </div>
                         <div class="composer-tools-right">
@@ -7174,6 +7617,7 @@ const skeletonHTML = () => `
             closeSidebarMobile();
             if (typeof togglePromptNav === 'function') togglePromptNav(false);
             if (typeof toggleChatArtifacts === 'function') toggleChatArtifacts(false);
+            if (typeof closePromptLibrary === 'function') closePromptLibrary();
             closeTableExplorer();
             closeDocExplorer();
             closeMenus();
@@ -7222,6 +7666,7 @@ const skeletonHTML = () => `
             closeSidebarMobile();
             if (typeof togglePromptNav === 'function') togglePromptNav(false);
             if (typeof toggleChatArtifacts === 'function') toggleChatArtifacts(false);
+            if (typeof closePromptLibrary === 'function') closePromptLibrary();
             closeTableExplorer();
             closeDocExplorer();
             closeMenus();
@@ -8673,7 +9118,7 @@ const skeletonHTML = () => `
             }
         }
         document.addEventListener('click', e => { if (!e.target.closest('.pop')) closeMenus(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenus(); togglePromptNav(false); toggleChatArtifacts(false); } });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenus(); togglePromptNav(false); toggleChatArtifacts(false); if (typeof closePromptLibrary === 'function') closePromptLibrary(); } });
 
         function autoGrow() {
             const t = document.getElementById('userInput');
@@ -9464,7 +9909,15 @@ const skeletonHTML = () => `
             return q;
         }
 
-        const summaryOf = t => t.replace(/```[\s\S]*?(```|$)/g, '').split('\n').filter(l => !l.trim().startsWith('|')).join('\n').replace(/\[\[EXPORT:\w+\]\]/gi, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`#>]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+        const summaryOf = t => t.replace(/```[\s\S]*?(```|$)/g, '').split('\n').filter(l => {
+            const tr = l.trim();
+            if (!tr || tr.startsWith('|')) return false;
+            if (/^dear\s+[\w\s]+,/i.test(tr)) return false;
+            if (/^please\s+update\s+avg\.?\s+fuel/i.test(tr)) return false;
+            if (/official\s+source:\s*petrolratetoday\.pk/i.test(tr)) return false;
+            if (/jk\s+group\s+enterprise\s+intelligence/i.test(tr)) return false;
+            return true;
+        }).join('\n').replace(/\[\[EXPORT:\w+\]\]/gi, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`#>]/g, '').replace(/\n{3,}/g, '\n\n').trim();
 
         function readAllTables(box) {
             const rawTables = [...box.querySelectorAll('.table-block table, table')];
@@ -10697,8 +11150,14 @@ const skeletonHTML = () => `
                 return;
             }
             const expView = document.getElementById('tableExplorerView');
+            const docView = document.getElementById('docExplorerView');
+            const adminView = document.getElementById('adminConsoleView');
+            const promptView = document.getElementById('promptExplorerView');
             const chatScroll = document.querySelector('.chat-scroll-area');
             const inputWrap = document.querySelector('.input-wrapper');
+            if (docView) docView.style.display = 'none';
+            if (adminView) adminView.style.display = 'none';
+            if (promptView) promptView.style.display = 'none';
             if (!expView) return;
             expView.style.display = 'flex';
             if (chatScroll) chatScroll.style.display = 'none';
@@ -11194,7 +11653,11 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const chatScroll = document.querySelector('.chat-scroll-area');
             const inputWrap = document.querySelector('.input-wrapper');
             const expView = document.getElementById('tableExplorerView');
+            const adminView = document.getElementById('adminConsoleView');
+            const promptView = document.getElementById('promptExplorerView');
             if (expView) expView.style.display = 'none';
+            if (adminView) adminView.style.display = 'none';
+            if (promptView) promptView.style.display = 'none';
             if (!docView) return;
             docView.style.display = 'flex';
             if (chatScroll) chatScroll.style.display = 'none';
@@ -11768,6 +12231,377 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             }
         }
 
+        // ================= Enterprise Prompt Library Explorer =================
+        const PROMPT_LIBRARY = [
+            {
+                id: 'petrol',
+                name: 'Petrol & Fuel Intelligence',
+                icon: 'fa-solid fa-gas-pump',
+                badge: 'fuel',
+                color: '#ef4444',
+                desc: 'Comprehensive fuel price monitoring, official POL archives, date-range calculations, weighted averages, and global cross-border benchmarks.',
+                prompts: [
+                    {
+                        title: 'Date-Range Fuel Calculation',
+                        query: 'Fuel Rate Update - 01-Nov-2026 to 20-Nov-2026',
+                        desc: 'Calculates exact sub-period days, daily rate, total amount, and weighted average fuel rate for employee reimbursement.',
+                        badge: 'Date-Range',
+                        badgeCls: 'fuel'
+                    },
+                    {
+                        title: 'Fuel Rates to Today',
+                        query: 'Fuel rates from 01-November-2026 to today',
+                        desc: 'Computes day-by-day fuel breakdown and weighted average from a starting date up to today.',
+                        badge: 'Live to Today',
+                        badgeCls: 'fuel'
+                    },
+                    {
+                        title: 'Current Official Fuel Prices',
+                        query: 'What is the current petrol and diesel price in Pakistan today?',
+                        desc: 'Fetches verified official Pakistan State Oil / OGRA notification prices and effective notification dates.',
+                        badge: 'Official Live',
+                        badgeCls: 'fuel'
+                    },
+                    {
+                        title: 'Global Fuel Comparison Benchmark',
+                        query: 'Compare fuel prices in Pakistan, UAE, Saudi Arabia, and USA',
+                        desc: 'Compares retail gasoline/petrol and diesel in USD and local currencies against the World Average benchmark via GlobalPetrolPrices.com.',
+                        badge: 'Global Benchmark',
+                        badgeCls: 'fuel'
+                    },
+                    {
+                        title: 'Export Fuel Report as Excel',
+                        query: 'Export fuel rate report from 01-Nov-2026 to today as Excel',
+                        desc: 'Generates a verified, structured Excel spreadsheet (.xlsx) with column formatting and formulas.',
+                        badge: 'Excel Export',
+                        badgeCls: 'fuel'
+                    },
+                    {
+                        title: 'Specific Historical Date Rate',
+                        query: 'What were the petrol prices on 15-October-2026?',
+                        desc: 'Look up past historical petroleum rates for any specific date on record.',
+                        badge: 'History Lookup',
+                        badgeCls: 'fuel'
+                    }
+                ]
+            },
+            {
+                id: 'psx',
+                name: 'PSX & Stock Market',
+                icon: 'fa-solid fa-chart-line',
+                badge: 'psx',
+                color: '#10b981',
+                desc: 'Live equity intelligence for Pakistan Stock Exchange (PSX DPS Portal, Investify.pk, Firecrawl Production, and POL / EORL Primary stock data).',
+                prompts: [
+                    {
+                        title: 'POL Share Price & Day Change',
+                        query: 'What is the current share price and day change for POL on PSX?',
+                        desc: 'Queries Pakistan Oilfields Limited (POL) live quote, trading volume, day high/low, and market status.',
+                        badge: 'POL Primary',
+                        badgeCls: 'psx'
+                    },
+                    {
+                        title: 'Oil & Gas Sector Comparison',
+                        query: 'Compare POL, OGDC, and PPL stock prices and trading volume today on PSX',
+                        desc: 'Cross-benchmarks Pakistan Oilfields (POL), Oil & Gas Development Co (OGDC), and Pakistan Petroleum (PPL).',
+                        badge: 'Sector Analysis',
+                        badgeCls: 'psx'
+                    },
+                    {
+                        title: 'Firecrawl Corporate Scrape & Disclosures',
+                        query: 'Search latest corporate announcements and financial results for POL and EORL via Firecrawl Production',
+                        desc: 'Uses Firecrawl Production web intelligence to scrape latest company disclosures and financial filings.',
+                        badge: 'Firecrawl Prod',
+                        badgeCls: 'firecrawl'
+                    },
+                    {
+                        title: 'KSE-100 Index Live Performance',
+                        query: 'What is the live index point and market summary for KSE-100 index today?',
+                        desc: 'Fetches benchmark KSE-100 index points, net change, percentage movement, and market volume.',
+                        badge: 'KSE-100 Index',
+                        badgeCls: 'psx'
+                    },
+                    {
+                        title: 'Top Volume Equities Today',
+                        query: 'Show top volume traded equities in Pakistan Stock Exchange today',
+                        desc: 'Retrieves volume leaders, closing prices, and trading activity on the PSX floor.',
+                        badge: 'Volume Leaders',
+                        badgeCls: 'psx'
+                    },
+                    {
+                        title: 'Blue-Chip Equities Quote',
+                        query: 'What is the current share price of Systems Limited (SYS) and Interloop (ILP)?',
+                        desc: 'Instant equity intelligence for premier technology and textile manufacturers on PSX.',
+                        badge: 'Equities',
+                        badgeCls: 'psx'
+                    }
+                ]
+            },
+            {
+                id: 'forex',
+                name: 'Dollar & Forex Rates',
+                icon: 'fa-solid fa-dollar-sign',
+                badge: 'forex',
+                color: '#3b82f6',
+                desc: 'Real-time global interbank exchange rates, dollar to PKR conversion, Gulf remittances (AED, SAR), and European currencies.',
+                prompts: [
+                    {
+                        title: 'USD to PKR Interbank Rate',
+                        query: 'What is the USD to PKR exchange rate today?',
+                        desc: 'Fetches verified live interbank rate for US Dollar to Pakistani Rupee with reverse rate calculation.',
+                        badge: 'Live Interbank',
+                        badgeCls: 'forex'
+                    },
+                    {
+                        title: 'Currency Conversion ($500 to PKR)',
+                        query: 'Convert 500 USD to PKR at live interbank rate',
+                        desc: 'Computes exact converted amount, inverse rate, and comparison benchmark values across global currencies.',
+                        badge: 'Conversion',
+                        badgeCls: 'forex'
+                    },
+                    {
+                        title: 'Major Global Currencies Benchmark',
+                        query: 'Compare 100 USD against Euro, British Pound, Saudi Riyal, and UAE Dirham',
+                        desc: 'Generates a real-time foreign exchange comparison table with spot rates against major world currencies.',
+                        badge: 'Comparison',
+                        badgeCls: 'forex'
+                    },
+                    {
+                        title: 'Gulf Remittances (SAR & AED)',
+                        query: 'What is the exchange rate of Saudi Riyal (SAR) and UAE Dirham (AED) to PKR?',
+                        desc: 'Instant exchange quotes for GCC business remittances and trade financing.',
+                        badge: 'GCC Remittance',
+                        badgeCls: 'forex'
+                    },
+                    {
+                        title: 'Forex Matrix Table',
+                        query: "Give me today's foreign exchange rates table for all major global currencies",
+                        desc: 'Full matrix of major interbank conversion rates formatted in a clean table.',
+                        badge: 'Matrix Table',
+                        badgeCls: 'forex'
+                    }
+                ]
+            },
+            {
+                id: 'tables',
+                name: 'Autonomous Oracle Tables',
+                icon: 'fa-solid fa-database',
+                badge: 'oracle',
+                color: '#8b5cf6',
+                desc: 'Interactive analytical queries across authorized Oracle APEX ORDS database tables and in-memory datasets.',
+                prompts: [
+                    {
+                        title: 'Department Salary Expenditure',
+                        query: 'Show total employee count and total salary expenditure grouped by department',
+                        desc: 'Runs in-memory aggregation with interactive summary chart and average compensation metrics.',
+                        badge: 'Aggregation',
+                        badgeCls: 'oracle'
+                    },
+                    {
+                        title: 'Top 10 Highest Paid Personnel',
+                        query: 'List top 10 highest paid employees with department and designation',
+                        desc: 'Returns sorted personnel roster with salary figures, job titles, and department affiliations.',
+                        badge: 'Ranking',
+                        badgeCls: 'oracle'
+                    },
+                    {
+                        title: 'Export Full Employees to Excel',
+                        query: 'Export complete employee dataset to Excel with department details',
+                        desc: 'Generates formatted multi-column .xlsx workbook with zebra striping and custom column widths.',
+                        badge: 'Excel Export',
+                        badgeCls: 'oracle'
+                    },
+                    {
+                        title: 'Invoice Financial Overview',
+                        query: 'Show active invoice totals, paid amounts, and outstanding balance summary',
+                        desc: 'Aggregates commercial invoices, cash collections, and receivable balances.',
+                        badge: 'Financials',
+                        badgeCls: 'oracle'
+                    }
+                ]
+            },
+            {
+                id: 'weather',
+                name: 'Weather & Logistics',
+                icon: 'fa-solid fa-cloud-sun',
+                badge: 'weather',
+                color: '#f59e0b',
+                desc: 'Live meteorological intelligence, 7-day weather projections, precipitation probabilities, and logistics condition forecasts.',
+                prompts: [
+                    {
+                        title: 'Current City Weather & Temp',
+                        query: 'What is the current weather, temperature, and forecast in Karachi?',
+                        desc: 'Queries Open-Meteo & wttr.in for real-time temperature, wind speed, humidity, and condition summary.',
+                        badge: 'Live Meteo',
+                        badgeCls: 'weather'
+                    },
+                    {
+                        title: '7-Day Multi-City Forecast',
+                        query: 'Weather forecast for Lahore and Islamabad for the next 7 days',
+                        desc: 'Generates a multi-day comparison forecast with temperature ranges and rain probabilities.',
+                        badge: '7-Day Forecast',
+                        badgeCls: 'weather'
+                    },
+                    {
+                        title: 'Precipitation & Rain Alert',
+                        query: 'Is it going to rain in Faisalabad today or tomorrow?',
+                        desc: 'Checks precipitation probability, humidity levels, and cloud coverage.',
+                        badge: 'Rain Check',
+                        badgeCls: 'weather'
+                    }
+                ]
+            }
+        ];
+
+        let activePromptCategory = 'petrol';
+
+        function openPromptLibrary(category) {
+            closeMenus();
+            if (typeof closeTableExplorer === 'function') closeTableExplorer();
+            if (typeof closeDocExplorer === 'function') closeDocExplorer();
+            if (typeof closeAdminConsole === 'function') closeAdminConsole();
+
+            const pView = document.getElementById('promptExplorerView');
+            const chatScroll = document.querySelector('.chat-scroll-area');
+            const inputWrap = document.querySelector('.input-wrapper');
+
+            if (chatScroll) chatScroll.style.display = 'none';
+            if (inputWrap) inputWrap.style.display = 'none';
+
+            if (pView) {
+                pView.style.display = 'flex';
+                renderPromptCategories();
+                selectPromptCategory(category || activePromptCategory || 'petrol');
+            }
+        }
+
+        function closePromptLibrary() {
+            const pView = document.getElementById('promptExplorerView');
+            const chatScroll = document.querySelector('.chat-scroll-area');
+            const inputWrap = document.querySelector('.input-wrapper');
+
+            if (pView) pView.style.display = 'none';
+            if (chatScroll) chatScroll.style.display = 'flex';
+            if (inputWrap) inputWrap.style.display = 'block';
+            setTimeout(scrollToBottom, 50);
+        }
+
+        function togglePromptDrawer(force) {
+            const pane = document.getElementById('promptTocPane');
+            const backdrop = document.getElementById('promptDrawerBackdrop');
+            if (!pane) return;
+            const open = force !== undefined ? force : !pane.classList.contains('open');
+            pane.classList.toggle('open', open);
+            if (backdrop) backdrop.classList.toggle('show', open);
+        }
+
+        function renderPromptCategories() {
+            const nav = document.getElementById('promptCategoryNav');
+            if (!nav) return;
+            nav.innerHTML = PROMPT_LIBRARY.map(cat => `
+                <li class="prompt-toc-item ${cat.id === activePromptCategory ? 'active' : ''}" onclick="selectPromptCategory('${cat.id}')">
+                    <span class="pti-left">
+                        <i class="${cat.icon}" style="color:${cat.color}"></i>
+                        <span>${cat.name}</span>
+                    </span>
+                    <span class="pti-count">${cat.prompts.length}</span>
+                </li>
+            `).join('');
+        }
+
+        function selectPromptCategory(catId) {
+            activePromptCategory = catId;
+            renderPromptCategories();
+            togglePromptDrawer(false);
+
+            const cat = PROMPT_LIBRARY.find(c => c.id === catId) || PROMPT_LIBRARY[0];
+            const header = document.getElementById('promptCatHeader');
+            const mobTitle = document.getElementById('promptNavTitle');
+
+            if (mobTitle) mobTitle.textContent = cat.name;
+
+            if (header) {
+                header.innerHTML = `
+                    <h2 class="prompt-cat-title">
+                        <i class="${cat.icon}" style="color:${cat.color};"></i>
+                        <span>${cat.name}</span>
+                    </h2>
+                    <p class="prompt-cat-desc">${cat.desc}</p>
+                `;
+            }
+
+            renderPromptCards(cat.prompts, cat.badge);
+        }
+
+        function renderPromptCards(prompts, defaultBadge) {
+            const grid = document.getElementById('promptCardsGrid');
+            if (!grid) return;
+            if (!prompts.length) {
+                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-magnifying-glass" style="font-size:24px; margin-bottom:10px; opacity:0.5;"></i><p>No prompts found matching your search.</p></div>`;
+                return;
+            }
+            grid.innerHTML = prompts.map(p => `
+                <div class="prompt-card" onclick="runLibraryPrompt(${JSON.stringify(p.query)})">
+                    <div>
+                        <div class="prompt-card-top">
+                            <span class="prompt-card-title">${escapeHtml(p.title)}</span>
+                            <span class="prompt-badge ${p.badgeCls || defaultBadge}">${escapeHtml(p.badge || 'PROMPT')}</span>
+                        </div>
+                        <div class="prompt-card-query">${escapeHtml(p.query)}</div>
+                        <div class="prompt-card-sub">${escapeHtml(p.desc)}</div>
+                    </div>
+                    <div class="prompt-card-actions" onclick="event.stopPropagation()">
+                        <button type="button" class="btn-run-prompt" onclick="runLibraryPrompt(${JSON.stringify(p.query)})" title="Ask Agent">
+                            <i class="fa-solid fa-paper-plane"></i> <span>Ask Agent</span>
+                        </button>
+                        <button type="button" class="btn-insert-prompt" onclick="insertLibraryPrompt(${JSON.stringify(p.query)})" title="Insert into chat input">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterPromptLibrary(query) {
+            const q = (query || '').toLowerCase().trim();
+            if (!q) {
+                selectPromptCategory(activePromptCategory);
+                return;
+            }
+            const filtered = [];
+            PROMPT_LIBRARY.forEach(cat => {
+                cat.prompts.forEach(p => {
+                    if (p.title.toLowerCase().includes(q) || p.query.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || cat.name.toLowerCase().includes(q)) {
+                        filtered.push({ ...p, defaultBadge: cat.badge });
+                    }
+                });
+            });
+            const header = document.getElementById('promptCatHeader');
+            if (header) {
+                header.innerHTML = `
+                    <h2 class="prompt-cat-title"><i class="fa-solid fa-magnifying-glass"></i> Search Results</h2>
+                    <p class="prompt-cat-desc">Found ${filtered.length} prompt${filtered.length === 1 ? '' : 's'} matching "${escapeHtml(q)}"</p>
+                `;
+            }
+            renderPromptCards(filtered, 'fuel');
+        }
+
+        function runLibraryPrompt(promptText) {
+            closePromptLibrary();
+            setInput(promptText);
+            sendMessage();
+        }
+
+        function insertLibraryPrompt(promptText) {
+            closePromptLibrary();
+            setInput(promptText);
+            const inp = document.getElementById('userInput');
+            if (inp) {
+                inp.focus();
+                if (typeof autoGrow === 'function') autoGrow();
+            }
+        }
+
         async function openAdminConsole() {
             if (!isUserAdmin()) {
                 if (typeof Swal !== 'undefined') {
@@ -11788,9 +12622,11 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const inputWrap = document.querySelector('.input-wrapper');
             const expView = document.getElementById('tableExplorerView');
             const docView = document.getElementById('docExplorerView');
+            const promptView = document.getElementById('promptExplorerView');
 
             if (expView) expView.style.display = 'none';
             if (docView) docView.style.display = 'none';
+            if (promptView) promptView.style.display = 'none';
             if (chatScroll) chatScroll.style.display = 'none';
             if (inputWrap) inputWrap.style.display = 'none';
 

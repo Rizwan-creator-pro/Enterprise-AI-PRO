@@ -3798,31 +3798,29 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 rows = fuel_raw.get("rows", [])
 
                 table_lines = [
-                    "| From Date Effective | Till Date | Days | Rate | Total Amount |",
+                    "| From Date Effective | Till Date | Days | Rate (Rs.) | Total Amount (Rs.) |",
                     "| :--- | :--- | :---: | :---: | :---: |"
                 ]
                 for r in rows:
                     table_lines.append(f"| {r['from_date']} | {r['till_date']} | {r['days']} | {r['rate']:.2f} | {r['amount']:.2f} |")
-                table_lines.append(f"| **Total Days** | | **{total_days}** | **Total:** | **{total_amount:.2f}** |")
-                table_lines.append(f"| | | | **Avg.** | **Rs. {avg_rate:.2f}** |")
+                table_lines.append(f"| **Total Days** | | **{total_days}** | **Total:** | **Rs. {total_amount:.2f}** |")
                 table_lines.append(f"| **Average Fuel Rate** | | | | **Rs. {avg_rate:.2f}** |")
                 tbl_str = "\n".join(table_lines)
 
                 synth_user_prompt += (
-                    f"\n\n[OFFICIAL FUEL HISTORY & EMPLOYEE REIMBURSEMENT REPORT ({from_d} TO {till_d}) - SOURCE: petrolratetoday.pk | JK Group Enterprise Intelligence Portal]:\n"
+                    f"\n\n[OFFICIAL FUEL HISTORY & RATES REPORT ({from_d} TO {till_d})]:\n"
                     f"Period: {from_d} to {till_d}\n"
                     f"Total Days: {total_days}\n"
                     f"Total Amount: Rs. {total_amount:.2f}\n"
                     f"Average Fuel Rate: Rs. {avg_rate:.2f}\n\n"
                     f"Table Data:\n{tbl_str}\n\n"
                     f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                    f"1. You MUST format your response as an official corporate fuel memo matching the corporate standard:\n"
-                    f"Dear Fasih,\n\n"
-                    f"Please update Avg. Fuel Rate **Rs. {avg_rate:.2f}** for the period **{from_d} to {till_d}** for Employees Fuel Calculations.\n\n"
-                    f"### FUEL RATES FROM {from_disp} TO {till_disp}\n\n"
-                    f"2. Render the exact markdown table above with all sub-periods, Days, Rate, Total Amount, Total Days, Total Amount, and Average Fuel Rate.\n"
-                    f"3. Include the bottom summary line: *Official Source: petrolratetoday.pk | JK Group Enterprise Intelligence Portal*.\n"
-                    f"4. Do NOT alter the numbers or dates; use the exact calculated figures provided."
+                    f"1. Do NOT include any greetings, usernames (e.g. absolutely no 'Dear Fasih' or any person's name), employee memo notes, or corporate company names.\n"
+                    f"2. Present ONLY the official fuel prices and calculations clearly starting directly with:\n"
+                    f"### Fuel Rates from {from_disp} to {till_disp}\n\n"
+                    f"3. Render the exact markdown table above with all sub-periods, Days, Rate, Total Amount, Total Days, Total Amount, and Average Fuel Rate.\n"
+                    f"4. State the summary figures: Total Period: **{total_days} Days**, Total Calculated Amount: **Rs. {total_amount:.2f}**, and Average Fuel Rate: **Rs. {avg_rate:.2f}**.\n"
+                    f"5. Do NOT include any external references, usernames, or extra remarks; show only the fuel prices, rates, and verified calculations."
                 )
 
             elif fuel_raw.get("type") == "fuel_comparison_report":

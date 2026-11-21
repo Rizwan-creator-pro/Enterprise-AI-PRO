@@ -119,7 +119,14 @@ const stamp = () => {
     const d = new Date(), p = n => String(n).padStart(2, '0');
     return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
-const summaryLines = s => String(s || '').split('\n').map(l => l.trim()).filter(Boolean);
+const summaryLines = s => String(s || '').split('\n').map(l => l.trim()).filter(l => {
+    if (!l) return false;
+    if (/^dear\s+[\w\s]+,/i.test(l)) return false;
+    if (/^please\s+update\s+avg\.?\s+fuel/i.test(l)) return false;
+    if (/official\s+source:\s*petrolratetoday\.pk/i.test(l)) return false;
+    if (/jk\s+group\s+enterprise\s+intelligence/i.test(l)) return false;
+    return true;
+});
 const sheetSafe = n => String(n || '').replace(/[*?:\\\/\[\]]/g, '-').trim().slice(0, 31) || 'Sheet1';
 const dataUrlBytes = u => Uint8Array.from(atob(u.split(',')[1]), c => c.charCodeAt(0));
 
