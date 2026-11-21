@@ -3796,32 +3796,55 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 total_days = fuel_raw.get("total_days", 0)
                 total_amount = fuel_raw.get("total_amount", 0.0)
                 rows = fuel_raw.get("rows", [])
+                is_single = fuel_raw.get("is_single_day") or (total_days == 1 and from_d == till_d)
 
-                table_lines = [
-                    "| From Date Effective | Till Date | Days | Rate (Rs.) | Total Amount (Rs.) |",
-                    "| :--- | :--- | :---: | :---: | :---: |"
-                ]
-                for r in rows:
-                    table_lines.append(f"| {r['from_date']} | {r['till_date']} | {r['days']} | {r['rate']:.2f} | {r['amount']:.2f} |")
-                table_lines.append(f"| **Total Days** | | **{total_days}** | **Total:** | **Rs. {total_amount:.2f}** |")
-                table_lines.append(f"| **Average Fuel Rate** | | | | **Rs. {avg_rate:.2f}** |")
-                tbl_str = "\n".join(table_lines)
+                if is_single:
+                    p_val = fuel_raw.get("single_day_petrol") or avg_rate
+                    d_val = fuel_raw.get("single_day_diesel") or (rows[0].get("diesel_rate") if rows else None)
+                    d_mention = f" and Diesel was Rs. {d_val:.2f} per liter" if d_val else ""
+                    d_row = f"\n| {from_disp} | High Speed Diesel (HSD) | Rs. {d_val:.2f} / Ltr |" if d_val else ""
 
-                synth_user_prompt += (
-                    f"\n\n[OFFICIAL FUEL HISTORY & RATES REPORT ({from_d} TO {till_d})]:\n"
-                    f"Period: {from_d} to {till_d}\n"
-                    f"Total Days: {total_days}\n"
-                    f"Total Amount: Rs. {total_amount:.2f}\n"
-                    f"Average Fuel Rate: Rs. {avg_rate:.2f}\n\n"
-                    f"Table Data:\n{tbl_str}\n\n"
-                    f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
-                    f"1. Do NOT include any greetings, usernames (e.g. absolutely no 'Dear Fasih' or any person's name), employee memo notes, or corporate company names.\n"
-                    f"2. Present ONLY the official fuel prices and calculations clearly starting directly with:\n"
-                    f"### Fuel Rates from {from_disp} to {till_disp}\n\n"
-                    f"3. Render the exact markdown table above with all sub-periods, Days, Rate, Total Amount, Total Days, Total Amount, and Average Fuel Rate.\n"
-                    f"4. State the summary figures: Total Period: **{total_days} Days**, Total Calculated Amount: **Rs. {total_amount:.2f}**, and Average Fuel Rate: **Rs. {avg_rate:.2f}**.\n"
-                    f"5. Do NOT include any external references, usernames, or extra remarks; show only the fuel prices, rates, and verified calculations."
-                )
+                    synth_user_prompt += (
+                        f"\n\n[OFFICIAL HISTORICAL FUEL PRICE FOR {from_disp} - SOURCE: petrolratetoday.pk]:\n"
+                        f"- Date: {from_disp}\n"
+                        f"- Super Petrol: Rs. {p_val:.2f} per liter\n"
+                        f"{f'- High Speed Diesel: Rs. {d_val:.2f} per liter' if d_val else ''}\n\n"
+                        f"Official Historical Rate Table:\n"
+                        f"| Date | Product Name | Official Historical Rate |\n"
+                        f"| :--- | :--- | :---: |\n"
+                        f"| {from_disp} | Super Petrol (Euro 5) | Rs. {p_val:.2f} / Ltr |{d_row}\n\n"
+                        f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                        f"1. State clearly in the very first sentence: On {from_disp}, the official fuel price in Pakistan was Petrol: Rs. {p_val:.2f} per liter{d_mention}.\n"
+                        f"2. Present the verification rate in the structured Markdown table above.\n"
+                        f"3. Cite petrolratetoday.pk as the official historical petroleum archive.\n"
+                        f"4. Strictly DO NOT claim the historical date is unavailable, missing, or requires consulting other archives."
+                    )
+                else:
+                    table_lines = [
+                        "| From Date Effective | Till Date | Days | Rate (Rs.) | Total Amount (Rs.) |",
+                        "| :--- | :--- | :---: | :---: | :---: |"
+                    ]
+                    for r in rows:
+                        table_lines.append(f"| {r['from_date']} | {r['till_date']} | {r['days']} | {r['rate']:.2f} | {r['amount']:.2f} |")
+                    table_lines.append(f"| **Total Days** | | **{total_days}** | **Total:** | **Rs. {total_amount:.2f}** |")
+                    table_lines.append(f"| **Average Fuel Rate** | | | | **Rs. {avg_rate:.2f}** |")
+                    tbl_str = "\n".join(table_lines)
+
+                    synth_user_prompt += (
+                        f"\n\n[OFFICIAL FUEL HISTORY & RATES REPORT ({from_d} TO {till_d})]:\n"
+                        f"Period: {from_d} to {till_d}\n"
+                        f"Total Days: {total_days}\n"
+                        f"Total Amount: Rs. {total_amount:.2f}\n"
+                        f"Average Fuel Rate: Rs. {avg_rate:.2f}\n\n"
+                        f"Table Data:\n{tbl_str}\n\n"
+                        f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
+                        f"1. Do NOT include any greetings, usernames (e.g. absolutely no 'Dear Fasih' or any person's name), employee memo notes, or corporate company names.\n"
+                        f"2. Present ONLY the official fuel prices and calculations clearly starting directly with:\n"
+                        f"### Fuel Rates from {from_disp} to {till_disp}\n\n"
+                        f"3. Render the exact markdown table above with all sub-periods, Days, Rate, Total Amount, Total Days, Total Amount, and Average Fuel Rate.\n"
+                        f"4. State the summary figures: Total Period: **{total_days} Days**, Total Calculated Amount: **Rs. {total_amount:.2f}**, and Average Fuel Rate: **Rs. {avg_rate:.2f}**.\n"
+                        f"5. Do NOT include any external references, usernames, or extra remarks; show only the fuel prices, rates, and verified calculations."
+                    )
 
             elif fuel_raw.get("type") == "fuel_comparison_report":
                 items = fuel_raw.get("items", [])
@@ -3867,8 +3890,8 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                 ldo_str = fuel_raw.get("ldo") or "N/A"
                 lpg_str = fuel_raw.get("lpg") or "N/A"
                 c_display = fuel_raw.get("country", "Pakistan")
-                src_str = fuel_raw.get("source", "GlobalPetrolPrices.com")
-                url_str = fuel_raw.get("url", "https://www.globalpetrolprices.com/")
+                src_str = fuel_raw.get("source", "petrolratetoday.pk & GlobalPetrolPrices.com")
+                url_str = fuel_raw.get("url", "https://petrolratetoday.pk/petrol-price-history")
 
                 world_avg_lines = ""
                 if fuel_raw.get("world_gasoline_avg") or fuel_raw.get("world_diesel_avg"):
@@ -3891,12 +3914,12 @@ def _run_chat(req: ChatRequest, cancelled: threading.Event, emit):
                     f"\n\n[OFFICIAL VERIFIED FUEL & PETROLEUM RATES ({c_display.upper()}) - SOURCE: {src_str} ({url_str}) (EFFECTIVE: {eff_dt} AS OF {fuel_raw.get('timestamp', '')})]:\n"
                     f"- Petrol / Gasoline: {p_str}\n"
                     f"- Diesel: {d_str}{extra_products}{world_avg_lines}\n\n"
-                    f"Live Official Dispatches & GlobalPetrolPrices Records:\n{snippets_txt}\n\n"
+                    f"Live Official Dispatches & Global Records:\n{snippets_txt}\n\n"
                     f"STRICT INSTRUCTIONS FOR AI RESPONSE:\n"
                     f"1. State clearly in the very first sentence: Official Fuel Prices for {c_display} (Effective: {eff_dt}, Source: {src_str}): Petrol / Gasoline is {p_str} and Diesel is {d_str}.\n"
                     f"2. Present the fuel rates in a structured Markdown table with columns: Product Name, Official Rate, and Category / Global Comparison.\n"
                     f"3. When worldwide averages are provided, include a comparison stating whether {c_display} is above or below the global average.\n"
-                    f"4. Cite https://www.globalpetrolprices.com/ as the verified international fuel price monitoring portal.\n"
+                    f"4. Cite {src_str} as the official verified data source.\n"
                     f"5. Strictly IGNORE historical range boundaries, old blogs, or outdated price tags."
                 )
 

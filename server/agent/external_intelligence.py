@@ -1132,6 +1132,19 @@ def extract_fuel_date_range(query: str) -> Tuple[Optional[datetime], Optional[da
             if d1 and d2:
                 return (min(d1, d2), max(d1, d2))
 
+    # 5. Single specific historical or past date lookup e.g. "on 15-October-2026", "for 15-Oct-2026", "15-October-2026"
+    single_patterns = [
+        r'\b(?:on|for|dated|at|of|in)?\s*(\d{1,2}(?:st|nd|rd|th)?[\s\-\/]+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)[\s\-\/]+\d{2,4})\b',
+        r'\b(?:on|for|dated|at|of|in)?\s*((?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)[\s\-\/]+\d{1,2}(?:st|nd|rd|th)?,?[\s\-\/]+\d{2,4})\b',
+        r'\b(?:on|for|dated|at|of|in)?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b'
+    ]
+    for pat in single_patterns:
+        m_single = re.search(pat, t, re.IGNORECASE)
+        if m_single:
+            dt = parse_fuel_date_str(m_single.group(1))
+            if dt:
+                return (dt, dt)
+
     return None, None
 
 
@@ -1153,11 +1166,52 @@ def extract_comparison_countries(text: str) -> List[str]:
     return found
 
 
+def fetch_pakistan_latest_fuel_rates() -> Optional[Dict[str, Any]]:
+    """
+    Scrapes the most recent daily fuel prices for Pakistan directly from petrolratetoday.pk.
+    Returns today's live petrol and diesel rates along with the exact effective date.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        url = "https://petrolratetoday.pk/petrol-price-history"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, "html.parser")
+            tables = soup.find_all("table")
+            if tables:
+                for tr in tables[0].find_all("tr"):
+                    tds = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
+                    if len(tds) >= 4:
+                        d_dt = parse_fuel_date_str(tds[0])
+                        if not d_dt:
+                            continue
+                        m_p = re.search(r'([\d.]+)', tds[1].replace(',', ''))
+                        m_d = re.search(r'([\d.]+)', tds[3].replace(',', '')) if len(tds) > 3 else None
+                        if m_p:
+                            p_val = float(m_p.group(1))
+                            d_val = float(m_d.group(1)) if m_d else None
+                            return {
+                                "date": d_dt,
+                                "date_str": d_dt.strftime("%d-%B-%Y"),
+                                "petrol": f"Rs. {p_val:.2f}",
+                                "petrol_float": p_val,
+                                "diesel": f"Rs. {d_val:.2f}" if d_val else None,
+                                "diesel_float": d_val,
+                                "source": "petrolratetoday.pk",
+                                "url": url
+                            }
+    except Exception as e:
+        logger.debug(f"[Fuel Intelligence] petrolratetoday.pk latest fetch error: {e}")
+    return None
+
+
 def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[datetime, str]) -> Optional[Dict[str, Any]]:
     """
     Scrapes and computes historical fuel rates for Pakistan from petrolratetoday.pk.
     Groups contiguous days with identical rates into official date-range rows.
     Computes Days, Rate, Total Amount, Total Days, and weighted Average Fuel Rate.
+    Supports single historical dates (e.g. 15-October-2026) as well as full multi-week ranges.
     """
     from_dt = parse_fuel_date_str(from_val) if isinstance(from_val, str) else from_val
     to_dt = parse_fuel_date_str(to_val) if isinstance(to_val, str) else to_val
@@ -1184,9 +1238,11 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
                         if not d_dt:
                             continue
                         m_p = re.search(r'([\d.]+)', tds[1].replace(',', ''))
+                        m_d = re.search(r'([\d.]+)', tds[3].replace(',', '')) if len(tds) > 3 else None
                         if m_p:
                             rate = float(m_p.group(1))
-                            daily_records.append({"date": d_dt, "rate": rate})
+                            diesel_val = float(m_d.group(1)) if m_d else None
+                            daily_records.append({"date": d_dt, "rate": rate, "diesel_rate": diesel_val})
     except Exception as e:
         logger.debug(f"[Fuel History] petrolratetoday.pk fetch exception: {e}")
 
@@ -1195,13 +1251,20 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
     in_range.sort(key=lambda x: x["date"])
 
     if not in_range:
-        return None
+        # If single historical date requested and exact day not changed, find the prevailing rate on or before that date
+        older = [rec for rec in daily_records if rec["date"].date() <= to_dt.date()]
+        if older:
+            older.sort(key=lambda x: x["date"], reverse=True)
+            in_range = [older[0]]
+        else:
+            return None
 
     # Group contiguous dates with identical rates
     grouped_rows = []
     curr_start = in_range[0]["date"]
     curr_end = in_range[0]["date"]
     curr_rate = in_range[0]["rate"]
+    curr_diesel = in_range[0].get("diesel_rate")
 
     for rec in in_range[1:]:
         if rec["rate"] == curr_rate:
@@ -1213,11 +1276,13 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
                 "till_date": curr_end.strftime("%d-%b-%Y"),
                 "days": days,
                 "rate": curr_rate,
+                "diesel_rate": curr_diesel,
                 "amount": round(days * curr_rate, 2)
             })
             curr_start = rec["date"]
             curr_end = rec["date"]
             curr_rate = rec["rate"]
+            curr_diesel = rec.get("diesel_rate")
 
     # Append final group
     days = (curr_end - curr_start).days + 1
@@ -1226,6 +1291,7 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
         "till_date": curr_end.strftime("%d-%b-%Y"),
         "days": days,
         "rate": curr_rate,
+        "diesel_rate": curr_diesel,
         "amount": round(days * curr_rate, 2)
     })
 
@@ -1233,8 +1299,14 @@ def fetch_pakistan_fuel_history(from_val: Union[datetime, str], to_val: Union[da
     total_amount = round(sum(row["amount"] for row in grouped_rows), 2)
     avg_rate = round(total_amount / total_days, 2) if total_days > 0 else 0.0
 
+    is_single_day = (from_dt.date() == to_dt.date())
+
     return {
         "type": "fuel_history_report",
+        "country": "Pakistan",
+        "is_single_day": is_single_day,
+        "single_day_petrol": in_range[0]["rate"] if is_single_day else None,
+        "single_day_diesel": in_range[0].get("diesel_rate") if is_single_day else None,
         "country": "Pakistan",
         "from_date": from_dt.strftime("%d-%b-%Y"),
         "till_date": to_dt.strftime("%d-%b-%Y"),
@@ -1434,7 +1506,21 @@ def fetch_live_fuel_prices(
     lpg_price = None
     effective_date = None
 
-    # Step 0: Query GlobalPetrolPrices.com for international / worldwide or national benchmarks
+    # Step 0: For Pakistan queries, query live daily rates from petrolratetoday.pk FIRST
+    # so today's date (e.g. 22-Nov-2026) and today's price are shown instead of weekly snapshots!
+    pk_latest = None
+    if cache_key == "pakistan":
+        pk_latest = fetch_pakistan_latest_fuel_rates()
+        if pk_latest:
+            effective_date = pk_latest["date_str"]
+            petrol_price = pk_latest["petrol"]
+            diesel_price = pk_latest["diesel"]
+            snippets.append(
+                f"- **petrolratetoday.pk (Daily Live Feed)**: Petrol is {petrol_price}, "
+                f"Diesel is {diesel_price} (Effective: {effective_date})."
+            )
+
+    # Step 0b: Query GlobalPetrolPrices.com for international / worldwide or national benchmarks
     gpp_data = fetch_from_globalpetrolprices(country)
     if gpp_data:
         if not effective_date and gpp_data.get("effective_date"):
@@ -1622,6 +1708,11 @@ def fetch_live_fuel_prices(
     world_g = gpp_data.get("world_gasoline_avg") if gpp_data else None
     world_d = gpp_data.get("world_diesel_avg") if gpp_data else None
 
+    src_name = "petrolratetoday.pk & GlobalPetrolPrices.com" if (cache_key == "pakistan" and pk_latest) else (
+        "Pakistan State Oil (PSO) POL Archives & GlobalPetrolPrices.com" if gpp_data else "Official Notification Archives"
+    )
+    res_url = pk_latest.get("url") if pk_latest else (gpp_data.get("url") if gpp_data else "https://petrolratetoday.pk/petrol-price-history")
+
     # Dynamic official rate result - strictly dynamically fetched without hardcoded price values
     result = {
         "country": country,
@@ -1635,8 +1726,8 @@ def fetch_live_fuel_prices(
         "world_gasoline_avg": world_g,
         "world_diesel_avg": world_d,
         "timestamp": timestamp,
-        "source": "Pakistan State Oil (PSO) POL Archives & GlobalPetrolPrices.com",
-        "url": gpp_data.get("url") if gpp_data else "https://www.globalpetrolprices.com/Pakistan/gasoline_prices/",
+        "source": src_name,
+        "url": res_url,
         "snippets": snippets[:6]
     }
 
