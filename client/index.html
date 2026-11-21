@@ -2240,84 +2240,6 @@
             background: var(--border-color);
             color: var(--text-main);
         }
-
-        /* ================= Sidebar Prompt Library Button ================= */
-        .sidebar-prompt-lib-btn {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            padding: 10px 14px;
-            margin: 6px 0 10px;
-            border-radius: 12px;
-            border: 1px solid rgba(245, 158, 11, 0.28);
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.04));
-            color: var(--text-main);
-            font: inherit;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            box-sizing: border-box;
-        }
-        .sidebar-prompt-lib-btn:hover {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.08));
-            border-color: rgba(245, 158, 11, 0.5);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.12);
-        }
-        .sidebar-prompt-lib-btn .spl-left {
-            display: inline-flex;
-            align-items: center;
-            gap: 9px;
-        }
-        .sidebar-prompt-lib-btn .sb-lib-pill {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 999px;
-            background: #f59e0b;
-            color: #fff;
-            letter-spacing: 0.04em;
-        }
-
-        /* ================= Pin UI Prompt Composer Quick Actions Deck ================= */
-        .composer-prompt-deck {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            overflow-x: auto;
-            scrollbar-width: none;
-            padding: 0 4px 8px;
-            margin-bottom: 2px;
-            max-width: 100%;
-        }
-        .composer-prompt-deck::-webkit-scrollbar { display: none; }
-        .cpd-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 5px 12px;
-            border-radius: 999px;
-            border: 1px solid var(--border-color);
-            background: var(--surface);
-            color: var(--text-muted);
-            font: inherit;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-        }
-        .cpd-chip:hover {
-            border-color: var(--accent-blue);
-            color: var(--text-main);
-            background: var(--surface-2);
-            transform: translateY(-1.5px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
         .cpd-chip.fuel:hover { border-color: #ef4444; color: #ef4444; }
         .cpd-chip.psx:hover { border-color: #10b981; color: #10b981; }
         .cpd-chip.forex:hover { border-color: #3b82f6; color: #3b82f6; }
@@ -5704,10 +5626,6 @@
             <button class="new-chat-btn" onclick="startNewSession()">
                 <i class="fa-solid fa-plus"></i> New Chat
             </button>
-            <button type="button" class="sidebar-prompt-lib-btn" onclick="openPromptLibrary()" title="Browse Curated Enterprise Prompts (Petrol, PSX, Forex, Weather)">
-                <span class="spl-left"><i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i> <span>Prompt Library</span></span>
-                <span class="sb-lib-pill">TABS</span>
-            </button>
             <div class="sidebar-search-wrap">
                 <i class="fa-solid fa-magnifying-glass sb-search-icon"></i>
                 <input type="text" id="chatSearchInput" class="sb-search-input" placeholder="Search chats..." autocomplete="off" oninput="filterChatHistory(this.value)" />
@@ -5738,9 +5656,9 @@
                     </div>
 
                     <div class="pop-item" id="menuPromptsItem" onclick="closeMenus(); openPromptLibrary()">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
                         <div class="pi-text"><span class="pi-name">Prompt Library</span><span class="pi-sub">Petrol, PSX, Forex & Stock Prompts</span></div>
-                        <span class="pop-badge" style="background:#fef3c7; color:#d97706; font-weight:700;">PROMPTS</span>
+                        <span class="pop-badge">PROMPTS</span>
                     </div>
 
                     <div class="pop-item" id="menuDocsItem" onclick="closeMenus(); openDocExplorer()">
@@ -5752,7 +5670,7 @@
                     <div class="pop-item" id="menuAdminConsoleItem" style="display:none;" onclick="closeMenus(); openAdminConsole()">
                         <i class="fa-solid fa-shield-halved"></i>
                         <div class="pi-text"><span class="pi-name">Admin Console</span><span class="pi-sub">Master DB link & system health</span></div>
-                        <span class="pop-badge" style="background:#e8f0fe; color:#1a73e8; font-weight:700;">ADMIN</span>
+                        <span class="pop-badge">ADMIN</span>
                     </div>
 
                     <!-- Theme Accordion (clean inline expansion, works on all screens) -->
@@ -5939,8 +5857,8 @@
                         <button type="button" class="et-back-btn" onclick="closePromptLibrary()" title="Back to Chat"><i class="fa-solid fa-arrow-left"></i> <span>Back to Chat</span></button>
                         <button type="button" class="et-mob-nav-btn" id="promptMobNavBtn" onclick="togglePromptDrawer()" title="Categories"><i class="fa-solid fa-list-ul"></i> <span>Categories</span></button>
                         <div class="et-title">
-                            <span class="doc-title-desktop"><i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i> Enterprise Prompt Library</span>
-                            <span class="doc-badge doc-title-desktop" style="background:#fef3c7; color:#d97706; font-weight:700;">ONE-CLICK INTELLIGENCE</span>
+                            <span class="doc-title-desktop"><i class="fa-solid fa-wand-magic-sparkles"></i> Enterprise Prompt Library</span>
+                            <span class="doc-badge doc-title-desktop">PROMPTS</span>
                             <span class="doc-nav-mobile" id="promptNavTitle">Prompts</span>
                         </div>
                     </div>
@@ -5957,7 +5875,7 @@
                         </div>
                         <div class="et-search-box">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="promptSearchInput" placeholder="Filter prompts..." oninput="filterPromptLibrary(this.value)" autocomplete="off" />
+                            <input type="text" id="promptLibSearchInput" placeholder="Filter prompts..." oninput="filterPromptLibrary(this.value)" autocomplete="off" />
                         </div>
                         <div class="prompt-toc-heading">INTELLIGENCE STREAMS</div>
                         <ul class="prompt-toc-nav" id="promptCategoryNav"></ul>
@@ -6180,25 +6098,6 @@
                 <div id="popBackdrop" class="pop-backdrop" onclick="closeMenus()"></div>
                 <button type="button" id="jumpBtn" class="jump-btn" title="Scroll to latest" aria-label="Scroll to latest message" onclick="scrollToBottom(true)"><i class="fa-solid fa-arrow-down"></i></button>
 
-                <!-- Pin UI Inspired Quick Prompt Actions Deck -->
-                <div class="composer-prompt-deck" id="composerPromptDeck">
-                    <button type="button" class="cpd-chip fuel" onclick="runLibraryPrompt('Fuel rates from 01-November-2026 to today')">
-                        <i class="fa-solid fa-gas-pump"></i> <span>Fuel Rates</span>
-                    </button>
-                    <button type="button" class="cpd-chip psx" onclick="runLibraryPrompt('What is the share price of POL on PSX?')">
-                        <i class="fa-solid fa-chart-line"></i> <span>POL Stock</span>
-                    </button>
-                    <button type="button" class="cpd-chip forex" onclick="runLibraryPrompt('What is the USD to PKR exchange rate today?')">
-                        <i class="fa-solid fa-dollar-sign"></i> <span>USD/PKR</span>
-                    </button>
-                    <button type="button" class="cpd-chip weather" onclick="runLibraryPrompt('Weather forecast for Karachi')">
-                        <i class="fa-solid fa-cloud-sun"></i> <span>Weather</span>
-                    </button>
-                    <button type="button" class="cpd-chip all-prompts" onclick="openPromptLibrary()" title="Browse all curated prompts">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Prompt Library</span>
-                    </button>
-                </div>
-
                 <div class="composer">
                     <div id="composerImageTray" class="composer-image-tray" style="display:none;"></div>
                     <textarea id="userInput" rows="1" dir="auto" placeholder="Ask anything, / for actions" autocomplete="off" oninput="autoGrow()" onkeydown="onInputKey(event)"></textarea>
@@ -6255,10 +6154,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="mode-toggle-btn prompt-deck-btn" onclick="openPromptLibrary()" title="Browse Curated Prompts (Petrol, PSX, Forex, Weather)">
-                                <i class="fa-solid fa-wand-magic-sparkles" style="color:#f59e0b;"></i>
-                                <span class="lbl-full">Prompts</span>
-                            </button>
 
                         </div>
                         <div class="composer-tools-right">
@@ -11187,8 +11082,8 @@ const skeletonHTML = () => `
             const chatScroll = document.querySelector('.chat-scroll-area');
             const inputWrap = document.querySelector('.input-wrapper');
             if (expView) expView.style.display = 'none';
-            if (chatScroll) chatScroll.style.display = 'flex';
-            if (inputWrap) inputWrap.style.display = 'block';
+            if (chatScroll) chatScroll.style.display = '';
+            if (inputWrap) inputWrap.style.display = '';
             setTimeout(scrollToBottom, 50);
         }
 
@@ -11672,8 +11567,8 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const chatScroll = document.querySelector('.chat-scroll-area');
             const inputWrap = document.querySelector('.input-wrapper');
             if (docView) docView.style.display = 'none';
-            if (chatScroll) chatScroll.style.display = 'flex';
-            if (inputWrap) inputWrap.style.display = 'block';
+            if (chatScroll) chatScroll.style.display = '';
+            if (inputWrap) inputWrap.style.display = '';
             setTimeout(scrollToBottom, 50);
         }
 
@@ -12454,6 +12349,7 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         ];
 
         let activePromptCategory = 'petrol';
+        let currentPromptList = [];
 
         function openPromptLibrary(category) {
             closeMenus();
@@ -12481,8 +12377,8 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const inputWrap = document.querySelector('.input-wrapper');
 
             if (pView) pView.style.display = 'none';
-            if (chatScroll) chatScroll.style.display = 'flex';
-            if (inputWrap) inputWrap.style.display = 'block';
+            if (chatScroll) chatScroll.style.display = '';
+            if (inputWrap) inputWrap.style.display = '';
             setTimeout(scrollToBottom, 50);
         }
 
@@ -12534,14 +12430,15 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
         }
 
         function renderPromptCards(prompts, defaultBadge) {
+            currentPromptList = Array.isArray(prompts) ? prompts : [];
             const grid = document.getElementById('promptCardsGrid');
             if (!grid) return;
-            if (!prompts.length) {
+            if (!currentPromptList.length) {
                 grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-magnifying-glass" style="font-size:24px; margin-bottom:10px; opacity:0.5;"></i><p>No prompts found matching your search.</p></div>`;
                 return;
             }
-            grid.innerHTML = prompts.map(p => `
-                <div class="prompt-card" onclick="runLibraryPrompt(${JSON.stringify(p.query)})">
+            grid.innerHTML = currentPromptList.map((p, idx) => `
+                <div class="prompt-card" onclick="runPromptByIndex(${idx})">
                     <div>
                         <div class="prompt-card-top">
                             <span class="prompt-card-title">${escapeHtml(p.title)}</span>
@@ -12551,11 +12448,11 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
                         <div class="prompt-card-sub">${escapeHtml(p.desc)}</div>
                     </div>
                     <div class="prompt-card-actions" onclick="event.stopPropagation()">
-                        <button type="button" class="btn-run-prompt" onclick="runLibraryPrompt(${JSON.stringify(p.query)})" title="Ask Agent">
+                        <button type="button" class="btn-run-prompt" onclick="event.stopPropagation(); runPromptByIndex(${idx})" title="Ask Agent">
                             <i class="fa-solid fa-paper-plane"></i> <span>Ask Agent</span>
                         </button>
-                        <button type="button" class="btn-insert-prompt" onclick="insertLibraryPrompt(${JSON.stringify(p.query)})" title="Insert into chat input">
-                            <i class="fa-solid fa-pen-to-square"></i>
+                        <button type="button" class="btn-insert-prompt" onclick="event.stopPropagation(); insertPromptByIndex(${idx})" title="Edit in chat box">
+                            <i class="fa-solid fa-pencil"></i>
                         </button>
                     </div>
                 </div>
@@ -12586,19 +12483,45 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             renderPromptCards(filtered, 'fuel');
         }
 
+        function runPromptByIndex(idx) {
+            const p = currentPromptList[idx];
+            if (!p || !p.query) return;
+            runLibraryPrompt(p.query);
+        }
+
+        function insertPromptByIndex(idx) {
+            const p = currentPromptList[idx];
+            if (!p || !p.query) return;
+            insertLibraryPrompt(p.query);
+        }
+
         function runLibraryPrompt(promptText) {
+            if (!promptText) return;
             closePromptLibrary();
-            setInput(promptText);
-            sendMessage();
+            const inp = document.getElementById('userInput');
+            if (inp) {
+                inp.value = promptText;
+                if (typeof autoGrow === 'function') autoGrow();
+                inp.focus();
+            }
+            setTimeout(() => {
+                if (typeof sendMessage === 'function') {
+                    sendMessage();
+                }
+            }, 50);
         }
 
         function insertLibraryPrompt(promptText) {
+            if (!promptText) return;
             closePromptLibrary();
-            setInput(promptText);
             const inp = document.getElementById('userInput');
             if (inp) {
-                inp.focus();
+                inp.value = promptText;
                 if (typeof autoGrow === 'function') autoGrow();
+                inp.focus();
+                if (inp.setSelectionRange) {
+                    inp.setSelectionRange(inp.value.length, inp.value.length);
+                }
             }
         }
 
@@ -12642,8 +12565,8 @@ curl -X POST "https://enterprise-ai-6lku.onrender.com/api/chat" \\
             const inputWrap = document.querySelector('.input-wrapper');
 
             if (adminView) adminView.style.display = 'none';
-            if (chatScroll) chatScroll.style.display = 'flex';
-            if (inputWrap) inputWrap.style.display = 'block';
+            if (chatScroll) chatScroll.style.display = '';
+            if (inputWrap) inputWrap.style.display = '';
             setTimeout(scrollToBottom, 50);
         }
 
